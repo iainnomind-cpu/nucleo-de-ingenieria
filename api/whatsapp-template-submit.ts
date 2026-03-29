@@ -74,10 +74,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             text: template.body
         };
 
-        // Meta exige un array de ejemplos por variable
-        if (template.variables && template.variables.length > 0) {
+        // Contar el número real de variables únicas {{1}}, {{2}} presentes en el cuerpo
+        const bodyMatches = template.body.match(/\{\{(\d+)\}\}/g);
+        let highestVarCount = 0;
+        if (bodyMatches) {
+            bodyMatches.forEach((m: string) => {
+                const num = parseInt(m.replace(/[^0-9]/g, ''), 10);
+                if (num > highestVarCount) highestVarCount = num;
+            });
+        }
+
+        // Meta exige un array de ejemplos con exactamente la misma cantidad de variables encontradas en el body
+        if (highestVarCount > 0) {
+            const examples = [];
+            for (let i = 1; i <= highestVarCount; i++) {
+                // Usar el nombre que dio el usuario en DB, o un dummy string si le faltaron
+                const varName = (template.variables && template.variables[i-1] && template.variables[i-1].length > 0) 
+                    ? template.variables[i-1] 
+                    : `ejemplo_variable_${i}`;
+                examples.push(varName);
+            }
             bodyComponent.example = {
-                body_text: [ template.variables.map((_: string, idx: number) => `Ejemplo_Var_${idx + 1}`) ]
+                body_text: [ examples ]
             };
         }
         components.push(bodyComponent);

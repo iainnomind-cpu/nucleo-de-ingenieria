@@ -96,7 +96,9 @@ export default function TemplatesList() {
                 alert('¡Plantilla enviada exitosamente a revisión!');
                 fetchTemplates();
             } else {
-                alert(`Error al enviar a Meta: ${data.message || 'Error desconocido'}`);
+                console.error('Error Meta Detail:', data);
+                const metaDetail = data.meta_error?.error_user_msg || data.meta_error?.message || data.meta_error?.error_subcode || '';
+                alert(`Meta API Error: ${data.message}\n${metaDetail ? 'Detalle: ' + metaDetail : 'Revisa posibles errores de variables (exige una palabra de ejemplo limpia) o mayúsculas en nombre.'}`);
             }
         } catch (error) {
             console.error(error);
