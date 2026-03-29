@@ -12,7 +12,7 @@ export default function TemplatesList() {
     const navigate = useNavigate();
     const [templates, setTemplates] = useState<WaTemplate[]>([]);
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const [submittingId, setSubmittingId] = useState<string | null>(null);
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [previewTemplate, setPreviewTemplate] = useState<WaTemplate | null>(null);
@@ -83,7 +83,7 @@ export default function TemplatesList() {
     const submitToMeta = async (id: string, name: string) => {
         if (!confirm(`¿Estás seguro de enviar la plantilla "${name}" a Meta? \nUna vez en revisión, no podrás editarla temporalmente.`)) return;
         
-        setSubmitting(true);
+        setSubmittingId(id);
         try {
             const res = await fetch('/api/whatsapp-template-submit', {
                 method: 'POST',
@@ -104,7 +104,7 @@ export default function TemplatesList() {
             console.error(error);
             alert('Error de red al intentar enviar.');
         } finally {
-            setSubmitting(false);
+            setSubmittingId(null);
         }
     };
 
@@ -170,15 +170,6 @@ export default function TemplatesList() {
                     ))}
                 </div>
 
-                {submitting && (
-                    <div className="mb-4 rounded-lg bg-sky-50 p-4 border border-sky-200">
-                        <div className="flex items-center gap-3">
-                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
-                            <p className="text-sm font-medium text-sky-800">Enviando plantilla a Meta para su revisión...</p>
-                        </div>
-                    </div>
-                )}
-
                 {loading ? (
                     <div className="flex justify-center py-12"><div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /></div>
                 ) : templates.length === 0 ? (
@@ -228,19 +219,24 @@ export default function TemplatesList() {
                                 </div>
                                 <div className="flex items-center border-t border-slate-100 dark:border-slate-800 opacity-0 group-hover:opacity-100 transition-all">
                                     {(tpl.meta_status === 'draft' || tpl.meta_status === 'rejected') && (
-                                        <button onClick={() => submitToMeta(tpl.id, tpl.name)} disabled={submitting} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-bold text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 disabled:opacity-50">
-                                            <span className="material-symbols-outlined text-[14px]">send</span>Enviar a Revisión
+                                        <button onClick={() => submitToMeta(tpl.id, tpl.name)} disabled={submittingId !== null} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-bold text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 disabled:opacity-50 transition-all">
+                                            {submittingId === tpl.id ? (
+                                                <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
+                                            ) : (
+                                                <span className="material-symbols-outlined text-[14px]">send</span>
+                                            )}
+                                            {submittingId === tpl.id ? 'Enviando...' : 'Enviar a Revisión'}
                                         </button>
                                     )}
-                                    <button onClick={() => setPreviewTemplate(tpl)} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800">
+                                    <button onClick={() => setPreviewTemplate(tpl)} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50">
                                         <span className="material-symbols-outlined text-[14px]">visibility</span>Vista
                                     </button>
                                     {(tpl.meta_status === 'draft' || tpl.meta_status === 'rejected') && (
-                                        <button onClick={() => editTemplate(tpl)} disabled={submitting} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/10">
+                                        <button onClick={() => editTemplate(tpl)} disabled={submittingId !== null} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/10 disabled:opacity-50">
                                             <span className="material-symbols-outlined text-[14px]">edit</span>Editar
                                         </button>
                                     )}
-                                    <button onClick={() => deleteTemplate(tpl)} disabled={submitting} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10">
+                                    <button onClick={() => deleteTemplate(tpl)} disabled={submittingId !== null} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 disabled:opacity-50">
                                         <span className="material-symbols-outlined text-[14px]">delete</span>
                                     </button>
                                 </div>
