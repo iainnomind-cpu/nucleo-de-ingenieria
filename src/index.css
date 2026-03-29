@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background-light dark:bg-background-dark font-display text-text-main antialiased;
+  }
+
+  ::selection {
+    @apply bg-primary text-white;
+  }
+}
+
+/* M7: Print styles for Dashboard PDF export */
+@media print {
+  body { background: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  nav, aside, .print\\:hidden { display: none !important; }
+  main { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+  .dark\:bg-slate-900\/50, .dark\:border-slate-800\/60 { background: white !important; border-color: #e2e8f0 !important; }
+}
