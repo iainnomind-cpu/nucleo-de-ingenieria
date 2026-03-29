@@ -53,7 +53,7 @@ export interface Quote {
     created_at: string;
     updated_at: string;
     // Joined
-    client?: { id: string; company_name: string; contact_name: string | null };
+    client?: { id: string; company_name: string; contact_name: string | null; email?: string; phone?: string; };
     items?: QuoteItem[];
     versions?: Quote[];
 }

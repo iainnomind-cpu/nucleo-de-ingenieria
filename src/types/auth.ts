@@ -25,6 +25,7 @@ export interface AppUser {
     id: string;
     full_name: string;
     email: string;
+    phone?: string;
     role_id: string | null;
     role_name?: string;
     permissions?: ModulePermissions;

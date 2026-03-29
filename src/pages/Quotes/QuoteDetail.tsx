@@ -19,6 +19,11 @@ export default function QuoteDetail() {
     const [versions, setVersions] = useState<Quote[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const [showSendModal, setShowSendModal] = useState(false);
+    const [sendChannels, setSendChannels] = useState({ whatsapp: true, email: true });
+    const [sendingInProgress, setSendingInProgress] = useState(false);
+    const [sendResultMsgs, setSendResultMsgs] = useState<string[]>([]);
+
     const fetchQuote = useCallback(async () => {
         if (!id) return;
         setLoading(true);
@@ -236,54 +241,84 @@ export default function QuoteDetail() {
                 created_by: 'Sistema' // Or current user UUID
             });
 
-            // → M8: Checklist pre-trabajo como tareas asignadas con fecha límite
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 3); // Due in 3 days
-            const formattedDueDate = dueDate.toISOString().split('T')[0];
+            // → M8: Checklist como tareas asignadas desde Plantillas Automáticas
+            const { data: stmts } = await supabase.from('system_settings').select('value').eq('key', 'task_templates').single();
+            const templates: any[] = stmts?.value || [];
+            const activeTemplate = templates.find((t: any) => t.project_type === quote.work_type);
 
-            const tasksToInsert = [
-                {
-                    title: `Checklist M3: Administrativo/Facturación para ${projectNumber}`,
-                    description: 'Validar anticipos, contratos y trámites administrativos antes de iniciar obra.',
-                    assigned_to: 'Admin',
-                    due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high',
-                },
-                {
-                    title: `Checklist M4: Materiales y Almacén para ${projectNumber}`,
-                    description: 'Preparar y apartar materiales en inventario (M4).',
-                    assigned_to: 'Admin',
-                    due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high',
-                },
-                {
-                    title: `Checklist M5: Vehículos y Herramienta para ${projectNumber}`,
-                    description: 'Revisar estado de vehículos y herramienta pesada requerida.',
-                    assigned_to: 'Admin',
-                    due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high',
-                },
-                {
-                    title: `Checklist M8: Cuadrilla para ${projectNumber}`,
-                    description: 'Asignar personal, hospedaje, y viáticos en campo.',
-                    assigned_to: 'Admin',
-                    due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high',
-                }
-            ];
-            await supabase.from('team_tasks').insert(tasksToInsert);
+            let tasksToInsert: any[] = [];
+            
+            if (activeTemplate && activeTemplate.tasks && activeTemplate.tasks.length > 0) {
+                // Fetch assigned users to get phone numbers for WhatsApp
+                const userIds = Array.from(new Set(activeTemplate.tasks.map((t: any) => t.assigned_to_id)));
+                const { data: usersData } = await supabase.from('app_users').select('id, phone').in('id', userIds as string[]);
+                const usersMap = new Map(usersData?.map((u: any) => [u.id, u.phone]) || []);
+
+                activeTemplate.tasks.forEach((t: any) => {
+                    const dueDate = new Date();
+                    dueDate.setDate(dueDate.getDate() + (t.days_to_due || 0));
+                    
+                    tasksToInsert.push({
+                        title: `${t.title}`,
+                        description: `Tarea automática para el proyecto ${projectNumber}. (Derivado de la cotización ${quote.quote_number})`,
+                        assigned_to: t.assigned_to_name || 'Admin', // Nota: team_tasks usa string. Si usa uuid en el futuro cambiar a t.assigned_to_id
+                        due_date: dueDate.toISOString().split('T')[0],
+                        project_id: project.id,
+                        priority: 'normal',
+                        status: 'pending' // Asumimos estado pendiente
+                    });
+
+                    // Notificación silenciosa a WhatsApp (Fire and Forget)
+                    const phone = usersMap.get(t.assigned_to_id);
+                    if (phone) {
+                        fetch('/api/whatsapp-send', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                to: phone,
+                                type: 'text',
+                                text: `🔔 *Nueva Tarea Asignada*\n\nHola ${t.assigned_to_name},\nSe te ha asignado una nueva tarea para el proyecto *${projectNumber}*:\n📌 *${t.title}*\n⏳ Límite: ${dueDate.toISOString().split('T')[0]}\n\nIngresa al Sistema NDI para más detalles y marcarla como completada.`
+                            })
+                        }).catch(e => console.error('Error enviando WA a', t.assigned_to_name, e));
+                    }
+                });
+            } else {
+                // Fallback default tasks Si no existe plantilla
+                const dueDate = new Date();
+                dueDate.setDate(dueDate.getDate() + 3);
+                const formattedDueDate = dueDate.toISOString().split('T')[0];
+
+                tasksToInsert = [
+                    {
+                        title: `Checklist M3: Administrativo/Facturación para ${projectNumber}`,
+                        description: 'Validar anticipos, contratos y trámites administrativos antes de iniciar obra.',
+                        assigned_to: 'Admin',
+                        due_date: formattedDueDate,
+                        project_id: project.id,
+                        priority: 'high',
+                    },
+                    {
+                        title: `Checklist M4: Materiales y Almacén para ${projectNumber}`,
+                        description: 'Preparar y apartar materiales en inventario (M4).',
+                        assigned_to: 'Admin',
+                        due_date: formattedDueDate,
+                        project_id: project.id,
+                        priority: 'high',
+                    }
+                ];
+            }
+
+            if (tasksToInsert.length > 0) {
+                await supabase.from('team_tasks').insert(tasksToInsert);
+            }
         }
 
         alert('¡Cotización convertida a proyecto exitosamente! (M3 y M8 actualizados con tareas generadas)');
         navigate('/projects');
     };
 
-    const handleGeneratePDF = async () => {
-        if (!quote) return;
+    const generatePDFDocument = async () => {
+        if (!quote) return null;
         try {
             const { default: jsPDF } = await import('jspdf');
             const { default: autoTable } = await import('jspdf-autotable');
@@ -411,10 +446,89 @@ export default function QuoteDetail() {
                 doc.text('Notas: ' + quote.notes.substring(0, 200), 14, ty, { maxWidth: pageWidth - 28 });
             }
 
-            doc.save(`${quote.quote_number}.pdf`);
+            return doc;
         } catch (err) {
             console.error('PDF error:', err);
+            return null;
+        }
+    };
+
+    const handleGeneratePDF = async () => {
+        const doc = await generatePDFDocument();
+        if (doc) {
+            doc.save(`${quote?.quote_number}.pdf`);
+        } else {
             alert('Error generando PDF. Verifica que jspdf esté instalado.');
+        }
+    };
+
+    const handleConfirmSend = async () => {
+        if (!quote) return;
+        if (!sendChannels.whatsapp && !sendChannels.email) {
+            alert('Selecciona al menos un canal de envío.');
+            return;
+        }
+
+        setSendingInProgress(true);
+        setSendResultMsgs([]);
+
+        try {
+            const doc = await generatePDFDocument();
+            if (!doc) throw new Error('No se pudo construir el PDF en memoria');
+            const base64Pdf = doc.output('datauristring');
+            const filename = `${quote.quote_number}.pdf`;
+
+            const promises: Promise<string>[] = [];
+
+            if (sendChannels.email && quote.client?.email) {
+                promises.push(
+                    fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: quote.client.email,
+                            subject: `Cotización ${quote.quote_number} - Núcleo de Ingeniería`,
+                            html: `<h3>Hola ${quote.client.contact_name || ''},</h3><p>Adjunto encontrarás tu cotización <strong>${quote.quote_number}</strong> por el servicio de <strong>${quote.title}</strong>.</p><p>Saludos cordiales,<br/>Equipo Núcleo de Ingeniería</p>`,
+                            attachments: [{ filename, content: base64Pdf }]
+                        })
+                    }).then(res => res.json()).then(data => data.success ? '✅ Correo enviado con éxito' : `❌ Correo falló: ${data.message}`)
+                );
+            }
+
+            if (sendChannels.whatsapp && quote.client?.phone) {
+                promises.push(
+                    fetch('/api/whatsapp-send-quote', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: quote.client.phone,
+                            base64Pdf,
+                            filename,
+                            caption: `Hola ${quote.client.contact_name || ''}, te adjuntamos la cotización de tu proyecto: ${quote.title}`
+                        })
+                    }).then(res => res.json()).then(data => data.success ? '✅ WhatsApp enviado con éxito' : `❌ WhatsApp falló: ${data.message}`)
+                );
+            }
+
+            const results = await Promise.all(promises);
+            setSendResultMsgs(results);
+
+            // Registrar actividad en el CRM
+            await supabase.from('client_activities').insert({
+                client_id: quote.client_id,
+                activity_type: 'quote',
+                title: `Cotización ${quote.quote_number} enviada`,
+                description: `Enviada a: ${quote.client?.contact_name || 'N/A'}.\nCanales utilizados y status:\n${results.join('\n')}`
+            });
+
+            // Automáticamente cambiar estado a enviado y pipeline
+            handleStatusChange('sent');
+
+        } catch (error: any) {
+            console.error('Error in handleConfirmSend:', error);
+            setSendResultMsgs([`❌ Error Crítico: ${error.message}`]);
+        } finally {
+            setSendingInProgress(false);
         }
     };
 
@@ -456,7 +570,7 @@ export default function QuoteDetail() {
                         Nueva Versión
                     </button>
                     {quote.status === 'draft' && (
-                        <button onClick={() => handleStatusChange('sent')}
+                        <button onClick={() => setShowSendModal(true)}
                             className="flex items-center gap-2 rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-sky-600">
                             <span className="material-symbols-outlined text-[18px]">send</span>
                             Enviar
@@ -617,6 +731,85 @@ export default function QuoteDetail() {
                     )}
                 </div>
             </div>
+
+            {/* Modal de Envío Bicanal */}
+            {showSendModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
+                        <div className="mb-4 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Enviar Cotización</h3>
+                            <button onClick={() => { setShowSendModal(false); setSendResultMsgs([]); }} className="text-slate-400 hover:text-slate-600">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+                        
+                        {!sendResultMsgs.length ? (
+                            <>
+                                <p className="mb-5 text-sm text-slate-600 dark:text-slate-400">Selecciona los canales para hacer llegar la información a <strong>{quote.client?.contact_name || quote.client?.company_name}</strong>.</p>
+                                <div className="space-y-3 mb-6">
+                                    <label className="flex items-center justify-between rounded-xl border border-slate-200 p-4 transition-all hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 cursor-pointer">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                <span className="material-symbols-outlined">chat</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">WhatsApp</span>
+                                                <span className="text-xs font-mono mt-0.5 text-slate-500">{quote.client?.phone || 'Sin número registrado'}</span>
+                                            </div>
+                                        </div>
+                                        <input type="checkbox" checked={sendChannels.whatsapp} 
+                                            onChange={e => setSendChannels({...sendChannels, whatsapp: e.target.checked})} 
+                                            disabled={!quote.client?.phone}
+                                            className="h-5 w-5 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500 cursor-pointer" />
+                                    </label>
+                                    
+                                    <label className="flex items-center justify-between rounded-xl border border-slate-200 p-4 transition-all hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800/50 cursor-pointer">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">
+                                                <span className="material-symbols-outlined">mail</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-slate-800 dark:text-slate-200">Correo Electrónico</span>
+                                                <span className="text-xs mt-0.5 text-slate-500">{quote.client?.email || 'Sin correo registrado'}</span>
+                                            </div>
+                                        </div>
+                                        <input type="checkbox" checked={sendChannels.email} 
+                                            onChange={e => setSendChannels({...sendChannels, email: e.target.checked})} 
+                                            disabled={!quote.client?.email}
+                                            className="h-5 w-5 rounded border-slate-300 text-sky-500 focus:ring-sky-500 cursor-pointer" />
+                                    </label>
+                                </div>
+                                
+                                <button onClick={handleConfirmSend} disabled={sendingInProgress || (!sendChannels.whatsapp && !sendChannels.email)}
+                                    className="w-full rounded-xl bg-gradient-to-r from-primary to-sky-600 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition-all hover:shadow-xl hover:opacity-90 disabled:opacity-50 disabled:shadow-none flex justify-center items-center gap-2">
+                                    {sendingInProgress ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" /> : <span className="material-symbols-outlined text-[18px]">rocket_launch</span>}
+                                    {sendingInProgress ? 'Generando PDF y enviando...' : 'Confirmar Envío Doble'}
+                                </button>
+                            </>
+                        ) : (
+                            <div className="space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <div className="rounded-xl bg-slate-50 p-5 dark:bg-slate-800/50">
+                                    <h4 className="font-bold text-slate-900 dark:text-white mb-3 flex relative items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">analytics</span> Resumen de Envío
+                                    </h4>
+                                    <ul className="space-y-3">
+                                        {sendResultMsgs.map((msg, i) => (
+                                            <li key={i} className={`flex items-start gap-2 text-sm font-medium ${msg.includes('Error') || msg.includes('falló') ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                                <span className="material-symbols-outlined text-[18px]">{msg.includes('Error') || msg.includes('falló') ? 'error' : 'check_circle'}</span>
+                                                <span>{msg}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                                <button onClick={() => { setShowSendModal(false); setSendResultMsgs([]); }}
+                                    className="w-full rounded-xl border-2 border-slate-200 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition-all">
+                                    Cerrar Ventana
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

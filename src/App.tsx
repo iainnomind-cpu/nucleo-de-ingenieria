@@ -34,6 +34,7 @@ import CampaignsList from './pages/WhatsApp/CampaignsList';
 import TemplatesList from './pages/WhatsApp/TemplatesList';
 import WhatsAppReports from './pages/WhatsApp/WhatsAppReports';
 import SystemSettings from './pages/Settings/SystemSettings';
+import NotificationListener from './components/NotificationListener';
 
 function ProtectedApp() {
   const { user, loading, hasPermission } = useAuth();
@@ -56,6 +57,7 @@ function ProtectedApp() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark">
       <Sidebar />
+      <NotificationListener />
       <main className="flex flex-1 flex-col overflow-y-auto bg-background-light dark:bg-background-dark">
         <Header />
         <Routes>
