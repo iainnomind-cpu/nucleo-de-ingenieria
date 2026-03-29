@@ -8,6 +8,17 @@ import {
     META_STATUS_LABELS, META_STATUS_COLORS,
 } from '../../types/whatsapp';
 
+const AVAILABLE_VARIABLES = [
+    { id: 'client_name', label: 'Nombre Cliente' },
+    { id: 'company_name', label: 'Empresa' },
+    { id: 'service_date', label: 'Fecha Servicio' },
+    { id: 'service_time', label: 'Hora Servicio' },
+    { id: 'service_type', label: 'Tipo Servicio' },
+    { id: 'invoice_amount', label: 'Monto' },
+    { id: 'invoice_due', label: 'Vencimiento' },
+    { id: 'technician_name', label: 'Técnico' },
+];
+
 export default function TemplatesList() {
     const navigate = useNavigate();
     const [templates, setTemplates] = useState<WaTemplate[]>([]);
@@ -34,17 +45,52 @@ export default function TemplatesList() {
 
     useEffect(() => { fetchTemplates(); }, [fetchTemplates]);
 
+    const processBodyForSave = (bodyText: string) => {
+        let finalBody = bodyText;
+        const matches = bodyText.match(/\{\{([^}]+)\}\}/g);
+        const uniqueVars: string[] = [];
+        
+        if (matches) {
+            matches.forEach(m => {
+                const varName = m.replace(/\{\{|\}\}/g, '').trim();
+                if (!uniqueVars.includes(varName)) {
+                    uniqueVars.push(varName);
+                }
+            });
+            uniqueVars.forEach((varName, idx) => {
+                const escaped = varName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(`\\{\\{${escaped}\\}\\}`, 'g');
+                finalBody = finalBody.replace(regex, `{{${idx + 1}}}`);
+            });
+        }
+        return { finalBody, finalVariables: uniqueVars };
+    };
+
+    const processBodyForEdit = (bodyText: string, varsArray: string[]) => {
+        let editableBody = bodyText;
+        if (varsArray && varsArray.length > 0) {
+            varsArray.forEach((varName, idx) => {
+                const regex = new RegExp(`\\{\\{${idx + 1}\\}\\}`, 'g');
+                editableBody = editableBody.replace(regex, `{{${varName}}}`);
+            });
+        }
+        return editableBody;
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        const { finalBody, finalVariables } = processBodyForSave(form.body);
+
         const payload = {
-            name: form.name,
+            name: form.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
             category: form.category,
             language: form.language,
             header_type: form.header_type !== 'none' ? form.header_type : null,
             header_content: form.header_content || null,
-            body: form.body,
+            body: finalBody,
             footer: form.footer || null,
-            variables: form.variables ? form.variables.split(',').map(v => v.trim()) : [],
+            variables: finalVariables,
             meta_status: form.meta_status,
         };
         if (editingId) {
@@ -60,11 +106,12 @@ export default function TemplatesList() {
     const resetForm = () => setForm({ name: '', category: 'utility', language: 'es_MX', header_type: 'none', header_content: '', body: '', footer: '', variables: '', meta_status: 'draft' });
 
     const editTemplate = (t: WaTemplate) => {
+        const editableBody = processBodyForEdit(t.body, t.variables || []);
         setForm({
             name: t.name, category: t.category, language: t.language,
             header_type: t.header_type || 'none', header_content: t.header_content || '',
-            body: t.body, footer: t.footer || '',
-            variables: (t.variables || []).join(', '), meta_status: t.meta_status,
+            body: editableBody, footer: t.footer || '',
+            variables: '', meta_status: t.meta_status,
         });
         setEditingId(t.id);
         setShowForm(true);
@@ -109,8 +156,16 @@ export default function TemplatesList() {
     };
 
     // Parse body to highlight variables
-    const renderBody = (body: string) => {
-        return body.replace(/\{\{(\d+)\}\}/g, '<span class="inline-block rounded bg-emerald-100 px-1 text-emerald-700 font-mono text-xs dark:bg-emerald-900/30 dark:text-emerald-400">{{$1}}</span>');
+    const renderBody = (body: string, varsArray?: string[]) => {
+        let html = body;
+        if (varsArray && varsArray.length > 0) {
+            varsArray.forEach((v, i) => {
+                const regex = new RegExp(`\\{\\{${i + 1}\\}\\}`, 'g');
+                html = html.replace(regex, `<span class="inline-block rounded bg-emerald-100 px-1 text-emerald-700 font-mono text-xs dark:bg-emerald-900/30 dark:text-emerald-400">{{${v}}}</span>`);
+            });
+        }
+        // Fallback or raw variable highlight
+        return html.replace(/\{\{([^}]+)\}\}/g, '<span class="inline-block rounded bg-emerald-100 px-1 text-emerald-700 font-mono text-xs dark:bg-emerald-900/30 dark:text-emerald-400">{{$1}}</span>');
     };
 
     const tabs = [
@@ -204,7 +259,7 @@ export default function TemplatesList() {
                                             {tpl.header_content && (
                                                 <p className="text-xs font-bold text-slate-900 dark:text-white mb-1">{tpl.header_content}</p>
                                             )}
-                                            <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-3 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderBody(tpl.body) }} />
+                                            <p className="text-xs text-slate-700 dark:text-slate-300 line-clamp-3 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderBody(tpl.body, tpl.variables) }} />
                                             {tpl.footer && <p className="text-[10px] text-slate-400 mt-1 italic">{tpl.footer}</p>}
                                         </div>
                                     </div>
@@ -296,18 +351,32 @@ export default function TemplatesList() {
                                 </div>
                             )}
                             <div className="col-span-2">
-                                <label className={labelClass}>Cuerpo del Mensaje *</label>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cuerpo del Mensaje *</label>
+                                    <span className="text-[10px] text-slate-400">Arrastra o haz clic en las variables para insertarlas</span>
+                                </div>
                                 <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} required rows={5} className={inputClass}
-                                    placeholder="Hola {{1}}, le recordamos que su servicio de {{2}} está programado para el {{3}}. ¿Confirma la visita?" />
-                                <p className="text-[10px] text-slate-400 mt-1">Usa {"{{1}}"}, {"{{2}}"}, etc. para variables dinámicas</p>
+                                    placeholder="Hola {{Nombre Cliente}}, le recordamos que su servicio..." />
+                                
+                                <div className="mt-2.5 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 dark:border-emerald-900/30 dark:bg-emerald-900/10">
+                                    <p className="mb-2 text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Variables Mágicas Sugeridas:</p>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {AVAILABLE_VARIABLES.map(v => (
+                                            <div key={v.id} 
+                                                draggable 
+                                                onDragStart={(e) => e.dataTransfer.setData('text/plain', `{{${v.label}}}`)}
+                                                onClick={() => setForm({ ...form, body: form.body + (form.body.endsWith(' ') || form.body.length === 0 ? '' : ' ') + `{{${v.label}}}` })}
+                                                className="cursor-pointer rounded-full bg-white border border-emerald-200 px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm transition-all hover:bg-emerald-500 hover:text-white dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white"
+                                            >
+                                                {v.label}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
-                            <div>
+                            <div className="col-span-2">
                                 <label className={labelClass}>Footer (opcional)</label>
                                 <input value={form.footer} onChange={e => setForm({ ...form, footer: e.target.value })} className={inputClass} placeholder="Núcleo de Ingeniería" />
-                            </div>
-                            <div>
-                                <label className={labelClass}>Variables (separadas por coma)</label>
-                                <input value={form.variables} onChange={e => setForm({ ...form, variables: e.target.value })} className={inputClass} placeholder="client_name, service_type, date" />
                             </div>
                         </div>
                         <div className="mt-5 flex gap-2">
@@ -335,7 +404,7 @@ export default function TemplatesList() {
                                     {previewTemplate.header_content && (
                                         <p className="text-sm font-bold text-slate-900 dark:text-white mb-1">{previewTemplate.header_content}</p>
                                     )}
-                                    <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderBody(previewTemplate.body) }} />
+                                    <p className="text-sm text-slate-800 dark:text-slate-200 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderBody(previewTemplate.body, previewTemplate.variables) }} />
                                     {previewTemplate.footer && (
                                         <p className="text-[11px] text-slate-400 mt-2 italic">{previewTemplate.footer}</p>
                                     )}
