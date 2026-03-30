@@ -24,6 +24,7 @@ export default function TemplatesList() {
     const [templates, setTemplates] = useState<WaTemplate[]>([]);
     const [loading, setLoading] = useState(true);
     const [submittingId, setSubmittingId] = useState<string | null>(null);
+    const [syncingStatus, setSyncingStatus] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [previewTemplate, setPreviewTemplate] = useState<WaTemplate | null>(null);
@@ -155,6 +156,33 @@ export default function TemplatesList() {
         }
     };
 
+    const syncStatusFromMeta = async () => {
+        setSyncingStatus(true);
+        try {
+            const res = await fetch('/api/whatsapp-template-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+            });
+            const data = await res.json();
+            if (data.success) {
+                if (data.updated > 0) {
+                    const detailList = data.details?.map((d: { name: string; from: string; to: string }) => `• ${d.name}: ${d.from} → ${d.to}`).join('\n') || '';
+                    alert(`✅ ${data.message}\n\n${detailList}`);
+                } else {
+                    alert(`✅ ${data.message}`);
+                }
+                fetchTemplates();
+            } else {
+                alert(`❌ Error: ${data.message}`);
+            }
+        } catch (error) {
+            console.error(error);
+            alert('Error de red al sincronizar.');
+        } finally {
+            setSyncingStatus(false);
+        }
+    };
+
     // Parse body to highlight variables
     const renderBody = (body: string, varsArray?: string[]) => {
         let html = body;
@@ -194,10 +222,21 @@ export default function TemplatesList() {
                                 <p className="text-xs text-slate-500">Plantillas de mensaje</p>
                             </div>
                         </div>
-                        <button onClick={() => { setShowForm(true); setEditingId(null); resetForm(); }}
-                            className="flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-600 transition-all">
-                            <span className="material-symbols-outlined text-[18px]">add</span>Nueva Plantilla
-                        </button>
+                        <div className="flex items-center gap-2">
+                            <button onClick={syncStatusFromMeta} disabled={syncingStatus}
+                                className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition-all disabled:opacity-50 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 dark:hover:bg-sky-900/40">
+                                {syncingStatus ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
+                                ) : (
+                                    <span className="material-symbols-outlined text-[18px]">sync</span>
+                                )}
+                                {syncingStatus ? 'Sincronizando...' : 'Actualizar Estado'}
+                            </button>
+                            <button onClick={() => { setShowForm(true); setEditingId(null); resetForm(); }}
+                                className="flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-500/25 hover:bg-emerald-600 transition-all">
+                                <span className="material-symbols-outlined text-[18px]">add</span>Nueva Plantilla
+                            </button>
+                        </div>
                     </div>
                     <div className="flex gap-1">
                         {tabs.map(tab => (
