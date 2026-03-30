@@ -35,8 +35,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ success: false, message: 'El campo "to" es obligatorio' });
         }
 
-        // Construir payload para Meta
-        const cleanPhone = to.replace(/\D/g, '');
+        // Construir payload para Meta — normalizar teléfono mexicano
+        let cleanPhone = to.replace(/\D/g, ''); // Quitar todo excepto dígitos
+        // Si tiene 10 dígitos, es un número mexicano sin código de país → agregar 52
+        if (cleanPhone.length === 10) {
+            cleanPhone = '52' + cleanPhone;
+        }
+        // Si tiene 13 dígitos y empieza con 521, quitar el 1 intermedio (formato viejo móvil MX)
+        if (cleanPhone.length === 13 && cleanPhone.startsWith('521')) {
+            cleanPhone = '52' + cleanPhone.slice(3);
+        }
+        // Si empieza con 044 o 045 (prefijos viejos de celular MX), quitarlos y agregar 52
+        if (cleanPhone.startsWith('044') || cleanPhone.startsWith('045')) {
+            cleanPhone = '52' + cleanPhone.slice(3);
+        }
         let metaPayload: any = {
             messaging_product: 'whatsapp',
             recipient_type: 'individual',

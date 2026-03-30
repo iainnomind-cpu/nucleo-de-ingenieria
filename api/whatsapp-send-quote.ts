@@ -24,7 +24,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ success: false, message: '"to" y "base64Pdf" son obligatorios' });
         }
 
-        const cleanPhone = to.replace(/\D/g, '');
+        // Normalizar teléfono mexicano
+        let cleanPhone = to.replace(/\D/g, '');
+        if (cleanPhone.length === 10) cleanPhone = '52' + cleanPhone;
+        if (cleanPhone.length === 13 && cleanPhone.startsWith('521')) cleanPhone = '52' + cleanPhone.slice(3);
+        if (cleanPhone.startsWith('044') || cleanPhone.startsWith('045')) cleanPhone = '52' + cleanPhone.slice(3);
         
         // 1. Decodificar Base64 a Buffer
         const base64Data = base64Pdf.replace(/^data:application\/pdf;base64,/, '');
