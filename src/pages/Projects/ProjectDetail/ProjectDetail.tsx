@@ -54,7 +54,7 @@ export default function ProjectDetail() {
     const fetchAll = useCallback(async () => {
         if (!id) return;
         setLoading(true);
-        const [pRes, tRes, lRes, iRes, invRes, ipRes, expRes, sysRes] = await Promise.all([
+        const [pRes, tRes, lRes, iRes, invRes, ipRes, expRes, sysRes, milRes, mntRes] = await Promise.all([
             supabase.from('projects').select('*, client:clients(id, company_name)').eq('id', id).single(),
             supabase.from('project_tasks').select('*').eq('project_id', id).order('sort_order'),
             supabase.from('field_logs').select('*').eq('project_id', id).order('log_date', { ascending: false }),
@@ -86,10 +86,10 @@ export default function ProjectDetail() {
         setExpenseCost(exps.reduce((sum, item) => sum + Number(item.amount || 0), 0));
 
         // Fleet Cost logic
-        const p_mil = (await Promise.all([supabase.from('vehicle_mileage').select('calculated_trip_cost').eq('project_id', id)])).map(r => r[0].data || [])[0];
-        const p_mnt = (await Promise.all([supabase.from('vehicle_maintenance').select('cost').eq('project_id', id)])).map(r => r[0].data || [])[0];
-        const mileageCost = p_mil.reduce((sum, item) => sum + Number((item as any).calculated_trip_cost || 0), 0);
-        const maintenanceCost = p_mnt.reduce((sum, item) => sum + Number((item as any).cost || 0), 0);
+        const p_mil = milRes.data || [];
+        const p_mnt = mntRes.data || [];
+        const mileageCost = p_mil.reduce((sum: number, item: any) => sum + Number(item.calculated_trip_cost || 0), 0);
+        const maintenanceCost = p_mnt.reduce((sum: number, item: any) => sum + Number(item.cost || 0), 0);
         setFleetCost(mileageCost + maintenanceCost);
 
         if (sysRes.data?.value && Array.isArray(sysRes.data.value)) {
