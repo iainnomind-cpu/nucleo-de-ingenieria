@@ -33,6 +33,7 @@ import ConversationsInbox from './pages/WhatsApp/ConversationsInbox';
 import CampaignsList from './pages/WhatsApp/CampaignsList';
 import TemplatesList from './pages/WhatsApp/TemplatesList';
 import WhatsAppReports from './pages/WhatsApp/WhatsAppReports';
+import DirectSend from './pages/WhatsApp/DirectSend';
 import SystemSettings from './pages/Settings/SystemSettings';
 import NotificationListener from './components/NotificationListener';
 
@@ -134,6 +135,7 @@ function ProtectedApp() {
               <Route path="/whatsapp" element={<WhatsAppDashboard />} />
               <Route path="/whatsapp/conversations" element={<ConversationsInbox />} />
               <Route path="/whatsapp/campaigns" element={<CampaignsList />} />
+              <Route path="/whatsapp/send" element={<DirectSend />} />
               <Route path="/whatsapp/templates" element={<TemplatesList />} />
               <Route path="/whatsapp/reports" element={<WhatsAppReports />} />
             </>

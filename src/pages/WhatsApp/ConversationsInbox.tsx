@@ -93,6 +93,7 @@ export default function ConversationsInbox() {
     const tabs = [
         { label: 'Dashboard', icon: 'space_dashboard', path: '/whatsapp' },
         { label: 'Conversaciones', icon: 'chat', path: '/whatsapp/conversations' },
+        { label: 'Envío Directo', icon: 'send', path: '/whatsapp/send' },
         { label: 'Campañas', icon: 'campaign', path: '/whatsapp/campaigns' },
         { label: 'Plantillas', icon: 'description', path: '/whatsapp/templates' },
         { label: 'Reportes', icon: 'analytics', path: '/whatsapp/reports' },
