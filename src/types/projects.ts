@@ -102,6 +102,28 @@ export interface FieldExpense {
     updated_at: string;
 }
 
+export interface ProjectVehicle {
+    id: string;
+    project_id: string;
+    vehicle_id: string;
+    assigned_date: string;
+    release_date: string | null;
+    operator_name: string | null;
+    notes: string | null;
+    created_at: string;
+    vehicle?: {
+        id: string;
+        plates: string;
+        brand: string;
+        model: string;
+        year: number;
+        vehicle_type: string;
+        status: string;
+        cost_per_km: number;
+        current_mileage: number;
+    };
+}
+
 // Labels
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
     pending: 'Pendiente',

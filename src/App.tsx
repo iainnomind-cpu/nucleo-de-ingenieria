@@ -36,6 +36,7 @@ import WhatsAppReports from './pages/WhatsApp/WhatsAppReports';
 import DirectSend from './pages/WhatsApp/DirectSend';
 import SystemSettings from './pages/Settings/SystemSettings';
 import NotificationListener from './components/NotificationListener';
+import ClientWellLogPublic from './pages/Maintenance/ClientWellLogPublic';
 
 function ProtectedApp() {
   const { user, loading, hasPermission } = useAuth();
@@ -155,9 +156,12 @@ function ProtectedApp() {
 function App() {
   return (
     <Router>
-      <AuthProvider>
-        <ProtectedApp />
-      </AuthProvider>
+      <Routes>
+        {/* Public route — no auth required */}
+        <Route path="/well-log/:token" element={<ClientWellLogPublic />} />
+        {/* All other routes go through auth */}
+        <Route path="*" element={<AuthProvider><ProtectedApp /></AuthProvider>} />
+      </Routes>
     </Router>
   );
 }

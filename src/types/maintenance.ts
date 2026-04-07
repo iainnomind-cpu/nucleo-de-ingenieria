@@ -36,8 +36,41 @@ export interface InstalledEquipment {
     notes: string | null;
     created_at: string;
     updated_at: string;
+    access_token?: string;
     client?: { id: string; company_name: string };
 }
+
+export type FunctionalityStatus = 'normal' | 'intermittent' | 'stopped' | 'anomaly';
+
+export interface ClientWellLog {
+    id: string;
+    equipment_id: string;
+    client_id: string | null;
+    log_date: string;
+    recorded_by: string | null;
+    static_level: number | null;
+    dynamic_level: number | null;
+    flow_rate: number | null;
+    pressure: number | null;
+    hours_operation: number | null;
+    observations: string | null;
+    functionality_status: FunctionalityStatus;
+    photos: unknown[];
+    created_at: string;
+}
+
+export const FUNCTIONALITY_STATUS_LABELS: Record<FunctionalityStatus, string> = {
+    normal: 'Funcionando Normal',
+    intermittent: 'Funcionamiento Intermitente',
+    stopped: 'Detenido',
+    anomaly: 'Anomalía Detectada',
+};
+export const FUNCTIONALITY_STATUS_COLORS: Record<FunctionalityStatus, { bg: string; text: string; icon: string }> = {
+    normal: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', icon: 'check_circle' },
+    intermittent: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', icon: 'warning' },
+    stopped: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', icon: 'cancel' },
+    anomaly: { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-400', icon: 'error' },
+};
 
 export interface MaintenanceSchedule {
     id: string;

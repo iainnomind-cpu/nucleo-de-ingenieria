@@ -3,10 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import {
     InstalledEquipment, MonitoringLog, EquipmentWarranty, MaintenanceSchedule, VideoRecording,
+    ClientWellLog, FunctionalityStatus,
     EQUIPMENT_TYPE_LABELS, EQUIPMENT_TYPE_ICONS, EQUIPMENT_STATUS_LABELS, EQUIPMENT_STATUS_COLORS,
     WARRANTY_TYPE_LABELS, WARRANTY_STATUS_LABELS, WARRANTY_STATUS_COLORS,
     SCHEDULE_STATUS_LABELS, SCHEDULE_STATUS_COLORS,
     SERVICE_TYPE_LABELS,
+    FUNCTIONALITY_STATUS_LABELS, FUNCTIONALITY_STATUS_COLORS,
     MONITORING_FIELDS, getDaysUntil, getUrgencyColor, formatCurrencyMaint,
     EquipmentStatus, WarrantyType,
 } from '../../../types/maintenance';
@@ -14,7 +16,7 @@ import { PhotoAttachment } from '../../../types/photos';
 import PhotoUploader, { PhotoGallery } from '../../../components/PhotoUploader';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
-type Tab = 'monitoring' | 'trends' | 'video' | 'history' | 'warranties';
+type Tab = 'monitoring' | 'trends' | 'video' | 'history' | 'warranties' | 'client_log';
 
 export default function EquipmentDetail() {
     const { id } = useParams<{ id: string }>();
@@ -24,6 +26,7 @@ export default function EquipmentDetail() {
     const [warranties, setWarranties] = useState<EquipmentWarranty[]>([]);
     const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
     const [videos, setVideos] = useState<VideoRecording[]>([]);
+    const [clientLogs, setClientLogs] = useState<ClientWellLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<Tab>('monitoring');
     const [showLogForm, setShowLogForm] = useState(false);
@@ -49,13 +52,14 @@ export default function EquipmentDetail() {
     const fetchAll = useCallback(async () => {
         if (!id) return;
         setLoading(true);
-        const [eRes, lRes, wRes, sRes, vRes, cRes] = await Promise.all([
+        const [eRes, lRes, wRes, sRes, vRes, cRes, clRes] = await Promise.all([
             supabase.from('installed_equipment').select('*, client:clients(id, company_name)').eq('id', id).single(),
             supabase.from('monitoring_logs').select('*').eq('equipment_id', id).order('log_date', { ascending: false }),
             supabase.from('equipment_warranties').select('*').eq('equipment_id', id).order('end_date', { ascending: false }),
             supabase.from('maintenance_schedules').select('*').eq('equipment_id', id).order('next_service_date', { ascending: false }).limit(10),
             supabase.from('video_recordings').select('*').eq('equipment_id', id).order('recording_date', { ascending: false }),
-            supabase.from('system_settings').select('*').eq('key', 'operational_defaults').single()
+            supabase.from('system_settings').select('*').eq('key', 'operational_defaults').single(),
+            supabase.from('client_well_logs').select('*').eq('equipment_id', id).order('log_date', { ascending: false }),
         ]);
         if (!eRes.data) { navigate('/maintenance'); return; }
         setEquip(eRes.data as InstalledEquipment);
@@ -63,6 +67,7 @@ export default function EquipmentDetail() {
         setWarranties((wRes.data as EquipmentWarranty[]) || []);
         setSchedules((sRes.data as MaintenanceSchedule[]) || []);
         setVideos((vRes.data as VideoRecording[]) || []);
+        setClientLogs((clRes.data as ClientWellLog[]) || []);
         
         if (cRes.data && cRes.data.value) {
             setConfig({
@@ -218,6 +223,7 @@ export default function EquipmentDetail() {
                     { key: 'monitoring', icon: 'monitor_heart', label: `Monitoreo (${logs.length})` },
                     { key: 'trends', icon: 'monitoring', label: `Tendencias` },
                     { key: 'video', icon: 'videocam', label: `Videograbación (${videos.length})` },
+                    { key: 'client_log', icon: 'person_book', label: `Bitácora Cliente (${clientLogs.length})` },
                     { key: 'history', icon: 'history', label: `Historial Mant. (${schedules.length})` },
                     { key: 'warranties', icon: 'verified_user', label: `Garantías (${warranties.length})` },
                 ].map(t => (
@@ -532,6 +538,129 @@ export default function EquipmentDetail() {
                             </div>
                         )}
                     </div>
+                </div>
+            )}
+
+            {/* TAB: Client Well Log */}
+            {tab === 'client_log' && (
+                <div className="space-y-6">
+                    {/* Link sharing section */}
+                    <div className={sectionClass}>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                                    <span className="material-symbols-outlined text-sky-500 text-[18px]">link</span>
+                                    Enlace de Bitácora para el Cliente
+                                </h3>
+                                <p className="mt-1 text-xs text-slate-500">Comparte este enlace con el cliente para que llene su bitácora periódicamente sin necesidad de cuenta.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <code className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-mono text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 truncate min-w-0 max-w-[300px]">
+                                    {window.location.origin}/well-log/{equip.access_token || '...'}
+                                </code>
+                                <button
+                                    onClick={() => {
+                                        const url = `${window.location.origin}/well-log/${equip.access_token}`;
+                                        navigator.clipboard.writeText(url);
+                                        alert('✅ Enlace copiado al portapapeles');
+                                    }}
+                                    className="flex shrink-0 items-center gap-1 rounded-lg bg-sky-500 px-3 py-2 text-xs font-semibold text-white hover:bg-sky-600 transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                                    Copiar Link
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Activity indicator */}
+                        <div className="mt-4 flex items-center gap-3">
+                            {clientLogs.length === 0 ? (
+                                <span className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-slate-700">
+                                    <span className="material-symbols-outlined text-[14px]">info</span>
+                                    Sin bitácora — el cliente aún no ha registrado entradas
+                                </span>
+                            ) : (() => {
+                                const lastDate = new Date(clientLogs[0].log_date);
+                                const daysSince = Math.floor((Date.now() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
+                                const color = daysSince <= 30 ? 'emerald' : daysSince <= 60 ? 'amber' : 'red';
+                                return (
+                                    <span className={`flex items-center gap-1.5 rounded-full bg-${color}-100 px-3 py-1 text-xs font-semibold text-${color}-700 dark:bg-${color}-900/30 dark:text-${color}-400`}>
+                                        <span className="material-symbols-outlined text-[14px]">{daysSince <= 30 ? 'check_circle' : 'schedule'}</span>
+                                        {daysSince <= 30 ? `Al día — última entrada hace ${daysSince}d` :
+                                         daysSince <= 60 ? `${daysSince} días sin actualizar` :
+                                         `⚠ ${daysSince} días sin bitácora`}
+                                    </span>
+                                );
+                            })()}
+                            <span className="text-xs text-slate-400">{clientLogs.length} entradas totales</span>
+                        </div>
+                    </div>
+
+                    {/* Client Log Timeline */}
+                    {clientLogs.length === 0 ? (
+                        <div className="py-12 text-center">
+                            <span className="material-symbols-outlined mb-3 text-[56px] text-slate-200 dark:text-slate-700">person_book</span>
+                            <p className="text-sm text-slate-500">El cliente aún no ha registrado entradas en su bitácora.</p>
+                            <p className="text-xs text-slate-400 mt-1">Comparte el enlace para que comience a llenar su bitácora de operación.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {clientLogs.map((log, idx) => {
+                                const statusColor = FUNCTIONALITY_STATUS_COLORS[log.functionality_status] || FUNCTIONALITY_STATUS_COLORS.normal;
+                                const isFirst = idx === 0;
+                                return (
+                                    <div key={log.id} className={`rounded-xl border p-5 transition-all ${
+                                        isFirst
+                                            ? 'border-sky-200 bg-gradient-to-br from-white to-sky-50/30 shadow-sm dark:border-sky-800/40 dark:from-slate-800 dark:to-sky-900/10'
+                                            : 'border-slate-200/60 bg-white/50 dark:border-slate-800/60 dark:bg-slate-900/50'
+                                    }`}>
+                                        {isFirst && <div className="h-1 w-full -mt-5 mb-4 rounded-t-xl bg-gradient-to-r from-sky-400 to-blue-400 -mx-5" style={{width: 'calc(100% + 2.5rem)'}} />}
+                                        <div className="flex items-start justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${statusColor.bg}`}>
+                                                    <span className={`material-symbols-outlined text-[20px] ${statusColor.text}`}>{statusColor.icon}</span>
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-sm text-slate-900 dark:text-white">
+                                                        {new Date(log.log_date).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+                                                        {isFirst && <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-bold text-sky-600 dark:bg-sky-900/30 dark:text-sky-400">Más reciente</span>}
+                                                    </p>
+                                                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+                                                        {log.recorded_by && <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">person</span>{log.recorded_by}</span>}
+                                                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${statusColor.bg} ${statusColor.text}`}>
+                                                            {FUNCTIONALITY_STATUS_LABELS[log.functionality_status]}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {(log.static_level != null || log.dynamic_level != null || log.flow_rate != null || log.pressure != null || log.hours_operation != null) && (
+                                            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5 text-xs">
+                                                {log.static_level != null && <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/50"><span className="block text-slate-400 text-[10px]">Nivel Estático</span><span className="font-bold text-slate-900 dark:text-white">{log.static_level} m</span></div>}
+                                                {log.dynamic_level != null && <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/50"><span className="block text-slate-400 text-[10px]">Nivel Dinámico</span><span className="font-bold text-slate-900 dark:text-white">{log.dynamic_level} m</span></div>}
+                                                {log.flow_rate != null && <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/50"><span className="block text-slate-400 text-[10px]">Caudal</span><span className="font-bold text-slate-900 dark:text-white">{log.flow_rate} L/s</span></div>}
+                                                {log.pressure != null && <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/50"><span className="block text-slate-400 text-[10px]">Presión</span><span className="font-bold text-slate-900 dark:text-white">{log.pressure} PSI</span></div>}
+                                                {log.hours_operation != null && <div className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-800/50"><span className="block text-slate-400 text-[10px]">Horas Op.</span><span className="font-bold text-slate-900 dark:text-white">{log.hours_operation} hrs</span></div>}
+                                            </div>
+                                        )}
+
+                                        {log.observations && (
+                                            <div className="mt-3 rounded-lg bg-slate-50 p-3 dark:bg-slate-800/30">
+                                                <p className="text-xs text-slate-600 dark:text-slate-300 italic">"{log.observations}"</p>
+                                            </div>
+                                        )}
+
+                                        {log.photos && (log.photos as unknown[]).length > 0 && (
+                                            <div className="mt-3">
+                                                <PhotoGallery photos={log.photos as PhotoAttachment[]} />
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             )}
 

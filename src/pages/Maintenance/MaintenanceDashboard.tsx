@@ -13,6 +13,7 @@ import {
 } from '../../types/maintenance';
 import GoogleMapView, { MapPin } from '../../components/GoogleMap';
 import { NUCLEO_HQ, PinColor } from '../../lib/maps';
+import MaintenanceCalendar from './MaintenanceCalendar';
 
 export default function MaintenanceDashboard() {
     const navigate = useNavigate();
@@ -267,16 +268,38 @@ export default function MaintenanceDashboard() {
             )}
 
             {showScheduleForm && (
-                <form onSubmit={handleAddSchedule} className="rounded-xl border border-violet-200 bg-violet-50/50 p-6 dark:border-violet-900 dark:bg-violet-900/10">
-                    <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">Programar Mantenimiento</h3>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <div><label className={labelClass}>Equipo *</label><select value={schForm.equipment_id} onChange={e => setSchForm({ ...schForm, equipment_id: e.target.value })} required className={inputClass}><option value="">Seleccionar...</option>{equipment.map(eq => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name}</option>)}</select></div>
-                        <div><label className={labelClass}>Tipo Servicio</label><select value={schForm.service_type} onChange={e => setSchForm({ ...schForm, service_type: e.target.value as ServiceType, title: SERVICE_TYPE_LABELS[e.target.value as ServiceType] })} className={inputClass}>{(Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]).map(t => <option key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</option>)}</select></div>
-                        <div><label className={labelClass}>Próxima Fecha *</label><input type="date" value={schForm.next_service_date} onChange={e => setSchForm({ ...schForm, next_service_date: e.target.value })} required className={inputClass} /></div>
-                        <div><label className={labelClass}>Asignado a</label><input value={schForm.assigned_to} onChange={e => setSchForm({ ...schForm, assigned_to: e.target.value })} placeholder="Nombre" className={inputClass} /></div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800 max-h-[90vh] overflow-y-auto">
+                        <div className="mb-6 flex items-center justify-between">
+                            <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
+                                <span className="material-symbols-outlined text-primary text-[22px]">calendar_add_on</span>
+                                Programar Mantenimiento
+                            </h3>
+                            <button onClick={() => setShowScheduleForm(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"><span className="material-symbols-outlined text-[20px]">close</span></button>
+                        </div>
+                        {schForm.next_service_date && (
+                            <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2.5 dark:bg-primary/20">
+                                <span className="material-symbols-outlined text-primary text-[18px]">event</span>
+                                <span className="text-sm font-semibold text-primary dark:text-sky-300">
+                                    Fecha seleccionada: {new Date(schForm.next_service_date + 'T12:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                </span>
+                            </div>
+                        )}
+                        <form onSubmit={handleAddSchedule}>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="md:col-span-2"><label className={labelClass}>Equipo *</label><select value={schForm.equipment_id} onChange={e => setSchForm({ ...schForm, equipment_id: e.target.value })} required className={inputClass}><option value="">Seleccionar equipo...</option>{equipment.map(eq => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}</select></div>
+                                <div><label className={labelClass}>Tipo Servicio</label><select value={schForm.service_type} onChange={e => setSchForm({ ...schForm, service_type: e.target.value as ServiceType, title: SERVICE_TYPE_LABELS[e.target.value as ServiceType] })} className={inputClass}>{(Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]).map(t => <option key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</option>)}</select></div>
+                                <div><label className={labelClass}>Próxima Fecha *</label><input type="date" value={schForm.next_service_date} onChange={e => setSchForm({ ...schForm, next_service_date: e.target.value })} required className={inputClass} /></div>
+                                <div><label className={labelClass}>Título (opcional)</label><input value={schForm.title} onChange={e => setSchForm({ ...schForm, title: e.target.value })} placeholder="Se auto-genera del tipo de servicio" className={inputClass} /></div>
+                                <div><label className={labelClass}>Asignado a</label><input value={schForm.assigned_to} onChange={e => setSchForm({ ...schForm, assigned_to: e.target.value })} placeholder="Nombre del técnico" className={inputClass} /></div>
+                            </div>
+                            <div className="mt-6 flex justify-end gap-3">
+                                <button type="button" onClick={() => setShowScheduleForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">Programar Servicio</button>
+                            </div>
+                        </form>
                     </div>
-                    <div className="mt-4 flex gap-2"><button type="submit" className="rounded-lg bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white">Programar</button><button type="button" onClick={() => setShowScheduleForm(false)} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm text-slate-500 dark:border-slate-700">Cancelar</button></div>
-                </form>
+                </div>
             )}
 
             {/* Tabs */}
@@ -341,33 +364,14 @@ export default function MaintenanceDashboard() {
 
             {/* TAB: Calendar */}
             {tab === 'calendar' && (
-                <div className="space-y-4">
-                    {overdue.length > 0 && (
-                        <div className={sectionClass + ' border-red-200 dark:border-red-900'}>
-                            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-red-600"><span className="material-symbols-outlined text-[18px]">warning</span>Vencidos ({overdue.length})</h3>
-                            <div className="space-y-2">{overdue.map(s => <ScheduleCard key={s.id} schedule={s} onStatusChange={handleScheduleStatus} />)}</div>
-                        </div>
-                    )}
-                    {thisWeek.length > 0 && (
-                        <div className={sectionClass}>
-                            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-amber-600"><span className="material-symbols-outlined text-[18px]">event_upcoming</span>Esta Semana ({thisWeek.length})</h3>
-                            <div className="space-y-2">{thisWeek.map(s => <ScheduleCard key={s.id} schedule={s} onStatusChange={handleScheduleStatus} />)}</div>
-                        </div>
-                    )}
-                    {thisMonth.length > 0 && (
-                        <div className={sectionClass}>
-                            <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-sky-600"><span className="material-symbols-outlined text-[18px]">calendar_month</span>Este Mes ({thisMonth.length})</h3>
-                            <div className="space-y-2">{thisMonth.map(s => <ScheduleCard key={s.id} schedule={s} onStatusChange={handleScheduleStatus} />)}</div>
-                        </div>
-                    )}
-                    {upcoming.filter(s => getDaysUntil(s.next_service_date) > 30).length > 0 && (
-                        <div className={sectionClass}>
-                            <h3 className="mb-3 text-sm font-bold text-slate-500">Próximos (+30 días)</h3>
-                            <div className="space-y-2">{upcoming.filter(s => getDaysUntil(s.next_service_date) > 30).map(s => <ScheduleCard key={s.id} schedule={s} onStatusChange={handleScheduleStatus} />)}</div>
-                        </div>
-                    )}
-                    {upcoming.length === 0 && <div className="py-12 text-center text-sm text-slate-500">No hay servicios programados.</div>}
-                </div>
+                <MaintenanceCalendar
+                    schedules={schedules.filter(s => s.status !== 'cancelled')}
+                    onStatusChange={handleScheduleStatus}
+                    onDayClick={(date) => {
+                        setSchForm({ ...schForm, next_service_date: date });
+                        setShowScheduleForm(true);
+                    }}
+                />
             )}
 
             {/* TAB: Equipment */}

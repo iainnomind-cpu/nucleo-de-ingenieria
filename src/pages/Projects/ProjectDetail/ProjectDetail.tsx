@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
 import {
-    Project, ProjectTask, FieldLog, ProjectIncident,
+    Project, ProjectTask, FieldLog, ProjectIncident, ProjectVehicle,
     ProjectStatus, TaskStatus as TStatus,
     PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS, PROJECT_STATUS_ICONS,
     TASK_STATUS_LABELS, TASK_STATUS_COLORS,
@@ -18,8 +18,12 @@ import PhotoUploader, { PhotoGallery } from '../../../components/PhotoUploader';
 import { InventoryProduct, InventoryMovement, formatCurrencyInv, UNIT_LABELS } from '../../../types/inventory';
 import { getNavigationUrl, getStaticMapUrl, getCurrentPosition } from '../../../lib/maps';
 import { EquipmentType, EQUIPMENT_MAINTENANCE_RULES, EQUIPMENT_TYPE_LABELS } from '../../../types/maintenance';
+import {
+    Vehicle, VEHICLE_TYPE_LABELS, VEHICLE_TYPE_ICONS,
+    VEHICLE_STATUS_LABELS, VEHICLE_STATUS_COLORS
+} from '../../../types/fleet';
 
-type Tab = 'overview' | 'tasks' | 'fieldlogs' | 'incidents' | 'materials' | 'viaticos';
+type Tab = 'overview' | 'tasks' | 'fieldlogs' | 'incidents' | 'materials' | 'viaticos' | 'vehicles';
 const STATUS_FLOW: ProjectStatus[] = ['pending', 'preparation', 'in_field', 'completed', 'invoiced'];
 
 export default function ProjectDetail() {
@@ -37,6 +41,10 @@ export default function ProjectDetail() {
     const [expenseCost, setExpenseCost] = useState(0);
     const [fleetCost, setFleetCost] = useState(0);
 
+    // Vehicles assignment
+    const [projectVehicles, setProjectVehicles] = useState<ProjectVehicle[]>([]);
+    const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
+
     const [loading, setLoading] = useState(true);
     const [teamMembers, setTeamMembers] = useState<string[]>(TEAM_MEMBERS);
 
@@ -46,6 +54,7 @@ export default function ProjectDetail() {
     const [showIncidentForm, setShowIncidentForm] = useState(false);
     const [showMaterialForm, setShowMaterialForm] = useState(false);
     const [showExpenseForm, setShowExpenseForm] = useState(false);
+    const [showVehicleForm, setShowVehicleForm] = useState(false);
     
     // Auto-maintenance Modal
     const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -54,7 +63,7 @@ export default function ProjectDetail() {
     const fetchAll = useCallback(async () => {
         if (!id) return;
         setLoading(true);
-        const [pRes, tRes, lRes, iRes, invRes, ipRes, expRes, sysRes, milRes, mntRes] = await Promise.all([
+        const [pRes, tRes, lRes, iRes, invRes, ipRes, expRes, sysRes, milRes, mntRes, pvRes, avRes] = await Promise.all([
             supabase.from('projects').select('*, client:clients(id, company_name)').eq('id', id).single(),
             supabase.from('project_tasks').select('*').eq('project_id', id).order('sort_order'),
             supabase.from('field_logs').select('*').eq('project_id', id).order('log_date', { ascending: false }),
@@ -64,7 +73,9 @@ export default function ProjectDetail() {
             supabase.from('field_expenses').select('*').eq('project_id', id).order('created_at', { ascending: false }),
             supabase.from('system_settings').select('value').eq('key', 'team_directory').single(),
             supabase.from('vehicle_mileage').select('calculated_trip_cost').eq('project_id', id),
-            supabase.from('vehicle_maintenance').select('cost').eq('project_id', id)
+            supabase.from('vehicle_maintenance').select('cost').eq('project_id', id),
+            supabase.from('project_vehicles').select('*, vehicle:vehicles(id, plates, brand, model, year, vehicle_type, status, cost_per_km, current_mileage)').eq('project_id', id).order('assigned_date'),
+            supabase.from('vehicles').select('*').eq('status', 'active').order('brand')
         ]);
         if (!pRes.data) { navigate('/projects'); return; }
         setProject(pRes.data as Project);
@@ -91,6 +102,10 @@ export default function ProjectDetail() {
         const mileageCost = p_mil.reduce((sum: number, item: any) => sum + Number(item.calculated_trip_cost || 0), 0);
         const maintenanceCost = p_mnt.reduce((sum: number, item: any) => sum + Number(item.cost || 0), 0);
         setFleetCost(mileageCost + maintenanceCost);
+
+        // Project Vehicles
+        setProjectVehicles((pvRes.data as ProjectVehicle[]) || []);
+        setAvailableVehicles((avRes.data as Vehicle[]) || []);
 
         if (sysRes.data?.value && Array.isArray(sysRes.data.value)) {
             setTeamMembers(sysRes.data.value);
@@ -433,6 +448,56 @@ export default function ProjectDetail() {
         fetchAll();
     };
 
+    // Vehicle assignment
+    const [vehForm, setVehForm] = useState({ vehicle_id: '', assigned_date: '', release_date: '', operator_name: '', notes: '' });
+    const handleAssignVehicle = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!project || !vehForm.vehicle_id) return;
+
+        // Validate availability — check for date overlap
+        const startDate = vehForm.assigned_date;
+        const endDate = vehForm.release_date || '2099-12-31';
+
+        let overlapQuery = supabase.from('project_vehicles')
+            .select('*, project:projects(project_number, title)')
+            .eq('vehicle_id', vehForm.vehicle_id)
+            .neq('project_id', project.id);
+
+        // Overlap: existing.assigned_date <= endDate AND (existing.release_date IS NULL OR existing.release_date >= startDate)
+        overlapQuery = overlapQuery.lte('assigned_date', endDate);
+
+        const { data: overlaps } = await overlapQuery;
+        const actualOverlaps = (overlaps || []).filter((o: any) => {
+            const oRelease = o.release_date || '2099-12-31';
+            return oRelease >= startDate;
+        });
+
+        if (actualOverlaps.length > 0) {
+            const conflict = actualOverlaps[0] as any;
+            alert(`⚠️ Este vehículo ya está asignado al proyecto ${conflict.project?.project_number || 'Desconocido'} (${conflict.project?.title || ''}) del ${conflict.assigned_date} al ${conflict.release_date || 'sin fecha fin'}.\n\nSelecciona otro vehículo o ajusta las fechas.`);
+            return;
+        }
+
+        await supabase.from('project_vehicles').insert({
+            project_id: project.id,
+            vehicle_id: vehForm.vehicle_id,
+            assigned_date: vehForm.assigned_date,
+            release_date: vehForm.release_date || null,
+            operator_name: vehForm.operator_name || null,
+            notes: vehForm.notes || null,
+        });
+
+        setVehForm({ vehicle_id: '', assigned_date: '', release_date: '', operator_name: '', notes: '' });
+        setShowVehicleForm(false);
+        fetchAll();
+    };
+
+    const handleReleaseVehicle = async (pvId: string) => {
+        if (!confirm('¿Liberar este vehículo del proyecto? Quedará disponible para otros proyectos.')) return;
+        await supabase.from('project_vehicles').delete().eq('id', pvId);
+        fetchAll();
+    };
+
     // KPIs & Financials
     const tasksCompleted = tasks.filter(t => t.status === 'completed').length;
     const totalIncidentCost = incidents.reduce((sum, i) => sum + i.cost_impact, 0);
@@ -494,6 +559,7 @@ export default function ProjectDetail() {
                     { key: 'incidents', icon: 'warning', label: `Incidencias (${incidents.length})` },
                     { key: 'materials', icon: 'inventory_2', label: `Materiales (${materialsUsed.length})` },
                     { key: 'viaticos', icon: 'payments', label: `Viáticos (${expenses.length})` },
+                    { key: 'vehicles', icon: 'local_shipping', label: `Vehículos (${projectVehicles.length})` },
                 ].map(t => (
                     <button key={t.key} onClick={() => setTab(t.key as Tab)}
                         className={`flex flex-1 items-center justify-center min-w-[120px] gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all ${tab === t.key ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -1127,6 +1193,204 @@ export default function ProjectDetail() {
                                     </tr>
                                 </tfoot>
                             </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* TAB: Vehicles */}
+            {tab === 'vehicles' && (
+                <div className={sectionClass}>
+                    <div className="mb-4 flex items-center justify-between">
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-900 dark:text-white">Vehículos Asignados</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Asigna y controla la disponibilidad de vehículos para este proyecto</p>
+                        </div>
+                        <button onClick={() => {
+                            setVehForm({
+                                vehicle_id: '',
+                                assigned_date: project.start_date || new Date().toISOString().split('T')[0],
+                                release_date: project.end_date || '',
+                                operator_name: '',
+                                notes: ''
+                            });
+                            setShowVehicleForm(!showVehicleForm);
+                        }} className="flex items-center gap-1 rounded-lg bg-teal-500 px-3 py-2 text-xs font-semibold text-white hover:bg-teal-600 transition-colors">
+                            <span className="material-symbols-outlined text-[16px]">add</span>Asignar Vehículo
+                        </button>
+                    </div>
+
+                    {showVehicleForm && (
+                        <form onSubmit={handleAssignVehicle} className="mb-6 rounded-xl border border-teal-200 bg-gradient-to-br from-teal-50/80 to-emerald-50/50 p-5 dark:border-teal-900/40 dark:from-teal-900/20 dark:to-emerald-900/10">
+                            <h4 className="mb-4 flex items-center gap-2 text-sm font-bold text-teal-800 dark:text-teal-300">
+                                <span className="material-symbols-outlined text-[18px]">directions_car</span>
+                                Asignar Vehículo al Proyecto
+                            </h4>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="md:col-span-2">
+                                    <label className={labelClass}>Vehículo *</label>
+                                    <select value={vehForm.vehicle_id} onChange={e => setVehForm({ ...vehForm, vehicle_id: e.target.value })} required className={inputClass}>
+                                        <option value="">Seleccionar vehículo disponible...</option>
+                                        {availableVehicles
+                                            .filter(v => !projectVehicles.some(pv => pv.vehicle_id === v.id))
+                                            .map(v => (
+                                                <option key={v.id} value={v.id}>
+                                                    {VEHICLE_TYPE_LABELS[v.vehicle_type] || v.vehicle_type} — {v.brand} {v.model} ({v.plates}) · {v.current_mileage.toLocaleString()} km
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Fecha Asignación *</label>
+                                    <input type="date" value={vehForm.assigned_date} onChange={e => setVehForm({ ...vehForm, assigned_date: e.target.value })} required className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Fecha Liberación (estimada)</label>
+                                    <input type="date" value={vehForm.release_date} onChange={e => setVehForm({ ...vehForm, release_date: e.target.value })} className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Operador / Chofer</label>
+                                    <select value={vehForm.operator_name} onChange={e => setVehForm({ ...vehForm, operator_name: e.target.value })} className={inputClass}>
+                                        <option value="">Sin asignar</option>
+                                        {teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Notas</label>
+                                    <input type="text" value={vehForm.notes} onChange={e => setVehForm({ ...vehForm, notes: e.target.value })} className={inputClass} placeholder="Ej. Llevar equipo de soldadura" />
+                                </div>
+                            </div>
+
+                            {/* Preview del vehículo seleccionado */}
+                            {vehForm.vehicle_id && (() => {
+                                const sel = availableVehicles.find(v => v.id === vehForm.vehicle_id);
+                                if (!sel) return null;
+                                return (
+                                    <div className="mt-4 flex items-center gap-4 rounded-lg border border-teal-200 bg-white/70 p-3 dark:border-teal-800 dark:bg-slate-800/50">
+                                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-100 dark:bg-teal-900/40">
+                                            <span className="material-symbols-outlined text-teal-600 dark:text-teal-400 text-[24px]">{VEHICLE_TYPE_ICONS[sel.vehicle_type] || 'directions_car'}</span>
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="font-bold text-sm text-slate-900 dark:text-white">{sel.brand} {sel.model} <span className="text-xs text-slate-500">({sel.year})</span></p>
+                                            <div className="flex items-center gap-3 text-xs text-slate-500 mt-0.5">
+                                                <span className="font-mono font-bold text-teal-600 dark:text-teal-400">{sel.plates}</span>
+                                                <span>·</span>
+                                                <span>{sel.current_mileage.toLocaleString()} km</span>
+                                                <span>·</span>
+                                                <span>${sel.cost_per_km}/km</span>
+                                            </div>
+                                        </div>
+                                        <div className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${VEHICLE_STATUS_COLORS[sel.status].bg} ${VEHICLE_STATUS_COLORS[sel.status].text}`}>
+                                            {VEHICLE_STATUS_LABELS[sel.status]}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            <div className="mt-4 flex justify-end gap-2">
+                                <button type="button" onClick={() => setShowVehicleForm(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-500 dark:border-slate-700">Cancelar</button>
+                                <button type="submit" className="rounded-lg bg-teal-500 px-5 py-2 text-sm font-semibold text-white hover:bg-teal-600 shadow-sm">Asignar Vehículo</button>
+                            </div>
+                        </form>
+                    )}
+
+                    {projectVehicles.length === 0 ? (
+                        <div className="py-12 text-center">
+                            <span className="material-symbols-outlined mb-3 text-[56px] text-slate-200 dark:text-slate-700">local_shipping</span>
+                            <p className="text-sm text-slate-500">No hay vehículos asignados a este proyecto.</p>
+                            <p className="text-xs text-slate-400 mt-1">Asigna un vehículo para apartarlo y controlar su disponibilidad.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                            {projectVehicles.map(pv => {
+                                const v = pv.vehicle;
+                                if (!v) return null;
+                                const isActive = !pv.release_date || new Date(pv.release_date) >= new Date();
+                                const vStatusColor = VEHICLE_STATUS_COLORS[v.status as keyof typeof VEHICLE_STATUS_COLORS] || VEHICLE_STATUS_COLORS.active;
+                                return (
+                                    <div key={pv.id} className={`group relative rounded-xl border transition-all overflow-hidden ${
+                                        isActive
+                                            ? 'border-teal-200 bg-gradient-to-br from-white to-teal-50/30 shadow-sm hover:shadow-md hover:border-teal-300 dark:border-teal-800/60 dark:from-slate-800 dark:to-teal-900/10'
+                                            : 'border-slate-200 bg-slate-50/50 opacity-75 dark:border-slate-700 dark:bg-slate-800/30'
+                                    }`}>
+                                        {/* Top color bar */}
+                                        <div className={`h-1.5 w-full ${isActive ? 'bg-gradient-to-r from-teal-400 to-emerald-400' : 'bg-slate-300 dark:bg-slate-600'}`} />
+                                        <div className="p-5">
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${isActive ? 'bg-teal-100 dark:bg-teal-900/40' : 'bg-slate-100 dark:bg-slate-700'}`}>
+                                                        <span className={`material-symbols-outlined text-[22px] ${isActive ? 'text-teal-600 dark:text-teal-400' : 'text-slate-400'}`}>
+                                                            {VEHICLE_TYPE_ICONS[v.vehicle_type as keyof typeof VEHICLE_TYPE_ICONS] || 'directions_car'}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-900 dark:text-white">{v.brand} {v.model}</p>
+                                                        <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-mono font-bold text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                                                            {v.plates}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${vStatusColor.bg} ${vStatusColor.text}`}>
+                                                    {VEHICLE_STATUS_LABELS[v.status as keyof typeof VEHICLE_STATUS_LABELS] || v.status}
+                                                </div>
+                                            </div>
+
+                                            <div className="mt-4 space-y-2">
+                                                <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                    <span className="material-symbols-outlined text-[14px]">event</span>
+                                                    <span className="font-semibold">
+                                                        {new Date(pv.assigned_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        {pv.release_date ? ` → ${new Date(pv.release_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}` : ' → Sin fecha fin'}
+                                                    </span>
+                                                </div>
+                                                {pv.operator_name && (
+                                                    <div className="flex items-center gap-2 text-xs text-slate-500">
+                                                        <span className="material-symbols-outlined text-[14px]">person</span>
+                                                        <span className="font-semibold text-slate-700 dark:text-slate-300">{pv.operator_name}</span>
+                                                    </div>
+                                                )}
+                                                <div className="flex items-center gap-3 text-xs text-slate-400">
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[12px]">speed</span>
+                                                        {v.current_mileage.toLocaleString()} km
+                                                    </span>
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[12px]">paid</span>
+                                                        ${v.cost_per_km}/km
+                                                    </span>
+                                                    <span>
+                                                        {VEHICLE_TYPE_LABELS[v.vehicle_type as keyof typeof VEHICLE_TYPE_LABELS] || v.vehicle_type} · {v.year}
+                                                    </span>
+                                                </div>
+                                                {pv.notes && (
+                                                    <p className="text-xs text-slate-400 italic mt-1">{pv.notes}</p>
+                                                )}
+                                            </div>
+
+                                            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-700/50">
+                                                {isActive ? (
+                                                    <span className="flex items-center gap-1 text-xs font-semibold text-teal-600 dark:text-teal-400">
+                                                        <span className="relative flex h-2 w-2">
+                                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-teal-400 opacity-75"></span>
+                                                            <span className="relative inline-flex h-2 w-2 rounded-full bg-teal-500"></span>
+                                                        </span>
+                                                        En uso
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400">Periodo finalizado</span>
+                                                )}
+                                                <button
+                                                    onClick={() => handleReleaseVehicle(pv.id)}
+                                                    className="flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition-all hover:bg-red-100 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">link_off</span>
+                                                    Liberar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>
