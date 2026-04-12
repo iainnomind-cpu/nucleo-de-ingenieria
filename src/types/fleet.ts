@@ -40,6 +40,11 @@ export interface VehicleMileage {
     distance: number;
     fuel_cost: number;
     calculated_trip_cost: number;
+    destination: string | null;
+    departure_date: string | null;
+    return_date: string | null;
+    fuel_level_start: number | null;
+    fuel_level_end: number | null;
     notes: string | null;
     created_at: string;
 }

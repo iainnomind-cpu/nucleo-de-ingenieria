@@ -36,19 +36,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Construir payload para Meta — normalizar teléfono mexicano
+        // Meta requiere formato 521XXXXXXXXXX para números móviles de México
         let cleanPhone = to.replace(/\D/g, ''); // Quitar todo excepto dígitos
-        // Si tiene 10 dígitos, es un número mexicano sin código de país → agregar 52
-        if (cleanPhone.length === 10) {
-            cleanPhone = '52' + cleanPhone;
-        }
-        // Si tiene 13 dígitos y empieza con 521, quitar el 1 intermedio (formato viejo móvil MX)
-        if (cleanPhone.length === 13 && cleanPhone.startsWith('521')) {
-            cleanPhone = '52' + cleanPhone.slice(3);
-        }
-        // Si empieza con 044 o 045 (prefijos viejos de celular MX), quitarlos y agregar 52
+
+        // Quitar prefijos viejos de celular MX (044, 045)
         if (cleanPhone.startsWith('044') || cleanPhone.startsWith('045')) {
-            cleanPhone = '52' + cleanPhone.slice(3);
+            cleanPhone = cleanPhone.slice(3);
         }
+
+        // Si tiene 10 dígitos → número mexicano sin código de país → agregar 521
+        if (cleanPhone.length === 10) {
+            cleanPhone = '521' + cleanPhone;
+        }
+        // Si tiene 12 dígitos y empieza con 52 (sin el 1 intermedio) → agregar el 1
+        if (cleanPhone.length === 12 && cleanPhone.startsWith('52')) {
+            cleanPhone = '52' + '1' + cleanPhone.slice(2);
+        }
+        // Si ya tiene 13 dígitos y empieza con 521 → correcto, no tocar
         let metaPayload: any = {
             messaging_product: 'whatsapp',
             recipient_type: 'individual',

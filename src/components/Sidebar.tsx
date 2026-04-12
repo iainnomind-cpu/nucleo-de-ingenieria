@@ -11,6 +11,7 @@ const navItems = [
   { label: 'Proyectos', icon: 'engineering', path: '/projects', module: 'projects' },
   { label: 'Inventario', icon: 'warehouse', path: '/inventory', module: 'inventory' },
   { label: 'Mantenimiento', icon: 'build', path: '/maintenance', module: 'maintenance' },
+  { label: 'Reparaciones', icon: 'construction', path: '/repairs', module: 'maintenance' },
   { label: 'Finanzas', icon: 'account_balance', path: '/finance', module: 'finance' },
   { label: 'Flotilla', icon: 'local_shipping', path: '/fleet', module: 'fleet' },
   { label: 'WhatsApp Mktg', icon: 'chat', path: '/whatsapp', module: 'whatsapp' },

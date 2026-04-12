@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import { triggerWaAutomation } from '../../../lib/waAutomation';
 import {
     Project, ProjectTask, FieldLog, ProjectIncident, ProjectVehicle,
     ProjectStatus, TaskStatus as TStatus,
@@ -229,6 +230,22 @@ export default function ProjectDetail() {
         }
 
         await supabase.from('projects').update(updates).eq('id', project.id);
+
+        // → M9: WhatsApp automation trigger
+        triggerWaAutomation({
+            module: 'projects',
+            event: 'status_change',
+            condition: { new_status: newStatus },
+            record: {
+                title: project.title,
+                project_number: project.project_number,
+                client_name: project.client?.company_name || '',
+                status_label: PROJECT_STATUS_LABELS[newStatus],
+                project_manager: project.project_manager || '',
+            },
+            referenceId: project.id,
+        });
+
         fetchAll();
     };
 
@@ -300,6 +317,22 @@ export default function ProjectDetail() {
         }
 
         await supabase.from('projects').update({ status: 'completed', actual_end }).eq('id', project.id);
+
+        // → M9: WhatsApp automation trigger
+        triggerWaAutomation({
+            module: 'projects',
+            event: 'status_change',
+            condition: { new_status: 'completed' },
+            record: {
+                title: project.title,
+                project_number: project.project_number,
+                client_name: project.client?.company_name || '',
+                status_label: PROJECT_STATUS_LABELS.completed,
+                project_manager: project.project_manager || '',
+            },
+            referenceId: project.id,
+        });
+
         setShowCompletionModal(false);
         fetchAll();
     };

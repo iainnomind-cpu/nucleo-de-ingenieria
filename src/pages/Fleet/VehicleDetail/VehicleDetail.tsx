@@ -45,7 +45,7 @@ export default function VehicleDetail() {
             supabase.from('vehicle_insurances').select('*').eq('vehicle_id', id).order('start_date', { ascending: false }),
             supabase.from('vehicle_mileage').select('*, project:projects(project_number, title)').eq('vehicle_id', id).order('date', { ascending: false }),
             supabase.from('vehicle_maintenance').select('*, project:projects(project_number, title)').eq('vehicle_id', id).order('service_date', { ascending: false }),
-            supabase.from('projects').select('id, project_number, title')
+            supabase.from('projects').select('id, project_number, title, location')
         ]);
 
         setVehicle(vRes.data as Vehicle);
@@ -223,8 +223,10 @@ export default function VehicleDetail() {
                                     <tr>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Fecha</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Conductor</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500">Destino</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Proyecto</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Recorrido</th>
+                                        <th className="px-3 py-3 font-semibold text-slate-500 text-center">Tanque</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-right">Costo Combustible</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-right">Costo Operativo</th>
                                     </tr>
@@ -234,6 +236,9 @@ export default function VehicleDetail() {
                                         <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                                             <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.date).toLocaleDateString('es-MX')}</td>
                                             <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{m.driver_name}</td>
+                                            <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
+                                                {m.destination ? <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px] text-slate-400">location_on</span>{m.destination}</span> : '—'}
+                                            </td>
                                             <td className="px-4 py-3 text-xs text-slate-500">
                                                 {/* @ts-ignore */}
                                                 {m.project ? <span className="font-mono">{m.project.project_number}</span> : '—'}
@@ -241,6 +246,15 @@ export default function VehicleDetail() {
                                             <td className="px-4 py-3 font-mono text-xs">
                                                 <div className="text-slate-500">{m.odometer_start} - {m.odometer_end}</div>
                                                 <div className="font-bold text-emerald-500 mt-0.5">+{m.distance} km</div>
+                                            </td>
+                                            <td className="px-3 py-3 text-center text-xs">
+                                                {(m.fuel_level_start != null || m.fuel_level_end != null) ? (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <span className="text-slate-500">{m.fuel_level_start ?? '?'}%</span>
+                                                        <span className="material-symbols-outlined text-[12px] text-slate-400">arrow_forward</span>
+                                                        <span className="text-slate-700 dark:text-slate-300 font-semibold">{m.fuel_level_end ?? '?'}%</span>
+                                                    </div>
+                                                ) : '—'}
                                             </td>
                                             <td className="px-4 py-3 text-right text-slate-500">{m.fuel_cost > 0 ? formatCurrency(m.fuel_cost) : '—'}</td>
                                             <td className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300">{formatCurrency(m.calculated_trip_cost)}</td>
@@ -320,38 +334,66 @@ export default function VehicleDetail() {
             {/* Mileage Modal */}
             {showMilForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+                    <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
                         <div className="mb-6 flex items-center justify-between">
                             <h3 className="text-lg font-bold text-slate-900 dark:text-white">Registrar Viaje</h3>
                             <button onClick={() => setShowMilForm(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
                         </div>
                         <form onSubmit={handleAddMil} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Fecha</label><input required type="date" value={milForm.date || ''} onChange={e => setMilForm({...milForm, date: e.target.value})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
-                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Conductor</label><input required type="text" value={milForm.driver_name || ''} onChange={e => setMilForm({...milForm, driver_name: e.target.value})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Conductor *</label><input required type="text" value={milForm.driver_name || ''} onChange={e => setMilForm({...milForm, driver_name: e.target.value})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Fecha *</label><input required type="date" value={milForm.date || ''} onChange={e => setMilForm({...milForm, date: e.target.value})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                             </div>
                             <div>
                                 <label className="mb-1 block text-xs font-semibold text-slate-500">Proyecto Asociado (Opcional)</label>
-                                <select value={milForm.project_id || ''} onChange={e => setMilForm({...milForm, project_id: e.target.value || undefined})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900">
+                                <select value={milForm.project_id || ''} onChange={e => {
+                                    const pid = e.target.value || undefined;
+                                    const proj = projects.find(p => p.id === pid);
+                                    setMilForm({...milForm, project_id: pid, destination: proj?.location || milForm.destination || ''});
+                                }} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900">
                                     <option value="">-- Sin Proyecto (Operativo Gral) --</option>
-                                    {projects.map(p => <option key={p.id} value={p.id}>{p.project_number} - {p.title}</option>)}
+                                    {projects.map(p => <option key={p.id} value={p.id}>{p.project_number} - {p.title}{p.location ? ` (${p.location})` : ''}</option>)}
                                 </select>
-                                <p className="text-[10px] text-slate-400 mt-1">Si seleccionas un proyecto, el costo del recocorrido se descontará de la utilidad.</p>
+                                <p className="text-[10px] text-slate-400 mt-1">Si seleccionas un proyecto, el destino se llena automáticamente con la ubicación del proyecto.</p>
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-500">Destino</label>
+                                <input type="text" value={(milForm as any).destination || ''} onChange={e => setMilForm({...milForm, destination: e.target.value} as any)} placeholder="Ciudad, ubicación del pozo, etc." className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odom. Inicial</label><input required type="number" step="0.1" value={milForm.odometer_start || 0} onChange={e => setMilForm({...milForm, odometer_start: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
-                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odom. Final</label><input required type="number" step="0.1" value={milForm.odometer_end || 0} onChange={e => setMilForm({...milForm, odometer_end: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Fecha/Hora Salida</label><input type="datetime-local" value={(milForm as any).departure_date || ''} onChange={e => setMilForm({...milForm, departure_date: e.target.value} as any)} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Fecha/Hora Regreso</label><input type="datetime-local" value={(milForm as any).return_date || ''} onChange={e => setMilForm({...milForm, return_date: e.target.value} as any)} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odom. Inicial *</label><input required type="number" step="0.1" value={milForm.odometer_start || 0} onChange={e => setMilForm({...milForm, odometer_start: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odom. Final *</label><input required type="number" step="0.1" value={milForm.odometer_end || 0} onChange={e => setMilForm({...milForm, odometer_end: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                             </div>
                             <div className="flex justify-between items-center bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-sm border border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800/50">
                                 <span>Distancia: <strong>{((milForm.odometer_end || 0) - (milForm.odometer_start || 0)).toFixed(1)} km</strong></span>
                                 <span>Costo op: <strong>{formatCurrency(((milForm.odometer_end || 0) - (milForm.odometer_start || 0)) * vehicle.cost_per_km)}</strong></span>
                             </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">% Tanque Salida</label>
+                                    <div className="flex items-center gap-2">
+                                        <input type="range" min="0" max="100" step="5" value={(milForm as any).fuel_level_start || 0} onChange={e => setMilForm({...milForm, fuel_level_start: parseInt(e.target.value)} as any)} className="flex-1 accent-emerald-500" />
+                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300 w-10 text-right">{(milForm as any).fuel_level_start || 0}%</span>
+                                    </div>
+                                </div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">% Tanque Regreso</label>
+                                    <div className="flex items-center gap-2">
+                                        <input type="range" min="0" max="100" step="5" value={(milForm as any).fuel_level_end || 0} onChange={e => setMilForm({...milForm, fuel_level_end: parseInt(e.target.value)} as any)} className="flex-1 accent-emerald-500" />
+                                        <span className="text-sm font-bold text-slate-700 dark:text-slate-300 w-10 text-right">{(milForm as any).fuel_level_end || 0}%</span>
+                                    </div>
+                                </div>
+                            </div>
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Costo Carga Combustible ($ opcional)</label><input type="number" step="0.01" value={milForm.fuel_cost || 0} onChange={e => setMilForm({...milForm, fuel_cost: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                            <div><label className="mb-1 block text-xs font-semibold text-slate-500">Observaciones</label><textarea value={milForm.notes || ''} onChange={e => setMilForm({...milForm, notes: e.target.value})} rows={2} placeholder="Notas del viaje..." className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900 resize-none" /></div>
                             <button type="submit" className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700">Guardar Viaje</button>
                         </form>
                     </div>
                 </div>
             )}
+
 
             {/* Maintenance Modal */}
             {showMntForm && (
