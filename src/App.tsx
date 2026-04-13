@@ -34,7 +34,6 @@ import CampaignsList from './pages/WhatsApp/CampaignsList';
 import TemplatesList from './pages/WhatsApp/TemplatesList';
 import WhatsAppReports from './pages/WhatsApp/WhatsAppReports';
 import DirectSend from './pages/WhatsApp/DirectSend';
-import AutomationRules from './pages/WhatsApp/AutomationRules';
 import SystemSettings from './pages/Settings/SystemSettings';
 import NotificationListener from './components/NotificationListener';
 import ClientWellLogPublic from './pages/Maintenance/ClientWellLogPublic';
@@ -149,7 +148,6 @@ function ProtectedApp() {
               <Route path="/whatsapp/send" element={<DirectSend />} />
               <Route path="/whatsapp/templates" element={<TemplatesList />} />
               <Route path="/whatsapp/reports" element={<WhatsAppReports />} />
-              <Route path="/whatsapp/automations" element={<AutomationRules />} />
             </>
           )}
           {/* Configuración del Sistema */}

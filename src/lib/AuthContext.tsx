@@ -73,18 +73,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const refreshUser = useCallback(async () => {
         if (!user) return;
-        // Recargar datos del usuario y su rol desde la BD
+        // Recargar datos del usuario desde la BD
         const { data: userData } = await supabase
             .from('app_users')
-            .select('*, role:app_roles(*)')
+            .select('*')
             .eq('id', user.id)
             .single();
 
         if (userData) {
             const refreshed: AppUser = {
                 ...userData,
-                role_name: userData.role?.name || 'Sin rol',
-                permissions: userData.role?.permissions || {},
+                permissions: userData.permissions,
             };
             setUser(refreshed);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(refreshed));

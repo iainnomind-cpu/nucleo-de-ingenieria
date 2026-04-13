@@ -37,7 +37,7 @@ export default function TemplatesList() {
 
     const fetchTemplates = useCallback(async () => {
         setLoading(true);
-        let query = supabase.from('wa_templates').select('*').order('created_at', { ascending: false });
+        let query = supabase.from('wa_templates').select('*').eq('usage_type', 'marketing').order('created_at', { ascending: false });
         if (filterStatus !== 'all') query = query.eq('meta_status', filterStatus);
         const { data } = await query;
         setTemplates((data as WaTemplate[]) || []);
@@ -92,6 +92,7 @@ export default function TemplatesList() {
             body: finalBody,
             footer: form.footer || null,
             variables: finalVariables,
+            usage_type: 'marketing',
             meta_status: form.meta_status,
         };
         if (editingId) {

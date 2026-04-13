@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { triggerWaAutomation } from '../../lib/waAutomation';
 import {
     Quote,
     QuoteItem,
@@ -146,6 +147,19 @@ export default function QuoteDetail() {
             if (invoice) {
                 alert(`Generada factura en borrador: ${invoice.invoice_number} (Módulo M6)`);
             }
+
+            // → Trigger WA Automation: Cotización Aprobada / Proyecto Ganado
+            triggerWaAutomation({
+                module: 'quotes',
+                event: 'approved',
+                record: {
+                    quote_number: quote.quote_number,
+                    client_name: quote.client?.company_name || '',
+                    total_amount: formatCurrency(quote.total),
+                    title: quote.title,
+                },
+                referenceId: quote.id,
+            });
         }
 
         fetchQuote();
@@ -311,6 +325,22 @@ export default function QuoteDetail() {
             if (tasksToInsert.length > 0) {
                 await supabase.from('team_tasks').insert(tasksToInsert);
             }
+        }
+
+        // → Trigger WA Automation: Proyecto creado desde cotización
+        if (project) {
+            triggerWaAutomation({
+                module: 'projects',
+                event: 'created',
+                record: {
+                    title: `Proyecto: ${quote.title}`,
+                    project_number: projectNumber,
+                    client_name: quote.client?.company_name || '',
+                    status_label: 'Planeación',
+                    project_manager: 'Admin',
+                },
+                referenceId: project.id,
+            });
         }
 
         alert('¡Cotización convertida a proyecto exitosamente! (M3 y M8 actualizados con tareas generadas)');

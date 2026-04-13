@@ -24,6 +24,7 @@ export interface WaTemplate {
     footer: string | null;
     buttons: Array<{ type: string; text: string }>;
     variables: string[];
+    usage_type: 'marketing' | 'team';
     meta_status: MetaStatus;
     meta_template_id: string | null;
     example_values: string[];

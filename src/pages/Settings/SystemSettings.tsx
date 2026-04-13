@@ -7,10 +7,11 @@ import {
 } from '../../types/settings';
 import { formatCurrency } from '../../types/quotes';
 import {
-    AppUser, AppRole, ModulePermissions,
+    AppUser, ModulePermissions,
     MODULE_KEYS, PASSWORD_RULES, isPasswordValid,
-    AVATAR_COLORS, buildEmptyPermissions, buildFullPermissions,
+    buildEmptyPermissions, AVATAR_COLORS,
 } from '../../types/auth';
+import TareasTab from './TareasTab';
 
 type TabKey = 'operativos' | 'catalogos' | 'usuarios' | 'roles' | 'tareas';
 
@@ -24,8 +25,7 @@ export default function SystemSettings() {
         { key: 'operativos', label: 'Parámetros Operativos', icon: 'tune' },
         { key: 'catalogos', label: 'Catálogos', icon: 'folder_open' },
         { key: 'usuarios', label: 'Usuarios', icon: 'people' },
-        { key: 'roles', label: 'Roles', icon: 'shield_person' },
-        { key: 'tareas', label: 'T. Automáticas', icon: 'task_alt' },
+        { key: 'tareas', label: 'Automatizaciones', icon: 'bolt' },
     ];
 
     return (
@@ -67,7 +67,6 @@ export default function SystemSettings() {
             {activeTab === 'operativos' && <OperativosTab />}
             {activeTab === 'catalogos' && <CatalogosTab />}
             {activeTab === 'usuarios' && <UsuariosTab />}
-            {activeTab === 'roles' && <RolesTab />}
             {activeTab === 'tareas' && <TareasTab />}
         </div>
     );
@@ -383,30 +382,27 @@ function CatalogosTab() {
 // TAB 3: USUARIOS
 // ============================================================
 function UsuariosTab() {
-    const [users, setUsers] = useState<(AppUser & { role?: AppRole })[]>([]);
-    const [roles, setRoles] = useState<AppRole[]>([]);
+    const [users, setUsers] = useState<AppUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingUser, setEditingUser] = useState<AppUser | null>(null);
-    const [form, setForm] = useState({ full_name: '', email: '', password: '', role_id: '', avatar_color: '#6366f1', phone: '' });
+    const [form, setForm] = useState({ full_name: '', email: '', password: '', permissions: buildEmptyPermissions(), avatar_color: '#6366f1', phone: '' });
     const [formError, setFormError] = useState('');
     const [saving, setSaving] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const [usersRes, rolesRes] = await Promise.all([
-            supabase.from('app_users').select('*, role:app_roles(*)').order('full_name'),
-            supabase.from('app_roles').select('*').order('name'),
+        const [usersRes] = await Promise.all([
+            supabase.from('app_users').select('*').order('full_name'),
         ]);
         setUsers(usersRes.data || []);
-        setRoles(rolesRes.data || []);
         setLoading(false);
     }, []);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const resetForm = () => {
-        setForm({ full_name: '', email: '', password: '', role_id: roles[0]?.id || '', avatar_color: '#6366f1', phone: '' });
+        setForm({ full_name: '', email: '', password: '', permissions: buildEmptyPermissions(), avatar_color: '#6366f1', phone: '' });
         setEditingUser(null);
         setShowForm(false);
         setFormError('');
@@ -424,7 +420,7 @@ function UsuariosTab() {
             const { error } = await supabase.from('app_users').update({
                 full_name: form.full_name.trim(),
                 email: form.email.trim().toLowerCase(),
-                role_id: form.role_id || null,
+                permissions: form.permissions,
                 avatar_color: form.avatar_color,
                 phone: form.phone.trim() || null,
             }).eq('id', editingUser.id);
@@ -443,7 +439,7 @@ function UsuariosTab() {
                 p_full_name: form.full_name.trim(),
                 p_email: form.email.trim().toLowerCase(),
                 p_password: form.password,
-                p_role_id: form.role_id || null,
+                p_permissions: form.permissions,
                 p_avatar_color: form.avatar_color,
                 p_phone: form.phone.trim() || null,
             });
@@ -458,7 +454,8 @@ function UsuariosTab() {
 
     const handleEditUser = (u: any) => {
         setEditingUser(u);
-        setForm({ full_name: u.full_name, email: u.email, password: '', role_id: u.role_id || '', avatar_color: u.avatar_color || '#6366f1', phone: u.phone || '' });
+        const merged = { ...buildEmptyPermissions(), ...(u.permissions || {}) };
+        setForm({ full_name: u.full_name, email: u.email, password: '', permissions: merged as any, avatar_color: u.avatar_color || '#6366f1', phone: u.phone || '' });
         setShowForm(true);
         setFormError('');
     };
@@ -479,7 +476,7 @@ function UsuariosTab() {
                     <p className="text-sm text-slate-500">{users.length} usuarios registrados</p>
                 </div>
                 <button
-                    onClick={() => { resetForm(); setForm(f => ({ ...f, role_id: roles[0]?.id || '' })); setShowForm(true); }}
+                    onClick={() => { resetForm(); setForm(f => ({ ...f, permissions: buildEmptyPermissions() })); setShowForm(true); }}
                     className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20"
                 >
                     <span className="material-symbols-outlined text-[20px]">person_add</span>
@@ -517,13 +514,7 @@ function UsuariosTab() {
                             <label className={labelClass}>{editingUser ? 'Nueva contraseña (dejar vacío para mantener)' : 'Contraseña *'}</label>
                             <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={inputClass} placeholder="••••••••" />
                         </div>
-                        <div>
-                            <label className={labelClass}>Rol</label>
-                            <select value={form.role_id} onChange={e => setForm({ ...form, role_id: e.target.value })} className={inputClass}>
-                                <option value="">Sin rol</option>
-                                {roles.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
-                            </select>
-                        </div>
+                        
                         <div>
                             <label className={labelClass}>Color de avatar</label>
                             <div className="flex flex-wrap gap-2">
@@ -534,7 +525,90 @@ function UsuariosTab() {
                                     />
                                 ))}
                             </div>
+                        
+                    {/* Permissions Matrix */}
+                    <div className="col-span-full mt-4">
+                        <h5 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Matriz de Permisos Individuales</h5>
+                        <div className="rounded-xl border border-slate-200/60 bg-white/50 overflow-hidden dark:border-slate-800/60 dark:bg-slate-900/50">
+                            <table className="w-full text-sm">
+                                <thead className="border-b border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left font-semibold text-slate-500">Módulo</th>
+                                        <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Ver</th>
+                                        <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Crear</th>
+                                        <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Editar</th>
+                                        <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Eliminar</th>
+                                        <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Todo</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {MODULE_KEYS.map(m => {
+                                        const p = (form.permissions as any)[m.key] || { view: false, create: false, edit: false, delete: false };
+                                        const allChecked = p.view && p.create && p.edit && p.delete;
+                                        
+                                        const togglePerm = (moduleKey: string, action: 'view' | 'create' | 'edit' | 'delete') => {
+                                            setForm(prev => {
+                                                const perms = { ...prev.permissions } as any;
+                                                const mod = { ...(perms[moduleKey] || { view: false, create: false, edit: false, delete: false }) };
+                                                mod[action] = !mod[action];
+                                                if (action === 'view' && !mod[action]) {
+                                                    mod.create = false; mod.edit = false; mod.delete = false;
+                                                }
+                                                if (action !== 'view' && mod[action]) { mod.view = true; }
+                                                perms[moduleKey] = mod;
+                                                return { ...prev, permissions: perms };
+                                            });
+                                        };
+                                        const selectAllForModule = (moduleKey: string, value: boolean) => {
+                                            setForm(prev => {
+                                                const perms = { ...prev.permissions } as any;
+                                                perms[moduleKey] = { view: value, create: value, edit: value, delete: value };
+                                                return { ...prev, permissions: perms };
+                                            });
+                                        };
+                                        return (
+                                            <tr key={m.key} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
+                                                <td className="px-4 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="material-symbols-outlined text-[18px] text-slate-400">{m.icon}</span>
+                                                        <span className="font-medium text-slate-700 dark:text-slate-300">{m.label}</span>
+                                                    </div>
+                                                </td>
+                                                {(['view', 'create', 'edit', 'delete'] as const).map(action => (
+                                                    <td key={action} className="px-3 py-3 text-center">
+                                                        <button
+                                                            onClick={(e) => { e.preventDefault(); togglePerm(m.key, action); }}
+                                                            className={`h-6 w-6 rounded-md border-2 transition-all mx-auto flex items-center justify-center ${
+                                                                p[action]
+                                                                    ? 'border-primary bg-primary text-white'
+                                                                    : 'border-slate-300 bg-white hover:border-primary/50 dark:border-slate-600 dark:bg-slate-800'
+                                                            }`}
+                                                        >
+                                                            {p[action] && <span className="material-symbols-outlined text-[16px]">check</span>}
+                                                        </button>
+                                                    </td>
+                                                ))}
+                                                <td className="px-3 py-3 text-center">
+                                                    <button
+                                                        onClick={(e) => { e.preventDefault(); selectAllForModule(m.key, !allChecked); }}
+                                                        className={`h-6 w-6 rounded-md border-2 transition-all mx-auto flex items-center justify-center ${
+                                                            allChecked
+                                                                ? 'border-emerald-500 bg-emerald-500 text-white'
+                                                                : 'border-slate-300 bg-white hover:border-emerald-400 dark:border-slate-600 dark:bg-slate-800'
+                                                        }`}
+                                                    >
+                                                        {allChecked && <span className="material-symbols-outlined text-[16px]">done_all</span>}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
                         </div>
+                    </div>
+ 
+ </div>
                     </div>
 
                     {/* Password strength indicator */}
@@ -590,9 +664,7 @@ function UsuariosTab() {
                                     }`}>
                                         {u.is_active ? 'Activo' : 'Inactivo'}
                                     </span>
-                                    <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-[10px] font-bold text-primary">
-                                        {u.role?.name || 'Sin rol'}
-                                    </span>
+                                    
                                 </div>
                                 <div className="mt-1 flex flex-col gap-0.5">
                                     {u.phone && (
@@ -624,472 +696,3 @@ function UsuariosTab() {
     );
 }
 
-// ============================================================
-// TAB 4: ROLES
-// ============================================================
-function RolesTab() {
-    const [roles, setRoles] = useState<AppRole[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [showForm, setShowForm] = useState(false);
-    const [editingRole, setEditingRole] = useState<AppRole | null>(null);
-    const [form, setForm] = useState({ name: '', description: '', permissions: buildFullPermissions() });
-    const [formError, setFormError] = useState('');
-    const [saving, setSaving] = useState(false);
-
-    const fetchRoles = useCallback(async () => {
-        setLoading(true);
-        const { data } = await supabase.from('app_roles').select('*').order('is_system', { ascending: false }).order('name');
-        setRoles(data || []);
-        setLoading(false);
-    }, []);
-
-    useEffect(() => { fetchRoles(); }, [fetchRoles]);
-
-    const resetForm = () => {
-        setForm({ name: '', description: '', permissions: buildEmptyPermissions() });
-        setEditingRole(null);
-        setShowForm(false);
-        setFormError('');
-    };
-
-    const handleSave = async () => {
-        setFormError('');
-        if (!form.name.trim()) { setFormError('El nombre del rol es obligatorio'); return; }
-
-        setSaving(true);
-        const payload = { name: form.name.trim(), description: form.description.trim() || null, permissions: form.permissions };
-
-        if (editingRole) {
-            const { error } = await supabase.from('app_roles').update(payload).eq('id', editingRole.id);
-            if (error) { setFormError(error.message); setSaving(false); return; }
-        } else {
-            const { error } = await supabase.from('app_roles').insert(payload);
-            if (error) { setFormError(error.message); setSaving(false); return; }
-        }
-
-        setSaving(false);
-        resetForm();
-        fetchRoles();
-    };
-
-    const handleEdit = (r: AppRole) => {
-        setEditingRole(r);
-        // Merge with empty permissions to ensure all modules exist
-        const merged = { ...buildEmptyPermissions(), ...(r.permissions || {}) };
-        setForm({ name: r.name, description: r.description || '', permissions: merged as ModulePermissions });
-        setShowForm(true);
-        setFormError('');
-    };
-
-    const handleDelete = async (r: AppRole) => {
-        if (r.is_system) return;
-        if (!confirm(`¿Eliminar el rol "${r.name}"? Los usuarios asignados quedarán sin rol.`)) return;
-        await supabase.from('app_roles').delete().eq('id', r.id);
-        fetchRoles();
-    };
-
-    const togglePerm = (moduleKey: string, action: 'view' | 'create' | 'edit' | 'delete') => {
-        setForm(prev => {
-            const perms = { ...prev.permissions };
-            const mod = { ...(perms[moduleKey] || { view: false, create: false, edit: false, delete: false }) };
-            mod[action] = !mod[action];
-            // Si se deshabilita view, deshabilitar todo
-            if (action === 'view' && !mod[action]) {
-                mod.create = false; mod.edit = false; mod.delete = false;
-            }
-            // Si se habilita create/edit/delete, habilitar view
-            if (action !== 'view' && mod[action]) { mod.view = true; }
-            perms[moduleKey] = mod;
-            return { ...prev, permissions: perms };
-        });
-    };
-
-    const selectAllForModule = (moduleKey: string, value: boolean) => {
-        setForm(prev => {
-            const perms = { ...prev.permissions };
-            perms[moduleKey] = { view: value, create: value, edit: value, delete: value };
-            return { ...prev, permissions: perms };
-        });
-    };
-
-    if (loading) return <div className="flex justify-center py-12"><div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
-
-    return (
-        <div>
-            {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Roles y Permisos</h3>
-                    <p className="text-sm text-slate-500">Define los permisos de cada área de la empresa</p>
-                </div>
-                <button
-                    onClick={() => { resetForm(); setShowForm(true); }}
-                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20"
-                >
-                    <span className="material-symbols-outlined text-[20px]">add</span>
-                    Nuevo Rol
-                </button>
-            </div>
-
-            {/* Create/Edit Form */}
-            {showForm && (
-                <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-6 dark:bg-primary/5">
-                    <h4 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">
-                        {editingRole ? `Editar Rol: ${editingRole.name}` : 'Crear Nuevo Rol'}
-                    </h4>
-
-                    {formError && (
-                        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-                            <span className="material-symbols-outlined text-[18px]">error</span>{formError}
-                        </div>
-                    )}
-
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 mb-6">
-                        <div>
-                            <label className={labelClass}>Nombre del rol *</label>
-                            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputClass} placeholder="Ej: Ingeniería Campo" disabled={editingRole?.is_system} />
-                        </div>
-                        <div>
-                            <label className={labelClass}>Descripción</label>
-                            <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="Breve descripción del área..." />
-                        </div>
-                    </div>
-
-                    {/* Permissions Matrix */}
-                    <h5 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Matriz de permisos por módulo</h5>
-                    <div className="rounded-xl border border-slate-200/60 bg-white/50 overflow-hidden dark:border-slate-800/60 dark:bg-slate-900/50">
-                        <table className="w-full text-sm">
-                            <thead className="border-b border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/50">
-                                <tr>
-                                    <th className="px-4 py-3 text-left font-semibold text-slate-500">Módulo</th>
-                                    <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Ver</th>
-                                    <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Crear</th>
-                                    <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Editar</th>
-                                    <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Eliminar</th>
-                                    <th className="px-3 py-3 text-center font-semibold text-slate-500 w-20">Todo</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {MODULE_KEYS.map(m => {
-                                    const p = form.permissions[m.key] || { view: false, create: false, edit: false, delete: false };
-                                    const allChecked = p.view && p.create && p.edit && p.delete;
-                                    return (
-                                        <tr key={m.key} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30">
-                                            <td className="px-4 py-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-[18px] text-slate-400">{m.icon}</span>
-                                                    <span className="font-medium text-slate-700 dark:text-slate-300">{m.label}</span>
-                                                </div>
-                                            </td>
-                                            {(['view', 'create', 'edit', 'delete'] as const).map(action => (
-                                                <td key={action} className="px-3 py-3 text-center">
-                                                    <button
-                                                        onClick={() => togglePerm(m.key, action)}
-                                                        className={`h-6 w-6 rounded-md border-2 transition-all mx-auto flex items-center justify-center ${
-                                                            p[action]
-                                                                ? 'border-primary bg-primary text-white'
-                                                                : 'border-slate-300 bg-white hover:border-primary/50 dark:border-slate-600 dark:bg-slate-800'
-                                                        }`}
-                                                    >
-                                                        {p[action] && <span className="material-symbols-outlined text-[16px]">check</span>}
-                                                    </button>
-                                                </td>
-                                            ))}
-                                            <td className="px-3 py-3 text-center">
-                                                <button
-                                                    onClick={() => selectAllForModule(m.key, !allChecked)}
-                                                    className={`h-6 w-6 rounded-md border-2 transition-all mx-auto flex items-center justify-center ${
-                                                        allChecked
-                                                            ? 'border-emerald-500 bg-emerald-500 text-white'
-                                                            : 'border-slate-300 bg-white hover:border-emerald-400 dark:border-slate-600 dark:bg-slate-800'
-                                                    }`}
-                                                >
-                                                    {allChecked && <span className="material-symbols-outlined text-[16px]">done_all</span>}
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <div className="mt-4 flex gap-2">
-                        <button onClick={handleSave} disabled={saving} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-                            {saving ? 'Guardando...' : editingRole ? 'Actualizar Rol' : 'Crear Rol'}
-                        </button>
-                        <button onClick={resetForm} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-700 dark:text-slate-400">Cancelar</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Roles List */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {roles.map(r => {
-                    const permCount = Object.values(r.permissions || {}).filter((p: any) => p?.view).length;
-                    return (
-                        <div key={r.id}
-                            onClick={() => handleEdit(r)}
-                            className="group cursor-pointer rounded-xl border border-slate-200/60 bg-white/50 p-5 transition-all hover:shadow-md hover:border-primary/30 dark:border-slate-800/60 dark:bg-slate-900/50"
-                        >
-                            <div className="flex items-start justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                                        <span className="material-symbols-outlined text-primary text-[22px]">
-                                            {r.is_system ? 'admin_panel_settings' : 'shield_person'}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <p className="font-bold text-slate-900 dark:text-white">{r.name}</p>
-                                        <p className="text-xs text-slate-500">{r.description || 'Sin descripción'}</p>
-                                    </div>
-                                </div>
-                                {!r.is_system && (
-                                    <button
-                                        onClick={e => { e.stopPropagation(); handleDelete(r); }}
-                                        className="rounded-lg p-1.5 text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-red-50 hover:text-red-500 transition-all dark:hover:bg-red-900/20"
-                                    >
-                                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                                    </button>
-                                )}
-                            </div>
-                            <div className="mt-3 flex items-center justify-between">
-                                <span className="text-xs font-semibold text-slate-400">{permCount} de {MODULE_KEYS.length} módulos</span>
-                                {r.is_system && (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                        <span className="material-symbols-outlined text-[12px]">lock</span>
-                                        Sistema
-                                    </span>
-                                )}
-                            </div>
-                            {/* Mini permission bar */}
-                            <div className="mt-2 flex gap-0.5">
-                                {MODULE_KEYS.map(m => {
-                                    const p = (r.permissions as ModulePermissions)?.[m.key];
-                                    return (
-                                        <div key={m.key} className={`h-1.5 flex-1 rounded-full ${p?.view ? 'bg-primary' : 'bg-slate-200 dark:bg-slate-700'}`}
-                                            title={`${m.label}: ${p?.view ? 'Habilitado' : 'Deshabilitado'}`}
-                                        />
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}
-
-// ============================================================
-// TAB 5: PLANTILLAS DE TAREAS (AUTOMATIZACIÓN)
-// ============================================================
-export interface TaskTemplateItem {
-    id: string;
-    title: string;
-    description: string;
-    assigned_to_id: string;
-    assigned_to_name: string;
-    days_to_due: number;
-}
-export interface TaskTemplate {
-    id: string;
-    project_type: string;
-    tasks: TaskTemplateItem[];
-}
-
-function TareasTab() {
-    const [templates, setTemplates] = useState<TaskTemplate[]>([]);
-    const [users, setUsers] = useState<AppUser[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [showForm, setShowForm] = useState(false);
-    const [editingId, setEditingId] = useState<string | null>(null);
-    const [form, setForm] = useState<{ project_type: string; tasks: TaskTemplateItem[] }>({ project_type: '', tasks: [] });
-    const [formError, setFormError] = useState('');
-    const [saving, setSaving] = useState(false);
-
-    const fetchData = useCallback(async () => {
-        setLoading(true);
-        const [setsRes, usersRes] = await Promise.all([
-            supabase.from('system_settings').select('value').eq('key', 'task_templates').single(),
-            supabase.from('app_users').select('*').eq('is_active', true).order('full_name')
-        ]);
-        setTemplates((setsRes.data?.value as unknown as TaskTemplate[]) || []);
-        setUsers(usersRes.data || []);
-        setLoading(false);
-    }, []);
-
-    useEffect(() => { fetchData(); }, [fetchData]);
-
-    const saveToDB = async (payload: TaskTemplate[]) => {
-        setSaving(true);
-        await supabase.from('system_settings').upsert({ key: 'task_templates', value: payload as unknown as Record<string, unknown>, description: 'Plantillas automatizadas' });
-        setTemplates(payload);
-        setSaving(false);
-        setShowForm(false);
-    };
-
-    const handleSave = async () => {
-        setFormError('');
-        if (!form.project_type.trim()) return setFormError('El Tipo de Proyecto es obligatorio');
-        if (form.tasks.length === 0) return setFormError('Añade al menos una tarea a la plantilla');
-        
-        for (const t of form.tasks) {
-            if (!t.title.trim()) return setFormError('Todas las tareas deben tener título');
-            if (!t.assigned_to_id) return setFormError('Todas las tareas deben tener un responsable asignado');
-        }
-
-        let newTemplates = [...templates];
-        if (editingId) {
-            newTemplates = newTemplates.map(t => t.id === editingId ? { ...t, ...form } : t);
-        } else {
-            newTemplates.push({ id: crypto.randomUUID(), ...form });
-        }
-        await saveToDB(newTemplates);
-    };
-
-    const handleEdit = (t: TaskTemplate) => {
-        setEditingId(t.id);
-        setForm({ project_type: t.project_type, tasks: [...t.tasks] });
-        setShowForm(true);
-    };
-
-    const handleDelete = async (id: string) => {
-        if (!confirm('¿Eliminar esta plantilla?')) return;
-        const newTemplates = templates.filter(t => t.id !== id);
-        await saveToDB(newTemplates);
-    };
-
-    const handleAddTask = () => {
-        setForm(f => ({
-            ...f,
-            tasks: [...f.tasks, { id: crypto.randomUUID(), title: '', description: '', assigned_to_id: '', assigned_to_name: '', days_to_due: 1 }]
-        }));
-    };
-
-    const handleRemoveTask = (taskId: string) => {
-        setForm(f => ({ ...f, tasks: f.tasks.filter(t => t.id !== taskId) }));
-    };
-
-    const handleTaskChange = (taskId: string, field: keyof TaskTemplateItem, value: any) => {
-        setForm(f => ({
-            ...f,
-            tasks: f.tasks.map(t => {
-                if (t.id === taskId) {
-                    const mapped = { ...t, [field]: value };
-                    if (field === 'assigned_to_id') {
-                        mapped.assigned_to_name = users.find(u => u.id === value)?.full_name || '';
-                    }
-                    return mapped;
-                }
-                return t;
-            })
-        }));
-    };
-
-    if (loading) return <div className="flex justify-center py-12"><div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
-
-    return (
-        <div>
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">Plantillas de Tareas Automáticas</h3>
-                    <p className="text-sm text-slate-500">Configura qué tareas se asignan por defecto al aprobar Cotizaciones por tipo de servicio.</p>
-                </div>
-                <button
-                    onClick={() => { setEditingId(null); setForm({ project_type: '', tasks: [] }); setShowForm(true); }}
-                    className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20"
-                >
-                    <span className="material-symbols-outlined text-[20px]">add</span>
-                    Nueva Plantilla
-                </button>
-            </div>
-
-            {showForm && (
-                <div className="mb-6 rounded-xl border border-primary/20 bg-primary/5 p-6 dark:bg-primary/5">
-                    <h4 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">
-                        {editingId ? `Editar Plantilla` : 'Crear Nueva Plantilla'}
-                    </h4>
-
-                    {formError && (
-                        <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/20 dark:text-red-400">
-                            <span className="material-symbols-outlined text-[18px]">error</span>{formError}
-                        </div>
-                    )}
-
-                    <div className="mb-4">
-                        <label className={labelClass}>Tipo de Servicio/Trabajo en Cotización *</label>
-                        <input value={form.project_type} onChange={e => setForm({ ...form, project_type: e.target.value })} className={inputClass} placeholder="Ej: Perforación Pozo Nuevo" />
-                    </div>
-
-                    <div className="mb-4 flex items-center justify-between">
-                        <label className={labelClass}>Lista de Tareas Automáticas</label>
-                        <button onClick={handleAddTask} className="flex items-center gap-1 rounded bg-white px-3 py-1.5 text-xs font-bold text-primary border border-primary/20 hover:bg-primary/10">
-                            <span className="material-symbols-outlined text-[16px]">add</span> Añadir Tarea
-                        </button>
-                    </div>
-
-                    <div className="space-y-3 mb-6">
-                        {form.tasks.map((task, index) => (
-                            <div key={task.id} className="grid grid-cols-1 gap-2 md:grid-cols-12 relative items-end rounded-lg border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                                <div className="md:col-span-5">
-                                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Título {index + 1}</label>
-                                    <input value={task.title} onChange={e => handleTaskChange(task.id, 'title', e.target.value)} className={inputClass} placeholder="P.ej: Coordinar Grúa" />
-                                </div>
-                                <div className="md:col-span-4">
-                                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Asignar A</label>
-                                    <select value={task.assigned_to_id} onChange={e => handleTaskChange(task.id, 'assigned_to_id', e.target.value)} className={inputClass}>
-                                        <option value="">-- Selecciona --</option>
-                                        {users.map(u => <option key={u.id} value={u.id}>{u.full_name}</option>)}
-                                    </select>
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Días límite</label>
-                                    <input type="number" min="0" value={task.days_to_due} onChange={e => handleTaskChange(task.id, 'days_to_due', parseInt(e.target.value) || 0)} className={inputClass} />
-                                </div>
-                                <div className="md:col-span-1 flex justify-end pb-2">
-                                    <button onClick={() => handleRemoveTask(task.id)} className="text-slate-400 hover:text-red-500">
-                                        <span className="material-symbols-outlined text-[20px]">delete</span>
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                        {form.tasks.length === 0 && <p className="text-sm text-slate-400 italic">No hay tareas en esta plantilla.</p>}
-                    </div>
-
-                    <div className="mt-4 flex gap-2 border-t border-slate-200 pt-4 dark:border-slate-800">
-                        <button onClick={handleSave} disabled={saving} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-50">
-                            {saving ? 'Guardando...' : 'Guardar Plantilla'}
-                        </button>
-                        <button onClick={() => setShowForm(false)} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-700 dark:text-slate-400">Cancelar</button>
-                    </div>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                {templates.map(t => (
-                    <div key={t.id} className="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-800/50">
-                            <h4 className="font-bold text-slate-900 dark:text-white">Tipo: {t.project_type}</h4>
-                            <div className="flex gap-2">
-                                <button onClick={() => handleEdit(t)} className="text-slate-400 hover:text-primary"><span className="material-symbols-outlined text-[18px]">edit</span></button>
-                                <button onClick={() => handleDelete(t.id)} className="text-slate-400 hover:text-red-500"><span className="material-symbols-outlined text-[18px]">delete</span></button>
-                            </div>
-                        </div>
-                        <div className="p-4">
-                            <ul className="space-y-2 text-sm">
-                                {t.tasks.map(task => (
-                                    <li key={task.id} className="flex gap-2 items-center">
-                                        <span className="material-symbols-outlined text-[14px] text-slate-300">subdirectory_arrow_right</span>
-                                        <span className="font-medium text-slate-700 dark:text-slate-300">{task.title}</span>
-                                        <span className="ml-auto text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full dark:bg-slate-800">{task.assigned_to_name}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}

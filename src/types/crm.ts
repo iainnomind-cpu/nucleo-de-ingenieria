@@ -21,6 +21,7 @@ export interface Client {
     payment_score: number | null;
     growth_potential: GrowthPotential | null;
     credit_days: number;
+    is_trusted_client: boolean;
     created_at: string;
     updated_at: string;
 }

@@ -11,31 +11,17 @@ export interface ModulePermission {
 
 export type ModulePermissions = Record<string, ModulePermission>;
 
-export interface AppRole {
-    id: string;
-    name: string;
-    description: string | null;
-    permissions: ModulePermissions;
-    is_system: boolean;
-    created_at: string;
-    updated_at: string;
-}
-
 export interface AppUser {
     id: string;
     full_name: string;
     email: string;
     phone?: string;
-    role_id: string | null;
-    role_name?: string;
     permissions?: ModulePermissions;
     avatar_color: string;
     is_active: boolean;
     last_login: string | null;
     created_at?: string;
     updated_at?: string;
-    // Joined
-    role?: AppRole;
 }
 
 // ============================================================

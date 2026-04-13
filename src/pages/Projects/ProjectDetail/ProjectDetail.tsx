@@ -141,6 +141,50 @@ export default function ProjectDetail() {
     const handleStatusChange = async (newStatus: ProjectStatus) => {
         if (!project) return;
         const updates: Record<string, unknown> = { status: newStatus };
+
+        // ═══ CANDADO FINANCIERO: No avanzar a campo sin pago ═══
+        if (newStatus === 'in_field') {
+            // Verificar si existe al menos un pago registrado en facturas del proyecto
+            const { data: invoices } = await supabase
+                .from('invoices')
+                .select('id, status, amount_paid, total')
+                .eq('project_id', project.id)
+                .in('status', ['partial', 'paid']);
+
+            const hasPayment = invoices && invoices.length > 0 && invoices.some((inv: any) => inv.amount_paid > 0);
+
+            if (!hasPayment) {
+                // Verificar si el cliente es de confianza comercial
+                let isTrusted = false;
+                if (project.client_id) {
+                    const { data: clientData } = await supabase
+                        .from('clients')
+                        .select('is_trusted_client, status')
+                        .eq('id', project.client_id)
+                        .single();
+                    isTrusted = clientData?.is_trusted_client === true || clientData?.status === 'vip';
+                }
+
+                if (!isTrusted) {
+                    const override = confirm(
+                        '⚠️ CANDADO FINANCIERO\n\n' +
+                        'Este proyecto NO tiene anticipo ni pago registrado.\n' +
+                        'Según el proceso, no puede avanzar a campo sin pago.\n\n' +
+                        '¿Es un CLIENTE COMERCIAL DE CONFIANZA y deseas hacer una excepción?\n\n' +
+                        '• Sí → Se permitirá avanzar (se marcará al cliente como confiable)\n' +
+                        '• No → Regresa a registrar el pago en Finanzas'
+                    );
+                    if (!override) return;
+
+                    // Marcar al cliente como trusted para futuras operaciones
+                    if (project.client_id) {
+                        await supabase.from('clients').update({ is_trusted_client: true }).eq('id', project.client_id);
+                    }
+                }
+            }
+        }
+        // ═══════════════════════════════════════════════════════
+
         if (newStatus === 'in_field' && !project.actual_start) {
             updates.actual_start = new Date().toISOString().split('T')[0];
 
@@ -572,12 +616,24 @@ export default function ProjectDetail() {
                         const currentIdx = STATUS_FLOW.indexOf(project.status);
                         const isNext = idx === currentIdx + 1;
                         if (!isNext) return null;
+                        // ═══ CANDADO CHECKLIST: in_field requiere checklist completo
+                        const checklistDone = (['checklist_invoice', 'checklist_materials', 'checklist_vehicle', 'checklist_team'] as ChecklistField[]).every(f => getChecklist(project, f));
+                        const blockedByChecklist = s === 'in_field' && !checklistDone;
                         return (
-                            <button key={s} onClick={() => handleStatusChange(s)}
-                                className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-sm font-semibold text-white shadow-md">
-                                <span className="material-symbols-outlined text-[18px]">{PROJECT_STATUS_ICONS[s]}</span>
-                                Mover a {PROJECT_STATUS_LABELS[s]}
-                            </button>
+                            <div key={s} className="relative group">
+                                <button onClick={() => !blockedByChecklist && handleStatusChange(s)}
+                                    disabled={blockedByChecklist}
+                                    className={`flex items-center gap-1 rounded-lg px-4 py-2 text-sm font-semibold shadow-md transition-all ${blockedByChecklist ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-400' : 'bg-gradient-to-r from-primary to-primary-dark text-white'}`}>
+                                    <span className="material-symbols-outlined text-[18px]">{blockedByChecklist ? 'lock' : PROJECT_STATUS_ICONS[s]}</span>
+                                    Mover a {PROJECT_STATUS_LABELS[s]}
+                                </button>
+                                {blockedByChecklist && (
+                                    <div className="absolute top-full mt-1 right-0 z-10 hidden group-hover:block w-64 rounded-lg bg-slate-900 p-3 text-xs text-white shadow-xl">
+                                        <p className="font-bold mb-1">🔒 Checklist incompleto</p>
+                                        <p>Complete los 4 puntos del checklist pre-ejecución antes de avanzar a campo.</p>
+                                    </div>
+                                )}
+                            </div>
                         );
                     })}
                 </div>
@@ -608,16 +664,27 @@ export default function ProjectDetail() {
                     <div className="flex flex-col gap-6 lg:col-span-2">
                         {/* Checklist */}
                         <div className={sectionClass}>
-                            <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                                <span className="material-symbols-outlined text-primary text-[20px]">fact_check</span>
-                                Checklist Pre-Trabajo
-                            </h3>
+                            <div className="mb-4 flex items-center justify-between">
+                                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                                    <span className="material-symbols-outlined text-primary text-[20px]">fact_check</span>
+                                    Checklist Pre-Ejecución
+                                </h3>
+                                {(() => {
+                                    const checklistItems: ChecklistField[] = ['checklist_invoice', 'checklist_materials', 'checklist_vehicle', 'checklist_team'];
+                                    const done = checklistItems.filter(f => getChecklist(project, f)).length;
+                                    return (
+                                        <span className={`rounded-full px-3 py-1 text-xs font-bold ${done === 4 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                                            {done}/4 completado{done === 4 ? ' ✓' : ''}
+                                        </span>
+                                    );
+                                })()}
+                            </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 {([
-                                    { field: 'checklist_invoice' as ChecklistField, label: 'Factura Emitida', icon: 'receipt' },
-                                    { field: 'checklist_materials' as ChecklistField, label: 'Materiales Verificados', icon: 'inventory' },
-                                    { field: 'checklist_vehicle' as ChecklistField, label: 'Grúa/Vehículo Confirmado', icon: 'local_shipping' },
-                                    { field: 'checklist_team' as ChecklistField, label: 'Equipo de Campo Asignado', icon: 'group' },
+                                    { field: 'checklist_invoice' as ChecklistField, label: 'Facturación y Cobranza', icon: 'receipt', responsible: 'Samara' },
+                                    { field: 'checklist_materials' as ChecklistField, label: 'Materiales Listos', icon: 'inventory', responsible: 'Paulina' },
+                                    { field: 'checklist_vehicle' as ChecklistField, label: 'Equipos Preparados', icon: 'local_shipping', responsible: 'Joel' },
+                                    { field: 'checklist_team' as ChecklistField, label: 'Trabajo Programado', icon: 'group', responsible: 'Joel / Alejandro' },
                                 ]).map(item => {
                                     const checked = getChecklist(project, item.field);
                                     return (
@@ -626,15 +693,26 @@ export default function ProjectDetail() {
                                             <div className={`flex h-8 w-8 items-center justify-center rounded-full ${checked ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400 dark:bg-slate-700'}`}>
                                                 <span className="material-symbols-outlined text-[18px]">{checked ? 'check' : item.icon}</span>
                                             </div>
-                                            <span className={`text-sm font-medium ${checked ? 'text-emerald-700 dark:text-emerald-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
+                                            <div className="flex flex-col">
+                                                <span className={`text-sm font-medium ${checked ? 'text-emerald-700 dark:text-emerald-400 line-through' : 'text-slate-700 dark:text-slate-300'}`}>{item.label}</span>
+                                                <span className="text-[10px] text-slate-400 mt-0.5">Resp: {item.responsible}</span>
+                                            </div>
                                         </button>
                                     );
                                 })}
                             </div>
-                            {project.checklist_completed_at && (
-                                <p className="mt-3 text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[14px]">verified</span>
-                                    Checklist completado el {new Date(project.checklist_completed_at).toLocaleDateString('es-MX')}
+                            {project.checklist_completed_at ? (
+                                <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 p-3 border border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800">
+                                    <span className="material-symbols-outlined text-emerald-500 text-[20px]">verified</span>
+                                    <div>
+                                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">PROYECTO LISTO PARA EJECUCIÓN</p>
+                                        <p className="text-[10px] text-emerald-600 dark:text-emerald-500">Checklist completado el {new Date(project.checklist_completed_at).toLocaleDateString('es-MX')}</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="mt-3 text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px]">info</span>
+                                    Complete los 4 puntos para habilitar la ejecución del proyecto
                                 </p>
                             )}
                         </div>
