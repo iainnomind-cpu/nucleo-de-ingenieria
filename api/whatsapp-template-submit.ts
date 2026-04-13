@@ -85,14 +85,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Meta exige un array de ejemplos con exactamente la misma cantidad de variables encontradas en el body
+        // Meta exige un array de ejemplos con exactamente la misma cantidad de variables encontradas en el body
         if (highestVarCount > 0) {
             const examples = [];
             for (let i = 1; i <= highestVarCount; i++) {
-                // Usar el nombre que dio el usuario en DB, o un dummy string si le faltaron
-                const varName = (template.variables && template.variables[i-1] && template.variables[i-1].length > 0) 
-                    ? template.variables[i-1] 
-                    : `ejemplo_variable_${i}`;
-                examples.push(varName);
+                let exampleVal = `Ejemplo ${i}`; // default fallback
+                // Usar example_values si está configurado en BD
+                if (template.example_values && template.example_values.length >= i) {
+                    exampleVal = template.example_values[i-1];
+                } else if (template.variables && template.variables.length >= i) {
+                    exampleVal = template.variables[i-1];
+                }
+                examples.push(exampleVal);
             }
             bodyComponent.example = {
                 body_text: [ examples ]
