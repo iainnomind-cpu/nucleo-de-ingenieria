@@ -197,9 +197,11 @@ export default function TareasTab() {
             body: finalBody, footer: formTemplate.footer || null, variables: finalVariables, usage_type: 'team', meta_status: formTemplate.meta_status,
         };
         if (editingTemplateId) {
-            await supabase.from('wa_templates').update(payload).eq('id', editingTemplateId);
+            const { error } = await supabase.from('wa_templates').update(payload).eq('id', editingTemplateId);
+            if (error) { console.error('Error updating template:', error); alert('Error al guardar plantilla: ' + error.message); return; }
         } else {
-            await supabase.from('wa_templates').insert(payload);
+            const { error } = await supabase.from('wa_templates').insert(payload);
+            if (error) { console.error('Error inserting template:', error); alert('Error al crear plantilla: ' + error.message); return; }
         }
         setShowTemplateForm(false); setEditingTemplateId(null); resetTemplateForm(); fetchAll();
     };
