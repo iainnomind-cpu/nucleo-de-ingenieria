@@ -57,16 +57,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 2. Construir el payload para Meta Graph API
         const components: any[] = [];
 
+        // Helper: strip emojis (Meta rejects emojis in HEADER text)
+        const stripEmojis = (str: string) => str.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{27BF}\u{2300}-\u{23FF}\u{2B50}\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '').trim();
+
         // Header (si aplica, por ahora soportamos TEXT en este endpoint)
         if (template.header_type === 'text' && template.header_content) {
-            components.push({
-                type: 'HEADER',
-                format: 'TEXT',
-                text: template.header_content
-            });
+            const cleanHeader = stripEmojis(template.header_content);
+            if (cleanHeader) {
+                components.push({
+                    type: 'HEADER',
+                    format: 'TEXT',
+                    text: cleanHeader
+                });
+            }
         }
         // TODO: Para imágenes/documentos hace falta otro flujo de subida de Media a Meta primero.
-        // Se deja preparado para el futuro.
 
         // Body
         const bodyComponent: any = {
@@ -85,11 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         // Meta exige un array de ejemplos con exactamente la misma cantidad de variables encontradas en el body
-        // Meta exige un array de ejemplos con exactamente la misma cantidad de variables encontradas en el body
         if (highestVarCount > 0) {
             const examples = [];
             for (let i = 1; i <= highestVarCount; i++) {
-                let exampleVal = `Ejemplo ${i}`; // default fallback
+                let exampleVal = `Ejemplo_${i}`; // default fallback (no spaces, no accents)
                 // Usar example_values si está configurado en BD
                 if (template.example_values && template.example_values.length >= i) {
                     exampleVal = template.example_values[i-1];
@@ -104,20 +108,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         components.push(bodyComponent);
 
-        // Footer
+        // Footer — Meta rejects some special characters in footer
         if (template.footer) {
-            components.push({
-                type: 'FOOTER',
-                text: template.footer
-            });
+            const cleanFooter = stripEmojis(template.footer).trim();
+            if (cleanFooter) {
+                components.push({
+                    type: 'FOOTER',
+                    text: cleanFooter
+                });
+            }
         }
 
+        // Normalize name: Meta requires lowercase a-z, 0-9, underscore only.
+        // No leading/trailing underscores. No consecutive underscores.
+        const metaTemplateName = template.name
+            .toLowerCase()
+            .replace(/[^a-z0-9_]/g, '_')
+            .replace(/_+/g, '_')       // collapse consecutive underscores
+            .replace(/^_|_$/g, '');     // remove leading/trailing underscores
+
         const metaPayload = {
-            name: template.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'), // Asegurar formato snake_case exigido por Meta
+            name: metaTemplateName,
             language: template.language || 'es_MX',
             category: template.category.toUpperCase(), // Ej: UTILITY, MARKETING
             components: components
         };
+
+        console.log('[Template Submit] Payload to Meta:', JSON.stringify(metaPayload, null, 2));
 
         // 3. Enviar a Meta Cloud API
         const metaResponse = await fetch(

@@ -184,6 +184,28 @@ export default function TemplatesList() {
         }
     };
 
+    const resetToDraft = async (t: WaTemplate) => {
+        if (!confirm(`¿Resetear "${t.name}" a borrador?\n\nEsto permite re-enviarla a revisión con la cuenta WABA actual.`)) return;
+        await supabase.from('wa_templates').update({ 
+            meta_status: 'draft', 
+            meta_template_id: null, 
+            meta_name: null 
+        }).eq('id', t.id);
+        fetchTemplates();
+    };
+
+    const resetAllToDraft = async () => {
+        const nonDraft = templates.filter(t => t.meta_status !== 'draft');
+        if (nonDraft.length === 0) { alert('Todas las plantillas ya están en borrador.'); return; }
+        if (!confirm(`¿Resetear ${nonDraft.length} plantilla(s) a borrador?\n\nÚsalo cuando cambies de cuenta WABA para poder re-enviarlas a revisión.`)) return;
+        await supabase.from('wa_templates').update({ 
+            meta_status: 'draft', 
+            meta_template_id: null, 
+            meta_name: null 
+        }).in('id', nonDraft.map(t => t.id));
+        fetchTemplates();
+    };
+
     // Parse body to highlight variables
     const renderBody = (body: string, varsArray?: string[]) => {
         let html = body;
@@ -226,6 +248,11 @@ export default function TemplatesList() {
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
+                            <button onClick={resetAllToDraft}
+                                className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-700 hover:bg-amber-100 transition-all dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40"
+                                title="Resetear todas las plantillas a borrador (usar al cambiar de cuenta WABA)">
+                                <span className="material-symbols-outlined text-[18px]">restart_alt</span>Reset WABA
+                            </button>
                             <button onClick={syncStatusFromMeta} disabled={syncingStatus}
                                 className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition-all disabled:opacity-50 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 dark:hover:bg-sky-900/40">
                                 {syncingStatus ? (
@@ -323,6 +350,11 @@ export default function TemplatesList() {
                                                 <span className="material-symbols-outlined text-[14px]">send</span>
                                             )}
                                             {submittingId === tpl.id ? 'Enviando...' : 'Enviar a Revisión'}
+                                        </button>
+                                    )}
+                                    {(tpl.meta_status === 'approved' || tpl.meta_status === 'pending') && (
+                                        <button onClick={() => resetToDraft(tpl)} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-bold text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-all">
+                                            <span className="material-symbols-outlined text-[14px]">restart_alt</span>Resetear
                                         </button>
                                     )}
                                     <button onClick={() => setPreviewTemplate(tpl)} className="flex flex-1 items-center justify-center gap-1 py-2.5 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-50">

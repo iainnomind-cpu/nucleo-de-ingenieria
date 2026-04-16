@@ -210,8 +210,12 @@ export default function TareasTab() {
         try {
             const res = await fetch('/api/whatsapp-template-submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ template_id: id }) });
             const data = await res.json();
-            if (data.success) { alert('¡Plantilla enviada exitosamente a revisión!'); fetchAll(); } 
-            else { alert(`Meta API Error: ${data.message}`); }
+            if (data.success) { alert('¡Plantilla enviada exitosamente a revisión!'); fetchAll(); }
+            else {
+                console.error('Error Meta Detail:', data);
+                const metaDetail = data.meta_error?.error_user_msg || data.meta_error?.message || data.meta_error?.error_subcode || '';
+                alert(`Meta API Error: ${data.message}\n${metaDetail ? 'Detalle: ' + metaDetail : 'Revisa el header (sin emojis), body y footer.'}`);
+            }
         } catch (error) { alert('Error de red al intentar enviar.'); } finally { setSubmittingId(null); }
     };
 
