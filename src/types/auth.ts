@@ -39,6 +39,7 @@ export const MODULE_KEYS = [
     { key: 'fleet', label: 'Flotilla', icon: 'local_shipping' },
     { key: 'whatsapp', label: 'WhatsApp Mktg', icon: 'chat' },
     { key: 'team', label: 'Equipo', icon: 'forum' },
+    { key: 'tasks', label: 'Tablero de Tareas', icon: 'task' },
     { key: 'settings', label: 'Configuración', icon: 'settings' },
 ] as const;
 

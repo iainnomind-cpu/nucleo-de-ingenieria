@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import NotificationCenter from './NotificationCenter';
 
 function Header() {
   const [now, setNow] = useState(new Date());
@@ -40,12 +41,8 @@ function Header() {
             type="text"
           />
         </div>
-        <button className="relative flex h-10 w-10 items-center justify-center rounded-full bg-surface-light text-slate-600 shadow-sm transition-colors hover:bg-slate-100 dark:bg-surface-dark dark:text-slate-300 dark:hover:bg-slate-700">
-          <span className="material-symbols-outlined text-[20px]">
-            notifications
-          </span>
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-accent-danger" />
-        </button>
+        {/* Notification Center — campanita + dropdown + toasts */}
+        <NotificationCenter />
         {/* User avatar */}
         {user && (
           <div className="flex items-center gap-3 rounded-full bg-surface-light pl-1 pr-4 py-1 shadow-sm dark:bg-surface-dark">

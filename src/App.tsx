@@ -28,6 +28,7 @@ import VehicleDetail from './pages/Fleet/VehicleDetail/VehicleDetail';
 import SpaceChat from './pages/Team/SpaceChat';
 import TeamBoard from './pages/Team/TeamBoard';
 import Inbox from './pages/Team/Inbox';
+import TasksDashboard from './pages/Tasks/TasksDashboard';
 import WhatsAppDashboard from './pages/WhatsApp/WhatsAppDashboard';
 import ConversationsInbox from './pages/WhatsApp/ConversationsInbox';
 import CampaignsList from './pages/WhatsApp/CampaignsList';
@@ -35,10 +36,10 @@ import TemplatesList from './pages/WhatsApp/TemplatesList';
 import WhatsAppReports from './pages/WhatsApp/WhatsAppReports';
 import DirectSend from './pages/WhatsApp/DirectSend';
 import SystemSettings from './pages/Settings/SystemSettings';
-import NotificationListener from './components/NotificationListener';
 import ClientWellLogPublic from './pages/Maintenance/ClientWellLogPublic';
 import RepairsDashboard from './pages/Repairs/RepairsDashboard';
 import RepairDetail from './pages/Repairs/RepairDetail';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 function ProtectedApp() {
   const { user, loading, hasPermission } = useAuth();
@@ -61,7 +62,6 @@ function ProtectedApp() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark">
       <Sidebar />
-      <NotificationListener />
       <main className="flex flex-1 flex-col overflow-y-auto bg-background-light dark:bg-background-dark">
         <Header />
         <Routes>
@@ -130,6 +130,10 @@ function ProtectedApp() {
               <Route path="/fleet/:id" element={<VehicleDetail />} />
             </>
           )}
+          {/* Tablero de Tareas */}
+          {hasPermission('tasks', 'view') && (
+            <Route path="/tasks" element={<TasksDashboard />} />
+          )}
           {/* M8: Equipos & Comunicación */}
           {hasPermission('team', 'view') && (
             <>
@@ -168,6 +172,7 @@ function App() {
       <Routes>
         {/* Public route — no auth required */}
         <Route path="/well-log/:token" element={<ClientWellLogPublic />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
         {/* All other routes go through auth */}
         <Route path="*" element={<AuthProvider><ProtectedApp /></AuthProvider>} />
       </Routes>

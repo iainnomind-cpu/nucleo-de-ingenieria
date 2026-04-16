@@ -56,6 +56,81 @@ export default function InvoiceDetail() {
         const newBalance = invoice.total - newPaid;
         const newStatus: InvoiceStatus = newBalance <= 0 ? 'paid' : 'partial';
         await supabase.from('invoices').update({ amount_paid: newPaid, balance: Math.max(0, newBalance), status: newStatus }).eq('id', id);
+
+        // If fully paid, trigger "Pagado / Liberado" automation
+        if (newStatus === 'paid') {
+            const clientName = invoice.client?.company_name || 'Cliente';
+
+            // Sync cost to project
+            if (invoice.project_id) {
+                const totalExp = expenses.reduce((s, exp) => s + exp.amount, 0);
+                await supabase.from('projects').update({ actual_cost: totalExp }).eq('id', invoice.project_id);
+            }
+
+            // 6.2 Validación de Cobro — Samara
+            await supabase.from('team_tasks').insert({
+                title: `Validación de Cobro — ${invoice.invoice_number}`,
+                description: `Factura: ${invoice.invoice_number}\nCliente: ${clientName}\nMonto Total: ${formatCurrencyFin(invoice.total)}\n\nActividades:\n• Confirmar pago (anticipo o total según condiciones)\n• Registrar pago en CRM\n\nEl proyecto queda LIBERADO para avanzar a operación.`,
+                assigned_to: 'Samara',
+                created_by: 'Sistema',
+                status: 'pending',
+                priority: 'high',
+                due_date: new Date().toISOString().split('T')[0],
+                project_id: invoice.project_id || null,
+                checklist: JSON.stringify([
+                    { text: 'Confirmar pago (anticipo o total según condiciones)', done: false },
+                    { text: 'Registrar pago en CRM', done: false },
+                ]),
+                tags: ['auto', 'cobro', 'pagado-liberado'],
+            });
+
+            // Notificar en spaces
+            const { data: spaces } = await supabase.from('spaces')
+                .select('id, name').in('name', ['Operaciones', 'Administración']);
+            if (spaces) {
+                const msg = `💰 **PAGO CONFIRMADO — PROYECTO LIBERADO**\n\n📄 Factura: **${invoice.invoice_number}**\n👤 Cliente: **${clientName}**\n💲 Total: **${formatCurrencyFin(invoice.total)}**\n\nEl proyecto está financieramente liberado para avanzar a la fase operativa.\n\n_Tarea de Validación de Cobro asignada a @Samara._`;
+                for (const space of spaces) {
+                    await supabase.from('messages').insert({
+                        space_id: space.id,
+                        sender: 'Sistema',
+                        content: msg,
+                        message_type: 'system'
+                    });
+                }
+            }
+
+            // Push notifications internas
+            await supabase.from('app_notifications').insert([
+                {
+                    user_name: 'Samara',
+                    title: '💰 Validación de Cobro',
+                    message: `Factura ${invoice.invoice_number} de ${clientName} pagada (${formatCurrencyFin(invoice.total)}). Confirma y registra en CRM.`,
+                    type: 'payment',
+                    icon: 'payments',
+                    link: `/finance/invoices/${id}`,
+                    source: 'finance',
+                },
+                {
+                    user_name: 'Joel',
+                    title: '✅ Proyecto Liberado',
+                    message: `Factura ${invoice.invoice_number} de ${clientName} cobrada. El proyecto puede avanzar a ejecución.`,
+                    type: 'payment',
+                    icon: 'check_circle',
+                    link: '/tasks',
+                    source: 'finance',
+                },
+                {
+                    user_name: 'Director',
+                    title: '💰 Pago Confirmado',
+                    message: `Factura ${invoice.invoice_number} — ${clientName} — ${formatCurrencyFin(invoice.total)} cobrado.`,
+                    type: 'payment',
+                    icon: 'payments',
+                    link: `/finance/invoices/${id}`,
+                    source: 'finance',
+                },
+            ]);
+        }
+
         setShowPayment(false);
         setPayForm({ amount: '', payment_method: 'transfer', reference: '', notes: '', received_by: '' });
         fetchAll();
@@ -89,6 +164,74 @@ export default function InvoiceDetail() {
 
         await supabase.from('invoices').update(updates).eq('id', id);
 
+        // → TRIGGER: Cambio de estatus a "Pagado / Liberado"
+        if (status === 'paid') {
+            const clientName = invoice.client?.company_name || 'Cliente';
+
+            // 6.2 Validación de Cobro — Samara
+            await supabase.from('team_tasks').insert({
+                title: `Validación de Cobro — ${invoice.invoice_number}`,
+                description: `Factura: ${invoice.invoice_number}\nCliente: ${clientName}\nMonto Total: ${formatCurrencyFin(invoice.total)}\n\nActividades:\n• Confirmar pago (anticipo o total según condiciones)\n• Registrar pago en CRM\n\nEl proyecto queda LIBERADO para avanzar a operación.`,
+                assigned_to: 'Samara',
+                created_by: 'Sistema',
+                status: 'pending',
+                priority: 'high',
+                due_date: new Date().toISOString().split('T')[0],
+                project_id: invoice.project_id || null,
+                checklist: JSON.stringify([
+                    { text: 'Confirmar pago (anticipo o total según condiciones)', done: false },
+                    { text: 'Registrar pago en CRM', done: false },
+                ]),
+                tags: ['auto', 'cobro', 'pagado-liberado'],
+            });
+
+            // Notificar en spaces de Operaciones y Administración
+            const { data: spaces } = await supabase.from('spaces')
+                .select('id, name').in('name', ['Operaciones', 'Administración']);
+            if (spaces) {
+                const msg = `💰 **PAGO CONFIRMADO — PROYECTO LIBERADO**\n\n📄 Factura: **${invoice.invoice_number}**\n👤 Cliente: **${clientName}**\n💲 Total: **${formatCurrencyFin(invoice.total)}**\n\nEl proyecto está financieramente liberado para avanzar a la fase operativa.\n\n_Tarea de Validación de Cobro asignada a @Samara._`;
+                for (const space of spaces) {
+                    await supabase.from('messages').insert({
+                        space_id: space.id,
+                        sender: 'Sistema',
+                        content: msg,
+                        message_type: 'system'
+                    });
+                }
+            }
+
+            // Push notifications internas
+            await supabase.from('app_notifications').insert([
+                {
+                    user_name: 'Samara',
+                    title: '💰 Validación de Cobro',
+                    message: `Factura ${invoice.invoice_number} de ${clientName} marcada como pagada (${formatCurrencyFin(invoice.total)}).`,
+                    type: 'payment',
+                    icon: 'payments',
+                    link: `/finance/invoices/${id}`,
+                    source: 'finance',
+                },
+                {
+                    user_name: 'Joel',
+                    title: '✅ Proyecto Liberado',
+                    message: `Factura ${invoice.invoice_number} de ${clientName} cobrada. El proyecto puede avanzar a ejecución.`,
+                    type: 'payment',
+                    icon: 'check_circle',
+                    link: '/tasks',
+                    source: 'finance',
+                },
+                {
+                    user_name: 'Director',
+                    title: '💰 Pago Confirmado',
+                    message: `Factura ${invoice.invoice_number} — ${clientName} — ${formatCurrencyFin(invoice.total)} cobrado.`,
+                    type: 'payment',
+                    icon: 'payments',
+                    link: `/finance/invoices/${id}`,
+                    source: 'finance',
+                },
+            ]);
+        }
+
         // → M6→M8: Notify Samara when invoice is sent and due date is approaching/overdue
         if (status === 'sent' && invoice.balance > 0) {
             const today = new Date();
@@ -101,15 +244,15 @@ export default function InvoiceDetail() {
                 if (spaces && spaces.length > 0) {
                     await supabase.from('messages').insert({
                         space_id: spaces[0].id,
-                        sender_id: '12345678-1234-1234-1234-123456789012',
-                        content: `💰 **ALERTA COBRANZA (M6→M8)**: La factura **${invoice.invoice_number}** de **${invoice.client?.company_name || 'N/A'}** ${daysUntilDue < 0 ? `está **vencida** hace ${Math.abs(daysUntilDue)} días` : daysUntilDue === 0 ? '**vence hoy**' : `vence en **${daysUntilDue} días**`}.\n\n📋 Monto: **${formatCurrencyFin(invoice.total)}** | Saldo: **${formatCurrencyFin(invoice.balance)}**\n\n👤 @Samara — Se requiere seguimiento de cobranza inmediato.`,
-                        message_type: 'text'
+                        sender: 'Sistema',
+                        content: `💰 **ALERTA COBRANZA**: La factura **${invoice.invoice_number}** de **${invoice.client?.company_name || 'N/A'}** ${daysUntilDue < 0 ? `está **vencida** hace ${Math.abs(daysUntilDue)} días` : daysUntilDue === 0 ? '**vence hoy**' : `vence en **${daysUntilDue} días**`}.\n\n📋 Monto: **${formatCurrencyFin(invoice.total)}** | Saldo: **${formatCurrencyFin(invoice.balance)}**\n\n👤 @Samara — Se requiere seguimiento de cobranza inmediato.`,
+                        message_type: 'system'
                     });
 
                     // → M6→M8: Assign task directly to Samara on the board
                     await supabase.from('team_tasks').insert({
                         title: `Gestionar cobro factura ${invoice.invoice_number}`,
-                        description: `Cobranza de ${invoice.client?.company_name || 'Cliente'} (Saldo: ${formatCurrencyFin(invoice.balance)}). Generada por alerta M6→M8.`,
+                        description: `Cobranza de ${invoice.client?.company_name || 'Cliente'} (Saldo: ${formatCurrencyFin(invoice.balance)}). Generada por alerta automática.`,
                         assigned_to: 'Samara',
                         created_by: 'Sistema',
                         priority: daysUntilDue < 0 ? 'urgent' : 'high',

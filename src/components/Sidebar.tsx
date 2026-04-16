@@ -15,6 +15,7 @@ const navItems = [
   { label: 'Finanzas', icon: 'account_balance', path: '/finance', module: 'finance' },
   { label: 'Flotilla', icon: 'local_shipping', path: '/fleet', module: 'fleet' },
   { label: 'WhatsApp Mktg', icon: 'chat', path: '/whatsapp', module: 'whatsapp' },
+  { label: 'Tablero de Tareas', icon: 'task', path: '/tasks', module: 'tasks' },
   { label: 'Equipo', icon: 'forum', path: '/team', module: 'team' },
 ];
 

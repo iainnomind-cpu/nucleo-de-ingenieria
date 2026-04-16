@@ -66,7 +66,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const hasPermission = useCallback((moduleKey: string, action: 'view' | 'create' | 'edit' | 'delete') => {
         if (!user || !user.permissions) return false;
-        const mod = (user.permissions as ModulePermissions)[moduleKey];
+        const perms = user.permissions as ModulePermissions;
+        let mod = perms[moduleKey];
+        // Fallback: si el módulo 'tasks' no existe en permisos guardados, usar los de 'team'
+        if (!mod && moduleKey === 'tasks') mod = perms['team'];
         if (!mod) return false;
         return mod[action] === true;
     }, [user]);

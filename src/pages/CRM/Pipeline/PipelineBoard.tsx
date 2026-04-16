@@ -68,33 +68,154 @@ export default function PipelineBoard() {
     const handleStageChange = async (oppId: string, newStage: PipelineStage) => {
         await supabase.from('sales_opportunities').update({ stage: newStage }).eq('id', oppId);
 
-        // → M1→M8: Deal closed notification
+        // → TRIGGER: Cuando el proyecto se marca como "Vendido / Ganado"
         if (newStage === 'closed_won') {
             const opp = opportunities.find(o => o.id === oppId);
             if (opp) {
-                const spaceName = `Cliente — ${opp.client?.company_name || 'N/A'}`;
-                const { data: existingSpace } = await supabase.from('spaces').select('id').ilike('name', `%${opp.client?.company_name}%`).limit(1);
-                let spaceId = existingSpace?.[0]?.id;
+                const clientName = opp.client?.company_name || 'N/A';
+                const todayStr = new Date().toISOString().split('T')[0];
+                const dueDateStr = (() => { const d = new Date(); d.setDate(d.getDate() + 5); return d.toISOString().split('T')[0]; })();
 
-                if (!spaceId) {
-                    const { data: newSpace } = await supabase.from('spaces').insert({
-                        name: spaceName,
-                        space_type: 'client',
-                        description: `Space del cliente ${opp.client?.company_name}`,
-                        members: ['Alejandro', 'Director', 'Samara'],
-                        is_archived: false
-                    }).select().single();
-                    spaceId = newSpace?.id;
+                // ── 1. Crear Tareas Operativas Automáticas ──
+
+                // 6.1 Facturación y Cobranza — Samara
+                await supabase.from('team_tasks').insert({
+                    title: `Facturación y Cobranza — ${clientName}`,
+                    description: `Oportunidad: ${opp.title}\nValor: ${formatCurrency(opp.estimated_value || 0)}\n\nActividades:\n• Solicitar datos de facturación al cliente\n• Generar y enviar factura\n• Registrar factura en CRM\n• Dar seguimiento a cobranza\n\nCondición clave: El proyecto NO avanza a operación sin anticipo/pago acordado, salvo cliente conocido con relación comercial.`,
+                    assigned_to: 'Samara',
+                    created_by: 'Sistema',
+                    status: 'pending',
+                    priority: 'high',
+                    due_date: dueDateStr,
+                    checklist: JSON.stringify([
+                        { text: 'Solicitar datos de facturación al cliente', done: false },
+                        { text: 'Generar y enviar factura', done: false },
+                        { text: 'Registrar factura en CRM', done: false },
+                        { text: 'Dar seguimiento a cobranza', done: false },
+                    ]),
+                    tags: ['auto', 'facturación', 'cierre-ganado'],
+                });
+
+                // 7.1 Gestión de Materiales — Paulina
+                await supabase.from('team_tasks').insert({
+                    title: `Gestión de Materiales — ${clientName}`,
+                    description: `Oportunidad: ${opp.title}\n\nActividades:\n• Revisión de materiales requeridos para el proyecto\n• Validación de inventario\n\nCondicional:\n• SI hay materiales → Preparar\n• SI NO hay → Solicitar autorización a Dirección, generar órdenes de compra, dar seguimiento a entrega`,
+                    assigned_to: 'Paulina',
+                    created_by: 'Sistema',
+                    status: 'pending',
+                    priority: 'high',
+                    due_date: dueDateStr,
+                    checklist: JSON.stringify([
+                        { text: 'Revisión de materiales requeridos', done: false },
+                        { text: 'Validación de inventario', done: false },
+                        { text: 'Preparar materiales o generar orden de compra', done: false },
+                        { text: 'Confirmar entrega de materiales', done: false },
+                    ]),
+                    tags: ['auto', 'materiales', 'cierre-ganado'],
+                });
+
+                // 7.2 Preparación Técnica y Logística — Joel
+                await supabase.from('team_tasks').insert({
+                    title: `Preparación Técnica y Logística — ${clientName}`,
+                    description: `Oportunidad: ${opp.title}\n\nActividades:\n• Validar disponibilidad de equipos\n• Revisar estado operativo\n• Identificar faltantes técnicos\n• Coordinar logística de ejecución`,
+                    assigned_to: 'Joel',
+                    created_by: 'Sistema',
+                    status: 'pending',
+                    priority: 'high',
+                    due_date: dueDateStr,
+                    checklist: JSON.stringify([
+                        { text: 'Validar disponibilidad de equipos', done: false },
+                        { text: 'Revisar estado operativo', done: false },
+                        { text: 'Identificar faltantes técnicos', done: false },
+                        { text: 'Coordinar logística de ejecución', done: false },
+                    ]),
+                    tags: ['auto', 'logística', 'cierre-ganado'],
+                });
+
+                // 8. Programación de Trabajos — Joel & Alejandro
+                await supabase.from('team_tasks').insert({
+                    title: `Programación de Trabajos — ${clientName}`,
+                    description: `Oportunidad: ${opp.title}\nResponsables: Joel Rincón & Alejandro Bernal\n\nActividades:\n• Programación de fechas\n• Asignación de personal\n• Coordinación de maniobras\n\nCondición de cierre:\n• Facturación realizada\n• Cobranza validada\n• Materiales listos\n• Equipos preparados\n• Trabajo programado\n\nResultado: Proyecto listo para ejecución`,
+                    assigned_to: 'Alejandro',
+                    created_by: 'Sistema',
+                    status: 'pending',
+                    priority: 'normal',
+                    due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 7); return d.toISOString().split('T')[0]; })(),
+                    checklist: JSON.stringify([
+                        { text: 'Programación de fechas', done: false },
+                        { text: 'Asignación de personal', done: false },
+                        { text: 'Coordinación de maniobras', done: false },
+                        { text: 'Facturación realizada', done: false },
+                        { text: 'Cobranza validada', done: false },
+                        { text: 'Materiales listos', done: false },
+                        { text: 'Equipos preparados', done: false },
+                    ]),
+                    tags: ['auto', 'programación', 'cierre-ganado'],
+                });
+
+                // ── 2. Notificaciones internas (mensajes en spaces) ──
+                const notifContent = `🎉 **¡VENTA CERRADA — PROYECTO GANADO!**\n\nSe ha ganado la oportunidad: **${opp.title}**\n👤 Cliente: **${clientName}**\n💰 Valor: **${formatCurrency(opp.estimated_value || 0)}**\n📅 Fecha: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}\n\n**Tareas automáticas creadas para:**\n• 📋 Samara — Facturación y Cobranza\n• 📦 Paulina — Gestión de Materiales\n• 🔧 Joel — Preparación Técnica\n• 📅 Alejandro — Programación de Trabajos\n\n_A prepararse para el arranque del proyecto._`;
+
+                // Post to General and Operaciones spaces
+                const { data: spaces } = await supabase.from('spaces').select('id, name').in('name', ['General', 'Operaciones', 'Administración']);
+                if (spaces) {
+                    for (const space of spaces) {
+                        await supabase.from('messages').insert({
+                            space_id: space.id,
+                            sender: 'Sistema',
+                            content: notifContent,
+                            message_type: 'system'
+                        });
+                    }
                 }
 
-                if (spaceId) {
-                    await supabase.from('messages').insert({
-                        space_id: spaceId,
-                        sender_id: '12345678-1234-1234-1234-123456789012',
-                        content: `🎉 **¡VENTA CERRADA (M1→M8)!**\n\nSe ha ganado la oportunidad: **${opp.title}**\n💰 Valor Total: **${formatCurrency(opp.estimated_value || 0)}**\n📅 Fecha de cierre: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}\n\n*A prepararse para el arranque del proyecto.*`,
-                        message_type: 'text'
-                    });
+                // ── 3. Crear menciones para notificaciones push internas ──
+                const mentionTargets = ['Joel', 'Samara', 'Paulina', 'Alejandro'];
+                const { data: generalSpace } = await supabase.from('spaces').select('id').eq('name', 'General').single();
+                if (generalSpace) {
+                    const { data: sysMsg } = await supabase.from('messages')
+                        .select('id').eq('space_id', generalSpace.id).eq('sender', 'Sistema')
+                        .order('created_at', { ascending: false }).limit(1).single();
+                    if (sysMsg) {
+                        await supabase.from('message_mentions').insert(
+                            mentionTargets.map(u => ({
+                                message_id: sysMsg.id,
+                                space_id: generalSpace.id,
+                                mentioned_user: u,
+                                is_read: false,
+                            }))
+                        );
+                    }
                 }
+
+                // ── 4. Notificaciones push internas (app_notifications) ──
+                const taskAssignments: { user: string; task: string }[] = [
+                    { user: 'Samara', task: 'Facturación y Cobranza' },
+                    { user: 'Paulina', task: 'Gestión de Materiales' },
+                    { user: 'Joel', task: 'Preparación Técnica y Logística' },
+                    { user: 'Alejandro', task: 'Programación de Trabajos' },
+                ];
+                await supabase.from('app_notifications').insert(
+                    taskAssignments.map(a => ({
+                        user_name: a.user,
+                        title: `🎉 Proyecto Ganado — ${clientName}`,
+                        message: `Se te asignó: ${a.task}. Oportunidad: ${opp.title} (${formatCurrency(opp.estimated_value || 0)})`,
+                        type: 'project',
+                        icon: 'emoji_events',
+                        link: '/tasks',
+                        source: 'pipeline',
+                    }))
+                );
+                // Notificar también a Director
+                await supabase.from('app_notifications').insert({
+                    user_name: 'Director',
+                    title: `🎉 Venta Cerrada — ${clientName}`,
+                    message: `Oportunidad "${opp.title}" cerrada por ${formatCurrency(opp.estimated_value || 0)}. Tareas operativas creadas automáticamente.`,
+                    type: 'project',
+                    icon: 'emoji_events',
+                    link: '/tasks',
+                    source: 'pipeline',
+                });
             }
         }
 
