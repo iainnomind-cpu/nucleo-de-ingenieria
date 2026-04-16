@@ -122,6 +122,7 @@ export default function TareasTab() {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [showLogs, setShowLogs] = useState<string | null>(null);
+    const [viewMode, setViewMode] = useState<'rules' | 'templates'>('rules');
 
     // Form wizard state
     const [formStep, setFormStep] = useState(0);
@@ -241,6 +242,13 @@ export default function TareasTab() {
         });
         setEditingTemplateId(t.id);
         setShowTemplateForm(true);
+    };
+
+    const deleteTemplate = async (id: string, st: MetaStatus) => {
+        if (st !== 'draft' && st !== 'rejected') { alert('Solo puedes eliminar plantillas en borrador o rechazadas.'); return; }
+        if (!confirm('¿Eliminar esta plantilla?')) return;
+        await supabase.from('wa_templates').delete().eq('id', id);
+        fetchAll();
     };
 
     const processBodyForEdit = (bodyText: string, varsArray: string[]) => {
@@ -393,16 +401,22 @@ export default function TareasTab() {
                 </div>
             </div>
 
+            <div className="flex gap-6 border-b border-slate-200 dark:border-slate-800 px-6">
+                 <button onClick={() => setViewMode('rules')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${viewMode === 'rules' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Reglas de Automatización</button>
+                 <button onClick={() => setViewMode('templates')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${viewMode === 'templates' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Plantillas de Equipo</button>
+            </div>
+
             <div className="p-6">
-                {/* Rules List */}
-                {rules.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                        <span className="material-symbols-outlined text-[64px] mb-4">bolt</span>
-                        <p className="text-lg font-semibold text-slate-600 dark:text-slate-300">Sin automatizaciones</p>
-                        <p className="text-sm mt-1">Crea reglas para notificar al equipo por WhatsApp cuando sucedan eventos</p>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {viewMode === 'rules' ? (
+                    /* Rules List */
+                    rules.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                            <span className="material-symbols-outlined text-[64px] mb-4">bolt</span>
+                            <p className="text-lg font-semibold text-slate-600 dark:text-slate-300">Sin automatizaciones</p>
+                            <p className="text-sm mt-1">Crea reglas para notificar al equipo por WhatsApp cuando sucedan eventos</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                         {rules.map(rule => {
                             const mod = TRIGGER_MODULES.find(m => m.key === rule.trigger_module);
                             const evt = mod?.events.find(e => e.key === rule.trigger_event);
@@ -466,6 +480,57 @@ export default function TareasTab() {
                             );
                         })}
                     </div>
+                )
+                ) : (
+                    /* Templates List */
+                    templates.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                            <span className="material-symbols-outlined text-[64px] mb-4">description</span>
+                            <p className="text-lg font-semibold text-slate-600 dark:text-slate-300">Sin plantillas</p>
+                            <p className="text-sm mt-1">Crea plantillas para usarlas en tus reglas de automatización</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {templates.map(tpl => (
+                                <div key={tpl.id} className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-800 flex flex-col justify-between group">
+                                    <div className="p-4">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white">{tpl.name}</p>
+                                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                                                {META_STATUS_LABELS[tpl.meta_status]}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-lg bg-slate-50 p-2.5 border-l-4 border-emerald-500 dark:bg-slate-800">
+                                            {tpl.header_content && <p className="text-[10px] font-bold mb-1">{tpl.header_content}</p>}
+                                            <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-4 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderBody(tpl.body, tpl.variables) }} />
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col border-t border-slate-100 dark:border-slate-800 opacity-0 group-hover:opacity-100 transition-all bg-slate-50/50 dark:bg-slate-800/20">
+                                        {(tpl.meta_status === 'draft' || tpl.meta_status === 'rejected') && (
+                                            <button onClick={() => submitToMeta(tpl.id, tpl.name)} disabled={submittingId === tpl.id} className="w-full border-b border-slate-100 dark:border-slate-800 flex justify-center py-2 text-xs font-bold text-sky-600 hover:bg-sky-100 transition">
+                                                {submittingId === tpl.id ? 'Enviando...' : '📤 Enviar a Revisión Meta'}
+                                            </button>
+                                        )}
+                                        <div className="flex">
+                                            <button onClick={() => editTemplate(tpl)} className="flex-1 flex justify-center items-center gap-1 py-2 text-xs font-medium text-amber-600 hover:bg-amber-100 transition">
+                                                <span className="material-symbols-outlined text-[14px]">edit</span> Editar
+                                            </button>
+                                            {(tpl.meta_status === 'approved' || tpl.meta_status === 'pending') && (
+                                                <button onClick={() => resetToDraft(tpl)} className="flex-1 flex justify-center items-center gap-1 py-2 text-xs font-medium text-amber-600 hover:bg-amber-100 transition border-l border-slate-100 dark:border-slate-800">
+                                                    <span className="material-symbols-outlined text-[14px]">restart_alt</span> Reset
+                                                </button>
+                                            )}
+                                            {(tpl.meta_status === 'draft' || tpl.meta_status === 'rejected') && (
+                                                <button onClick={() => deleteTemplate(tpl.id, tpl.meta_status)} className="flex-1 flex justify-center items-center gap-1 py-2 text-xs font-medium text-red-500 hover:bg-red-100 transition border-l border-slate-100 dark:border-slate-800">
+                                                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )
                 )}
             </div>
 
