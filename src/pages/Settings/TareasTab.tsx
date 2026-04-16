@@ -219,6 +219,39 @@ export default function TareasTab() {
         } catch (error) { alert('Error de red al intentar enviar.'); } finally { setSubmittingId(null); }
     };
 
+    const resetToDraft = async (t: WaTemplate) => {
+        if (!confirm(`¿Resetear "${t.name}" a borrador?\n\nEsto permite re-enviarla a revisión o editarla.`)) return;
+        await supabase.from('wa_templates').update({ 
+            meta_status: 'draft', 
+            meta_template_id: null, 
+            meta_name: null 
+        }).eq('id', t.id);
+        fetchAll();
+    };
+
+    const editTemplate = (t: WaTemplate) => {
+        const editableBody = processBodyForEdit(t.body, t.variables || []);
+        setFormTemplate({
+            name: t.name, category: t.category, language: t.language,
+            header_type: t.header_type || 'none', header_content: t.header_content || '',
+            body: editableBody, footer: t.footer || '',
+            variables: '', meta_status: t.meta_status,
+        });
+        setEditingTemplateId(t.id);
+        setShowTemplateForm(true);
+    };
+
+    const processBodyForEdit = (bodyText: string, varsArray: string[]) => {
+        let editableBody = bodyText;
+        if (varsArray && varsArray.length > 0) {
+            varsArray.forEach((varName, idx) => {
+                const regex = new RegExp(`\\{\\{${idx + 1}\\}\\}`, 'g');
+                editableBody = editableBody.replace(regex, `{{${varName}}}`);
+            });
+        }
+        return editableBody;
+    };
+
     const syncStatusFromMeta = async () => {
         setSyncingStatus(true);
         try {
@@ -535,13 +568,23 @@ export default function TareasTab() {
                                                     <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-3 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: renderBody(tpl.body, tpl.variables) }} />
                                                 </div>
                                                 {tpl.variables?.length > 0 && <div className="mt-2 flex gap-1 flex-wrap">{tpl.variables.map((v, i) => <span key={i} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500 dark:bg-slate-700 dark:text-slate-400">{v}</span>)}</div>}
-                                                {(tpl.meta_status === 'draft' || tpl.meta_status === 'rejected') && (
-                                                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end">
-                                                        <button type="button" onClick={(e) => { e.stopPropagation(); submitToMeta(tpl.id, tpl.name); }} disabled={submittingId === tpl.id} className="flex items-center gap-1 rounded-lg bg-sky-100 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400 transition-all">
-                                                            {submittingId === tpl.id ? 'Enviando...' : 'Enviar a Revisión Meta'}
+                                                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-2">
+                                                    {(tpl.meta_status === 'draft' || tpl.meta_status === 'rejected') && (
+                                                        <>
+                                                            <button type="button" onClick={(e) => { e.stopPropagation(); editTemplate(tpl); }} disabled={submittingId === tpl.id} className="flex items-center gap-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 transition-all">
+                                                                Editar
+                                                            </button>
+                                                            <button type="button" onClick={(e) => { e.stopPropagation(); submitToMeta(tpl.id, tpl.name); }} disabled={submittingId === tpl.id} className="flex items-center gap-1 rounded-lg bg-sky-100 px-3 py-1.5 text-xs font-bold text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400 transition-all">
+                                                                {submittingId === tpl.id ? 'Enviando...' : 'Enviar a Revisión Meta'}
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {(tpl.meta_status === 'approved' || tpl.meta_status === 'pending') && (
+                                                        <button type="button" onClick={(e) => { e.stopPropagation(); resetToDraft(tpl); }} disabled={submittingId === tpl.id} className="flex items-center gap-1 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400 transition-all">
+                                                            <span className="material-symbols-outlined text-[14px]">restart_alt</span>Resetear
                                                         </button>
-                                                    </div>
-                                                )}
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                         })}

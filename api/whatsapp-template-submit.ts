@@ -73,10 +73,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         // TODO: Para imágenes/documentos hace falta otro flujo de subida de Media a Meta primero.
 
-        // Body
+        // Body — Meta rechaza bodies que terminan con una variable {{N}}
+        let bodyText = template.body;
+        // Si el body termina con {{N}} (opcionalmente seguido de puntuación), agregar texto después
+        if (/\{\{\d+\}\}[.,;:!?\s]*$/.test(bodyText.trim())) {
+            bodyText = bodyText.trimEnd().replace(/([.,;:!?\s]*)$/, '') + '.';
+        }
         const bodyComponent: any = {
             type: 'BODY',
-            text: template.body
+            text: bodyText
         };
 
         // Contar el número real de variables únicas {{1}}, {{2}} presentes en el cuerpo
