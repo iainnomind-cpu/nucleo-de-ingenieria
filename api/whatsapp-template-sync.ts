@@ -35,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 1. Obtener todas las plantillas locales que NO están en draft (ya fueron enviadas a Meta)
         const { data: localTemplates, error: fetchError } = await supabase
             .from('wa_templates')
-            .select('id, name, meta_template_id, meta_status')
+            .select('id, name, meta_template_id, meta_status, meta_name')
             .not('meta_status', 'eq', 'draft');
 
         if (fetchError) {
@@ -69,16 +69,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(400).json({ success: false, message: errorMsg, meta_error: metaResult?.error });
         }
 
-        const metaTemplates: Array<{ id: string; name: string; status: string }> = metaResult.data || [];
+        const metaTemplates: Array<{ id: string; name: string; status: string; language: string }> = metaResult.data || [];
 
         // 3. Mapear por nombre (snake_case normalizado) y por meta_template_id
-        const metaByName = new Map<string, string>();
-        const metaById = new Map<string, string>();
+        const metaByName = new Map<string, { status: string; metaName: string }>();
+        const metaById = new Map<string, { status: string; metaName: string }>();
 
         for (const mt of metaTemplates) {
             const normalizedStatus = mt.status.toLowerCase(); // APPROVED → approved, REJECTED → rejected, PENDING → pending
-            metaByName.set(mt.name.toLowerCase(), normalizedStatus);
-            metaById.set(mt.id, normalizedStatus);
+            const entry = { status: normalizedStatus, metaName: mt.name };
+            metaByName.set(mt.name.toLowerCase(), entry);
+            metaById.set(mt.id, entry);
         }
 
         // 4. Actualizar cada plantilla local cuyo estado difiera del de Meta
@@ -87,20 +88,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         for (const local of localTemplates) {
             // Intentar buscar por meta_template_id primero, luego por nombre normalizado
-            let metaStatus: string | undefined;
+            let metaEntry: { status: string; metaName: string } | undefined;
 
             if (local.meta_template_id) {
-                metaStatus = metaById.get(local.meta_template_id);
+                metaEntry = metaById.get(local.meta_template_id);
             }
-            if (!metaStatus) {
+            if (!metaEntry) {
                 const normalizedName = local.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
-                metaStatus = metaByName.get(normalizedName);
+                metaEntry = metaByName.get(normalizedName);
             }
 
-            if (metaStatus && metaStatus !== local.meta_status) {
+            if (metaEntry && (metaEntry.status !== local.meta_status || metaEntry.metaName !== local.meta_name)) {
+                const updatePayload: Record<string, string> = {};
+                if (metaEntry.status !== local.meta_status) {
+                    updatePayload.meta_status = metaEntry.status;
+                }
+                // Always sync the exact Meta name so sending uses the correct identifier
+                if (metaEntry.metaName !== local.meta_name) {
+                    updatePayload.meta_name = metaEntry.metaName;
+                }
+
                 const { error: updateError } = await supabase
                     .from('wa_templates')
-                    .update({ meta_status: metaStatus })
+                    .update(updatePayload)
                     .eq('id', local.id);
 
                 if (!updateError) {
@@ -108,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     details.push({
                         name: local.name,
                         from: local.meta_status,
-                        to: metaStatus
+                        to: metaEntry.status
                     });
                 }
             }

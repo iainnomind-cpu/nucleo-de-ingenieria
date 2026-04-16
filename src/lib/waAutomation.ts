@@ -80,7 +80,7 @@ export async function triggerWaAutomation(payload: TriggerPayload): Promise<void
             const template = rule.template;
             if (!template) continue;
 
-            const templateName = template.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+            const templateName = template.meta_name || template.name.toLowerCase().replace(/[^a-z0-9_]/g, '_');
             const varValues = (template.variables || []).map((_: string, idx: number) => {
                 const mapping = rule.variable_mapping?.[String(idx + 1)];
                 if (!mapping) return '';

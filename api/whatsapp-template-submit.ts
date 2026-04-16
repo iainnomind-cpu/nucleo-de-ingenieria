@@ -143,11 +143,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // 4. Si fue exitoso, actualizar el registro en Supabase a "pending"
         const metaTemplateId = metaResult.id;
 
+        const metaName = metaPayload.name; // The exact snake_case name sent to Meta
         const { error: updateError } = await supabase
             .from('wa_templates')
             .update({ 
                 meta_status: 'pending',
-                meta_template_id: metaTemplateId
+                meta_template_id: metaTemplateId,
+                meta_name: metaName,
             })
             .eq('id', template_id);
 

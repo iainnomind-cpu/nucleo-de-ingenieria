@@ -152,7 +152,7 @@ export default function DirectSend() {
                     body: JSON.stringify({
                         to: client.phone,
                         type: 'template',
-                        template_name: selectedTemplate.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+                        template_name: selectedTemplate.meta_name || selectedTemplate.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'),
                         language: selectedTemplate.language || 'es_MX',
                         variables: varValues.length > 0 ? varValues : undefined,
                     }),

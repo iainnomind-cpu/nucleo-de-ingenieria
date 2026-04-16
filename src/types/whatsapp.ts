@@ -27,6 +27,7 @@ export interface WaTemplate {
     usage_type: 'marketing' | 'team';
     meta_status: MetaStatus;
     meta_template_id: string | null;
+    meta_name: string | null;
     example_values: string[];
     created_at: string;
     updated_at: string;
