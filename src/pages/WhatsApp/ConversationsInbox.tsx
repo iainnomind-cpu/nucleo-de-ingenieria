@@ -52,19 +52,34 @@ export default function ConversationsInbox() {
     const sendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!input.trim() || !selectedConv) return;
-        await supabase.from('wa_messages').insert({
-            conversation_id: selectedConv.id,
-            direction: 'outbound',
-            message_type: 'text',
-            content: input.trim(),
-            status: 'sent',
-            sent_by: 'Director',
-        });
-        await supabase.from('wa_conversations').update({
-            last_message_at: new Date().toISOString(),
-            last_message_preview: input.trim().slice(0, 100),
-        }).eq('id', selectedConv.id);
-        setInput('');
+        
+        const messageText = input.trim();
+        setInput(''); // clear early for UI responsiveness
+        
+        try {
+            const res = await fetch('/api/whatsapp-send', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    to: selectedConv.phone_number,
+                    type: 'text',
+                    text: messageText,
+                    conversation_id: selectedConv.id
+                })
+            });
+            const data = await res.json();
+            if (!data.success) {
+                alert(`Error al enviar mensaje: ${data.message}`);
+                // Restore input on failure
+                setInput(messageText);
+            }
+        } catch (error) {
+            console.error('Network error sending message:', error);
+            alert('Error de conectividad al intentar enviar el mensaje.');
+            setInput(messageText);
+        }
+        
+        // Refresh UI
         fetchMessages(selectedConv.id);
         fetchConversations();
     };
