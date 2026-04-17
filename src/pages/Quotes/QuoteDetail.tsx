@@ -369,17 +369,40 @@ export default function QuoteDetail() {
             doc.text(`v${quote.version}`, pageWidth - 14, 20, { align: 'right' });
             doc.text(new Date(quote.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }), pageWidth - 14, 30, { align: 'right' });
 
+            // Load logo
+            let logoImg: HTMLImageElement | null = null;
+            try {
+                logoImg = await new Promise((resolve, reject) => {
+                    const img = new window.Image();
+                    img.src = '/logo.png';
+                    img.onload = () => resolve(img);
+                    img.onerror = () => reject();
+                });
+            } catch (e) { 
+                console.warn('Logo no encontrado'); 
+            }
+
             // Company info
+            let logoOffset = 0;
+            if (logoImg) {
+                const ratio = logoImg.height / logoImg.width;
+                const logoW = 35;
+                const logoH = logoW * ratio;
+                // Center vertically between 40 and 65 (25px block) => y = 45
+                doc.addImage(logoImg, 'PNG', 14, 45, logoW, logoH);
+                logoOffset = logoW + 5;
+            }
+
             doc.setTextColor(50, 50, 50);
             doc.setFontSize(14);
             doc.setFont('helvetica', 'bold');
-            doc.text('Núcleo de Ingeniería', 14, 55);
+            doc.text('Núcleo de Ingeniería', 14 + logoOffset, 55);
             doc.setFontSize(9);
             doc.setFont('helvetica', 'normal');
             doc.setTextColor(100, 100, 100);
 
             // Client info
-            let y = 70;
+            let y = logoImg ? Math.max(70, 45 + (35 * (logoImg.height / logoImg.width)) + 15) : 70;
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
             doc.setTextColor(50, 50, 50);
