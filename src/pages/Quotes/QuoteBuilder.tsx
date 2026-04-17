@@ -170,7 +170,7 @@ export default function QuoteBuilder() {
         const { data: quote, error } = await supabase.from('quotes').insert({
             quote_number: quoteNumber,
             client_id: clientId || null,
-            status,
+            status: 'draft', // Always initially save as draft so the Send Modal correctly tracks the transition
             title,
             description: description || null,
             work_type: workType || null,
@@ -249,7 +249,7 @@ export default function QuoteBuilder() {
         }
 
         setSaving(false);
-        navigate(`/quotes/${quote.id}`);
+        navigate(`/quotes/${quote.id}${status === 'sent' ? '?send=1' : ''}`);
     };
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';

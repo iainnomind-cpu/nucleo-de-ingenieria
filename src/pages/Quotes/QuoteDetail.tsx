@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { triggerWaAutomation } from '../../lib/waAutomation';
 import {
@@ -15,6 +15,7 @@ import {
 export default function QuoteDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const location = useLocation();
     const [quote, setQuote] = useState<Quote | null>(null);
     const [items, setItems] = useState<QuoteItem[]>([]);
     const [versions, setVersions] = useState<Quote[]>([]);
@@ -30,12 +31,17 @@ export default function QuoteDetail() {
         setLoading(true);
         const { data, error } = await supabase
             .from('quotes')
-            .select('*, client:clients(id, company_name, contact_name)')
+            .select('*, client:clients(id, company_name, contact_name, email, phone)')
             .eq('id', id)
             .single();
 
         if (error || !data) { navigate('/quotes'); return; }
         setQuote(data as Quote);
+
+        if (new URLSearchParams(location.search).get('send') === '1' && data.status === 'draft') {
+            setShowSendModal(true);
+            navigate(`/quotes/${id}`, { replace: true });
+        }
 
         // Fetch items
         const { data: itemsData } = await supabase.from('quote_items').select('*').eq('quote_id', id).order('sort_order');
