@@ -125,14 +125,20 @@ function checkPageBreak(doc: jsPDF, currentY: number, needed: number, pageWidth:
   return currentY;
 }
 
-export function generateExecutiveReport(data: ReportData) {
+export function generateExecutiveReport(data: ReportData, periodLabel: string = 'Este Mes') {
   const doc = new jsPDF('p', 'mm', 'letter');
   const pageWidth = doc.internal.pageSize.getWidth();
 
   // ─── PAGE 1: Cover + KPIs + Alerts ──────────────────────────
   drawHeader(doc, pageWidth);
+  
+  // Add Period Label below header
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(9);
+  doc.setTextColor(...COLORS.medium);
+  doc.text(`Período de Análisis: ${periodLabel}`, 14, 38);
 
-  let y = 42;
+  let y = 46;
 
   // ─── INDICADORES CLAVE ───
   y = drawSectionTitle(doc, y, 'Indicadores Clave de Desempeño');
