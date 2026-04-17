@@ -5,7 +5,7 @@ import {
     TeamTask, TaskStatus, TaskPriority,
     TASK_STATUS_LABELS, TASK_STATUS_COLORS,
     TASK_PRIORITY_LABELS, TASK_PRIORITY_COLORS, TASK_PRIORITY_ICONS,
-    TEAM_MEMBERS, getInitials, getAvatarColor,
+    getInitials, getAvatarColor,
 } from '../../types/teams';
 
 type ViewMode = 'kanban' | 'my_day' | 'manager' | 'calendar';
@@ -22,6 +22,7 @@ export default function TasksDashboard() {
     const [showForm, setShowForm] = useState(false);
     const [editingTask, setEditingTask] = useState<TeamTask | null>(null);
     const [projects, setProjects] = useState<{ id: string; project_number: string; title: string }[]>([]);
+    const [teamMembers, setTeamMembers] = useState<string[]>([]);
     const [calendarMonth, setCalendarMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -37,9 +38,18 @@ export default function TasksDashboard() {
         let q = supabase.from('team_tasks').select('*, project:projects(id, project_number, title)').order('due_date', { ascending: true });
         if (filterUser) q = q.eq('assigned_to', filterUser);
         if (filterPriority) q = q.eq('priority', filterPriority);
-        const [tRes, pRes] = await Promise.all([q, supabase.from('projects').select('id, project_number, title').order('project_number', { ascending: false })]);
+        const [tRes, pRes, usersRes] = await Promise.all([
+            q, 
+            supabase.from('projects').select('id, project_number, title').order('project_number', { ascending: false }),
+            supabase.from('app_users').select('full_name').eq('is_active', true).order('full_name')
+        ]);
         setTasks((tRes.data as TeamTask[]) || []);
         setProjects(pRes.data || []);
+        if (usersRes.data) {
+            setTeamMembers(usersRes.data.map(u => u.full_name).filter(Boolean));
+        } else {
+            setTeamMembers([]);
+        }
         setLoading(false);
     }, [filterUser, filterPriority]);
 
@@ -238,7 +248,7 @@ export default function TasksDashboard() {
                         ))}
                     </div>
                     <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-                        <option value="">Todos</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
+                        <option value="">Todos</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
                     </select>
                     <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
                         <option value="">Prioridad</option>
@@ -280,7 +290,7 @@ export default function TasksDashboard() {
                     </h3>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                         <div className="md:col-span-2"><label className={labelClass}>Tarea *</label><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="Verificar bomba pozo Limonera..." className={inputClass} /></div>
-                        <div><label className={labelClass}>Responsable *</label><select value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} required className={inputClass}><option value="">Seleccionar</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                        <div><label className={labelClass}>Responsable *</label><select value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} required className={inputClass}><option value="">Seleccionar</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
                         <div><label className={labelClass}>Prioridad</label><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as TaskPriority })} className={inputClass}>{(['low', 'normal', 'high', 'urgent'] as TaskPriority[]).map(p => <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>)}</select></div>
                         <div><label className={labelClass}>Fecha Límite</label><input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} className={inputClass} /></div>
                         <div><label className={labelClass}>Proyecto</label><select value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })} className={inputClass}><option value="">Ninguno</option>{projects.map(p => <option key={p.id} value={p.id}>{p.project_number} — {p.title}</option>)}</select></div>
@@ -424,7 +434,7 @@ export default function TasksDashboard() {
                                     <span className="material-symbols-outlined text-violet-500 text-[18px]">supervisor_account</span>¿Dónde está el equipo?
                                 </h3>
                                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                                    {TEAM_MEMBERS.map(member => {
+                                    {teamMembers.map(member => {
                                         const memberTasks = tasks.filter(t => t.assigned_to === member);
                                         const pending = memberTasks.filter(t => t.status !== 'completed').length;
                                         const completed = memberTasks.filter(t => t.status === 'completed').length;

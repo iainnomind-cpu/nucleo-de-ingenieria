@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import {
     Space, Message, SpaceType,
-    SPACE_TYPE_LABELS, SPACE_TYPE_ICONS, TEAM_MEMBERS,
+    SPACE_TYPE_LABELS, SPACE_TYPE_ICONS,
     TASK_PRIORITY_LABELS, TaskPriority,
     getInitials, getAvatarColor, timeAgo, parseMentions,
 } from '../../types/teams';
@@ -27,6 +27,7 @@ export default function SpaceChat() {
     const [spaceForm, setSpaceForm] = useState({ name: '', description: '', space_type: 'area' as SpaceType, icon: 'forum' });
     const [taskForm, setTaskForm] = useState({ title: '', assigned_to: '', priority: 'normal' as TaskPriority, due_date: '', project_id: '' });
     const [projects, setProjects] = useState<{ id: string; project_number: string; title: string }[]>([]);
+    const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
     const fetchSpaces = useCallback(async () => {
         const { data } = await supabase.from('spaces').select('*').eq('is_archived', false).order('space_type').order('name');
@@ -47,6 +48,7 @@ export default function SpaceChat() {
     useEffect(() => {
         fetchSpaces();
         supabase.from('projects').select('id, project_number, title').order('project_number', { ascending: false }).then(r => setProjects(r.data || []));
+        supabase.from('app_users').select('full_name').eq('is_active', true).order('full_name').then(r => setTeamMembers((r.data || []).map(u => u.full_name).filter(Boolean)));
     }, [fetchSpaces]);
 
     useEffect(() => {
@@ -328,7 +330,7 @@ export default function SpaceChat() {
                                 <label className={labelClass}>Responsable *</label>
                                 <select value={taskForm.assigned_to} onChange={e => setTaskForm({ ...taskForm, assigned_to: e.target.value })} required className={inputClass}>
                                     <option value="">Seleccionar...</option>
-                                    {TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}
+                                    {teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
                                 </select>
                             </div>
                             <div className="grid grid-cols-2 gap-3">
