@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import GoogleMapView, { MapPin } from '../components/GoogleMap';
 import { NUCLEO_HQ } from '../lib/maps';
+import { generateExecutiveReport } from '../lib/reportGenerator';
 
 interface DashboardData {
   // Ventas
@@ -206,7 +207,7 @@ export default function Dashboard() {
           <p className="mt-1 text-sm text-slate-500">Indicadores en tiempo real · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => window.print()} className="flex items-center gap-1 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 print:hidden" title="Exportar a PDF">
+          <button onClick={() => generateExecutiveReport(data)} className="flex items-center gap-1 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 print:hidden" title="Exportar Reporte Ejecutivo">
             <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>Exportar PDF
           </button>
           <button onClick={fetchAll} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 print:hidden">
