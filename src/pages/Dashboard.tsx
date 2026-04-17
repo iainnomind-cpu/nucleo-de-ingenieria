@@ -50,19 +50,44 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Date range state
+  const getMonthStart = () => { const d = new Date(); d.setDate(1); return d.toISOString().split('T')[0]; };
+  const getToday = () => new Date().toISOString().split('T')[0];
+  const [dateFrom, setDateFrom] = useState(getMonthStart());
+  const [dateTo, setDateTo] = useState(getToday());
+  const [activePreset, setActivePreset] = useState('this_month');
+
+  const applyPreset = (preset: string) => {
+    const now = new Date();
+    let from = '', to = getToday();
+    switch (preset) {
+      case 'this_month': { const d = new Date(); d.setDate(1); from = d.toISOString().split('T')[0]; break; }
+      case 'last_month': { const d = new Date(now.getFullYear(), now.getMonth() - 1, 1); from = d.toISOString().split('T')[0]; const e = new Date(now.getFullYear(), now.getMonth(), 0); to = e.toISOString().split('T')[0]; break; }
+      case 'last_3_months': { const d = new Date(now.getFullYear(), now.getMonth() - 2, 1); from = d.toISOString().split('T')[0]; break; }
+      case 'this_year': { from = `${now.getFullYear()}-01-01`; break; }
+      case 'all_time': { from = '2020-01-01'; break; }
+    }
+    setDateFrom(from); setDateTo(to); setActivePreset(preset);
+  };
+
+  const dateRangeLabel = () => {
+    const presetLabels: Record<string, string> = { this_month: 'Este Mes', last_month: 'Mes Pasado', last_3_months: 'Últimos 3 Meses', this_year: 'Este Año', all_time: 'Todo el Historial', custom: 'Personalizado' };
+    return presetLabels[activePreset] || 'Personalizado';
+  };
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
     const today = new Date().toISOString().split('T')[0];
-    const monthStart = new Date(); monthStart.setDate(1);
-    const monthStartStr = monthStart.toISOString().split('T')[0];
+    const rangeFrom = dateFrom;
+    const rangeTo = dateTo;
 
     const [quotesR, projectsR, productsR, invoicesR, paymentsR, expensesR, equipR, schedR, contractsR, tasksR, clientsR, spacesR, teamTasksR, geoClientsR, geoProjectsR] = await Promise.all([
       supabase.from('quotes').select('id, status, total'),
       supabase.from('projects').select('id, project_number, title, status, project_type, assigned_team'),
       supabase.from('inventory_products').select('id, name, code, current_stock, min_stock, unit_cost, criticality').eq('is_active', true),
-      supabase.from('invoices').select('id, invoice_number, status, total, amount_paid, balance, due_date, issue_date, client:clients(company_name)').order('issue_date', { ascending: false }).limit(10),
-      supabase.from('payments').select('amount, payment_date').gte('payment_date', monthStartStr),
-      supabase.from('project_expenses').select('project_id, amount, category'),
+      supabase.from('invoices').select('id, invoice_number, status, total, amount_paid, balance, due_date, issue_date, client:clients(company_name)').gte('issue_date', rangeFrom).lte('issue_date', rangeTo).order('issue_date', { ascending: false }).limit(20),
+      supabase.from('payments').select('amount, payment_date').gte('payment_date', rangeFrom).lte('payment_date', rangeTo),
+      supabase.from('project_expenses').select('project_id, amount, category, expense_date').gte('expense_date', rangeFrom).lte('expense_date', rangeTo),
       supabase.from('installed_equipment').select('id, status'),
       supabase.from('maintenance_schedules').select('id, status, next_service_date, assigned_to, title, equipment:installed_equipment(name, well_name)').neq('status', 'completed').neq('status', 'cancelled'),
       supabase.from('maintenance_contracts').select('id, status, monthly_amount').eq('status', 'active'),
@@ -180,7 +205,7 @@ export default function Dashboard() {
       geoClients, geoProjects,
     });
     setLoading(false);
-  }, []);
+  }, [dateFrom, dateTo]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -188,7 +213,7 @@ export default function Dashboard() {
 
   const kpis = [
     { label: 'Proyectos Activos', value: data.activeProjects.toString(), icon: 'engineering', color: 'from-sky-500 to-cyan-500', link: '/projects' },
-    { label: 'Ingresos del Mes', value: fmt(data.monthRevenue), icon: 'payments', color: 'from-emerald-500 to-teal-500', link: '/finance' },
+    { label: `Ingresos (${dateRangeLabel()})`, value: fmt(data.monthRevenue), icon: 'payments', color: 'from-emerald-500 to-teal-500', link: '/finance' },
     { label: 'Cuentas por Cobrar', value: fmt(data.totalAR), icon: 'account_balance_wallet', color: 'from-amber-500 to-orange-500', link: '/finance/invoices' },
     { label: 'Valor Inventario', value: fmt(data.inventoryValue), icon: 'warehouse', color: 'from-violet-500 to-purple-500', link: '/inventory' },
   ];
@@ -204,7 +229,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">Dashboard Ejecutivo</h2>
-          <p className="mt-1 text-sm text-slate-500">Indicadores en tiempo real · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          <p className="mt-1 text-sm text-slate-500">Período: {dateRangeLabel()} · {new Date().toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={() => generateExecutiveReport(data)} className="flex items-center gap-1 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 print:hidden" title="Exportar Reporte Ejecutivo">
@@ -213,6 +238,31 @@ export default function Dashboard() {
           <button onClick={fetchAll} className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 print:hidden">
             <span className="material-symbols-outlined text-[16px]">refresh</span>Actualizar
           </button>
+        </div>
+      </div>
+
+      {/* Date Range Selector */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/60 bg-white/70 p-3 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50 print:hidden">
+        <span className="material-symbols-outlined text-slate-400 text-[18px]">date_range</span>
+        {[
+          { key: 'this_month', label: 'Este Mes' },
+          { key: 'last_month', label: 'Mes Pasado' },
+          { key: 'last_3_months', label: 'Últimos 3 Meses' },
+          { key: 'this_year', label: 'Este Año' },
+          { key: 'all_time', label: 'Todo' },
+        ].map(p => (
+          <button key={p.key} onClick={() => applyPreset(p.key)}
+            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${activePreset === p.key ? 'bg-primary text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'}`}>
+            {p.label}
+          </button>
+        ))}
+        <div className="h-5 w-px bg-slate-200 dark:bg-slate-700 mx-1" />
+        <div className="flex items-center gap-1.5">
+          <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setActivePreset('custom'); }}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+          <span className="text-xs text-slate-400">a</span>
+          <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setActivePreset('custom'); }}
+            className="rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
         </div>
       </div>
 
