@@ -16,44 +16,39 @@ export default function NotificationListener() {
         audioRef.current = new Audio(NOTIFICATION_SOUND_URL);
         audioRef.current.volume = 0.5;
 
-        // Escuchar inserciones en team_tasks asignadas explícitamente al nombre del usuario (ya que en team_tasks 'assigned_to' es el nombre)
-        // O si cambia a UUID, sería user.id
         const taskSubscription = supabase
             .channel('public:team_tasks')
             .on(
                 'postgres_changes',
-                {
-                    event: 'INSERT',
-                    schema: 'public',
-                    table: 'team_tasks',
-                },
+                { event: 'INSERT', schema: 'public', table: 'team_tasks' },
                 (payload) => {
-                    // Validar si es para este usuario (asumimos que payload.new.assigned_to coincide con full_name pero haremos un match parcial por si acaso)
                     const newTask = payload.new;
                     if (newTask.assigned_to && user.full_name && newTask.assigned_to.includes(user.full_name)) {
-                        
-                        // Play sound
-                        if (audioRef.current) {
-                            audioRef.current.play().catch(e => console.error("Error reproduciendo sonido", e));
-                        }
-
-                        // Show visual toast
-                        setNotification({
-                            id: newTask.id,
-                            title: 'Nueva Tarea Asignada',
-                            message: newTask.title,
-                            isTask: true,
-                        });
-
-                        // Auto hide after 8s
+                        if (audioRef.current) audioRef.current.play().catch(e => console.error("Error reproduciendo sonido", e));
+                        setNotification({ id: newTask.id, title: 'Nueva Tarea Asignada', message: newTask.title, isTask: true });
                         setTimeout(() => setNotification(null), 8000);
                     }
                 }
             )
             .subscribe();
 
+        const waSubscription = supabase
+            .channel('public:wa_messages')
+            .on(
+                'postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'wa_messages', filter: "direction=eq.inbound" },
+                (payload) => {
+                    const newMsg = payload.new;
+                    if (audioRef.current) audioRef.current.play().catch(e => console.error("Error reproduciendo sonido", e));
+                    setNotification({ id: newMsg.id, title: 'Nuevo Mensaje WhatsApp', message: newMsg.content || 'Mensaje recibido', isTask: false });
+                    setTimeout(() => setNotification(null), 8000);
+                }
+            )
+            .subscribe();
+
         return () => {
             supabase.removeChannel(taskSubscription);
+            supabase.removeChannel(waSubscription);
         };
     }, [user]);
 
@@ -63,8 +58,10 @@ export default function NotificationListener() {
         <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-4 slide-in-from-right-4 duration-500">
             <div className={`relative flex w-80 flex-col overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-slate-900/5 dark:bg-slate-900 dark:ring-white/10 ${notification.isTask ? 'border-l-4 border-l-primary' : ''}`}>
                 <div className="flex items-start gap-4 p-4">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary mt-0.5">
-                        <span className="material-symbols-outlined text-[20px]">{notification.isTask ? 'task_alt' : 'notifications'}</span>
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 mt-0.5 ${notification.title.includes('WhatsApp') ? 'text-emerald-500' : 'text-primary'}`}>
+                        <span className="material-symbols-outlined text-[20px]">
+                            {notification.title.includes('WhatsApp') ? 'chat' : (notification.isTask ? 'task_alt' : 'notifications')}
+                        </span>
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
                         <p className="font-bold text-slate-900 dark:text-white">{notification.title}</p>

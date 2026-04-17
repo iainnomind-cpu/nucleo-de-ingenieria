@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { useAuth } from '../lib/AuthContext';
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 
 const navItems = [
   { label: 'Dashboard', icon: 'space_dashboard', path: '/dashboard', module: 'dashboard' },
@@ -22,6 +24,23 @@ const navItems = [
 function Sidebar() {
   const location = useLocation();
   const { user, logout, hasPermission } = useAuth();
+  const [unreadWaCount, setUnreadWaCount] = useState(0);
+
+  useEffect(() => {
+    if (!user || !hasPermission('whatsapp', 'view')) return;
+    
+    const fetchUnread = async () => {
+      const { count } = await supabase.from('wa_conversations').select('*', { count: 'exact', head: true }).gt('unread_count', 0);
+      setUnreadWaCount(count || 0);
+    };
+    fetchUnread();
+
+    const sub = supabase.channel('wa_unread')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_conversations' }, fetchUnread)
+      .subscribe();
+      
+    return () => { supabase.removeChannel(sub); };
+  }, [user, hasPermission]);
 
   // Filtrar items según permisos del usuario
   const visibleItems = navItems.filter(item => hasPermission(item.module, 'view'));
@@ -56,14 +75,24 @@ function Sidebar() {
                 key={item.path}
                 to={item.path}
                 className={clsx(
-                  'group flex items-center gap-3 rounded-lg px-4 py-3 transition-all',
+                  'group relative flex items-center gap-3 rounded-lg px-4 py-3 transition-all',
                   isActive
                     ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-content font-semibold'
                     : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
                 )}
               >
-                <span className="material-symbols-outlined text-[24px]">{item.icon}</span>
+                <span className="material-symbols-outlined relative text-[24px]">
+                  {item.icon}
+                  {item.module === 'whatsapp' && unreadWaCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900 shadow-sm" />
+                  )}
+                </span>
                 <span className="text-sm">{item.label}</span>
+                {item.module === 'whatsapp' && unreadWaCount > 0 && (
+                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
+                     {unreadWaCount}
+                  </span>
+                )}
               </Link>
             );
           })}

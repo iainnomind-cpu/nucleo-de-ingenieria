@@ -132,16 +132,25 @@ export default function ConversationsInbox() {
                         </div>
                     </div>
                     <div className="flex gap-1">
-                        {tabs.map(tab => (
-                            <button key={tab.path} onClick={() => navigate(tab.path)}
-                                className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-xs font-semibold transition-all ${tab.path === '/whatsapp/conversations'
-                                        ? 'bg-white text-emerald-700 border-b-2 border-emerald-500 dark:bg-slate-800 dark:text-emerald-400'
-                                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                                    }`}>
-                                <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
-                                {tab.label}
-                            </button>
-                        ))}
+                        {tabs.map(tab => {
+                            const isConversationsTab = tab.path === '/whatsapp/conversations';
+                            const totalUnread = isConversationsTab ? conversations.reduce((sum, c) => sum + (c.unread_count || 0), 0) : 0;
+                            return (
+                                <button key={tab.path} onClick={() => navigate(tab.path)}
+                                    className={`relative flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-xs font-semibold transition-all ${tab.path === '/whatsapp/conversations'
+                                            ? 'bg-white text-emerald-700 border-b-2 border-emerald-500 dark:bg-slate-800 dark:text-emerald-400'
+                                            : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                                        }`}>
+                                    <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
+                                    {tab.label}
+                                    {totalUnread > 0 && (
+                                        <span className="ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white shadow-sm">
+                                            {totalUnread}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
             </div>
