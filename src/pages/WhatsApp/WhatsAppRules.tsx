@@ -152,7 +152,7 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
         setLoading(true);
         const [rRes, tRes, uRes] = await Promise.all([
             supabase.from('wa_automation_rules').select('*, template:wa_templates(*)').eq('send_to_client', clientMode).order('created_at', { ascending: false }),
-            supabase.from('wa_templates').select('*').eq('usage_type', 'team').order('name'),
+            supabase.from('wa_templates').select('*').eq('usage_type', clientMode ? 'marketing' : 'team').order('name'),
             supabase.from('app_users').select('id, full_name, email, phone, avatar_color').not('phone', 'is', null).order('full_name'),
         ]);
         setRules((rRes.data as AutoRule[]) || []);
@@ -720,6 +720,8 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
                                     <p className="text-xs text-sky-700/70 mt-1 dark:text-sky-300/70">Selecciona los miembros del equipo que recibirán esta notificación.</p>
                                 </div>
                                 )}
+                                {!clientMode && (
+                                <>
                                 <div>
                                     <label className={labelClass}>Miembros del Equipo (con teléfono registrado)</label>
                                     <div className="space-y-1 max-h-[250px] overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-700">
@@ -753,6 +755,8 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
                                         </div>
                                     )}
                                 </div>
+                                </>
+                                )}
                                 <div className="flex justify-between">
                                     <button onClick={() => setFormStep(1)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-500 dark:border-slate-700">← Atrás</button>
                                     <button onClick={() => setFormStep(3)} disabled={!form.send_to_client && form.recipient_user_ids.length === 0 && form.custom_phones.length === 0}
