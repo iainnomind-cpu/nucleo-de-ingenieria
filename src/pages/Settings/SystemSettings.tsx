@@ -12,8 +12,9 @@ import {
     buildEmptyPermissions, AVATAR_COLORS,
 } from '../../types/auth';
 import TareasTab from './TareasTab';
+import IntegracionesTab from './IntegracionesTab';
 
-type TabKey = 'operativos' | 'catalogos' | 'usuarios' | 'roles' | 'tareas';
+type TabKey = 'operativos' | 'catalogos' | 'usuarios' | 'roles' | 'tareas' | 'integraciones';
 
 // ============================================================
 // MAIN COMPONENT
@@ -26,6 +27,7 @@ export default function SystemSettings() {
         { key: 'catalogos', label: 'Catálogos', icon: 'folder_open' },
         { key: 'usuarios', label: 'Usuarios', icon: 'people' },
         { key: 'tareas', label: 'Automatizaciones', icon: 'bolt' },
+        { key: 'integraciones', label: 'Integraciones', icon: 'mail' },
     ];
 
     return (
@@ -68,6 +70,7 @@ export default function SystemSettings() {
             {activeTab === 'catalogos' && <CatalogosTab />}
             {activeTab === 'usuarios' && <UsuariosTab />}
             {activeTab === 'tareas' && <TareasTab />}
+            {activeTab === 'integraciones' && <IntegracionesTab />}
         </div>
     );
 }
