@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import GoogleMapView, { MapPin } from '../components/GoogleMap';
 import { NUCLEO_HQ } from '../lib/maps';
 import { generateExecutiveReport } from '../lib/reportGenerator';
+import { triggerWaAutomation } from '../lib/waAutomation';
 
 interface DashboardData {
   // Ventas
@@ -75,6 +76,87 @@ export default function Dashboard() {
     const labels: Record<string, string> = { this_month: 'Este Mes', last_month: 'Mes Pasado', last_3_months: 'Últimos 3 Meses', last_6_months: 'Últimos 6 Meses', this_year: 'Este Año', all_time: 'Todo el Historial', custom: 'Personalizado' };
     return labels[reportPreset] || 'Personalizado';
   };
+
+  // --- CRON DIARIO SIMULADO (Recordatorios de pago) ---
+  useEffect(() => {
+    const runCron = async () => {
+      try {
+        const { data: setting } = await supabase.from('system_settings').select('value').eq('key', 'last_payment_reminders').single();
+        const today = new Date().toISOString().split('T')[0];
+        // Quitar las comillas dobles si vienen de json stringify
+        const lastRun = typeof setting?.value === 'string' ? setting.value.replace(/"/g, '') : null;
+        if (lastRun === today) return;
+
+        // Actualizar para bloquear ejecuciones concurrentes
+        await supabase.from('system_settings').upsert({ key: 'last_payment_reminders', value: today });
+
+        // 1. A 3 días de vencer ('upcoming')
+        const targetDate = new Date();
+        targetDate.setDate(targetDate.getDate() + 3);
+        const upcomingStr = targetDate.toISOString().split('T')[0];
+
+        const { data: upcomingInvoices } = await supabase.from('invoices')
+            .select('*, client:clients(company_name, phone)')
+            .eq('due_date', upcomingStr)
+            .eq('status', 'pending');
+
+        if (upcomingInvoices) {
+            for (const inv of upcomingInvoices) {
+                triggerWaAutomation({
+                    module: 'invoices',
+                    event: 'upcoming',
+                    record: {
+                        invoice_number: inv.invoice_number,
+                        client_name: (inv.client as any)?.company_name || 'Cliente',
+                        client_phone: (inv.client as any)?.phone || '',
+                        amount: inv.total,
+                        due_date: inv.due_date,
+                    },
+                    referenceId: inv.id,
+                });
+            }
+        }
+
+        // 2. Facturas que acaban de vencer ayer ('overdue')
+        const overDate = new Date();
+        overDate.setDate(overDate.getDate() - 1);
+        const overdueStr = overDate.toISOString().split('T')[0];
+
+        const { data: overdueInvoices } = await supabase.from('invoices')
+            .select('*, client:clients(company_name, phone)')
+            .eq('due_date', overdueStr)
+            .in('status', ['pending', 'partially_paid']);
+
+        if (overdueInvoices) {
+            for (const inv of overdueInvoices) {
+                triggerWaAutomation({
+                    module: 'invoices',
+                    event: 'overdue',
+                    record: {
+                        invoice_number: inv.invoice_number,
+                        client_name: (inv.client as any)?.company_name || 'Cliente',
+                        client_phone: (inv.client as any)?.phone || '',
+                        amount: inv.total,
+                        due_date: inv.due_date,
+                    },
+                    referenceId: inv.id,
+                });
+            }
+        }
+      } catch (err) {
+        console.error('Error during silent cron:', err);
+      }
+    };
+    
+    // Ejecutar al iniciar
+    runCron();
+    
+    // Y dejar un latido (heartbeat) cada hora, en caso de que dejen la pestaña abierta.
+    const intervalId = setInterval(runCron, 1000 * 60 * 60); 
+    return () => clearInterval(intervalId);
+
+  }, []);
+  // -------------------------
 
   const handleGenerateReport = async () => {
     setGeneratingReport(true);

@@ -14,6 +14,7 @@ import {
 import GoogleMapView, { MapPin } from '../../components/GoogleMap';
 import { NUCLEO_HQ, PinColor } from '../../lib/maps';
 import MaintenanceCalendar from './MaintenanceCalendar';
+import { triggerWaAutomation } from '../../lib/waAutomation';
 
 export default function MaintenanceDashboard() {
     const navigate = useNavigate();
@@ -89,7 +90,23 @@ export default function MaintenanceDashboard() {
             frequency_months: SERVICE_FREQUENCY[schForm.service_type],
             next_service_date: schForm.next_service_date, assigned_to: schForm.assigned_to || null,
             alert_days_before: parseInt(schForm.alert_days_before) || 15,
-        });
+        }).select().single();
+
+        if (res.data) {
+            triggerWaAutomation({
+                module: 'maintenance',
+                event: 'upcoming', // Agendar mantenimiento
+                record: {
+                    title: res.data.title,
+                    service_type: res.data.service_type,
+                    assigned_to: res.data.assigned_to,
+                    equipment_name: eq?.name || '',
+                    next_service_date: res.data.next_service_date
+                },
+                referenceId: res.data.id
+            });
+        }
+
         setShowScheduleForm(false);
         setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15' });
         fetchAll();
@@ -145,7 +162,16 @@ export default function MaintenanceDashboard() {
                     last_service_date: sch.next_service_date,
                     next_service_date: nextDate.toISOString().split('T')[0],
                     assigned_to: sch.assigned_to, alert_days_before: sch.alert_days_before,
-                });
+                }).select().single();
+
+                if (autoRes.data) {
+                    triggerWaAutomation({
+                        module: 'maintenance',
+                        event: 'upcoming', 
+                        record: { title: autoRes.data.title, assigned_to: autoRes.data.assigned_to, equipment_name: sch.equipment?.name || '', next_service_date: autoRes.data.next_service_date },
+                        referenceId: autoRes.data.id
+                    });
+                }
 
                 // → M6: Auto-create invoice if maintenance has a cost
                 if (sch.cost && sch.cost > 0 && sch.client_id) {
@@ -182,6 +208,19 @@ export default function MaintenanceDashboard() {
                         if (!msgCreated) msgCreated = true;
                     }
                 }
+
+                // Notificar al cliente Mantenimiento completado
+                triggerWaAutomation({
+                    module: 'maintenance',
+                    event: 'completed',
+                    record: {
+                        title: sch.title,
+                        service_type: sch.service_type,
+                        assigned_to: sch.assigned_to,
+                        equipment_name: sch.equipment?.name || '',
+                    },
+                    referenceId: sch.id
+                });
             }
         }
         await supabase.from('maintenance_schedules').update(updates).eq('id', id);

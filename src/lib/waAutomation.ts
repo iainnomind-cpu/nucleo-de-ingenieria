@@ -74,6 +74,45 @@ export async function triggerWaAutomation(payload: TriggerPayload): Promise<void
                 });
             }
 
+            // Agregar cliente si la regla lo requiere
+            if (rule.send_to_client) {
+                let clientPhone = '';
+                let clientName = 'Cliente';
+
+                if (payload.record.client_phone) {
+                    clientPhone = String(payload.record.client_phone);
+                    clientName = String(payload.record.client_name || 'Cliente');
+                } else if (payload.referenceId) {
+                    const moduleTableMap: Record<string, string> = {
+                        projects: 'projects',
+                        quotes: 'quotes',
+                        repairs: 'repairs',
+                        invoices: 'invoices',
+                        maintenance: 'maintenance_schedules',
+                    };
+                    const tableName = moduleTableMap[payload.module];
+                    if (tableName) {
+                        try {
+                            const { data: refData } = await supabase
+                                .from(tableName)
+                                .select('client:clients(id, phone, company_name)')
+                                .eq('id', payload.referenceId)
+                                .single();
+                            if ((refData?.client as any)?.phone) {
+                                clientPhone = (refData.client as any).phone;
+                                clientName = (refData.client as any).company_name || 'Cliente';
+                            }
+                        } catch (e) {
+                            console.error('Error fetching client phone for automation', e);
+                        }
+                    }
+                }
+
+                if (clientPhone) {
+                    phones.push({ phone: clientPhone, name: clientName });
+                }
+            }
+
             if (phones.length === 0) continue;
 
             // 4. Construir variables de la plantilla

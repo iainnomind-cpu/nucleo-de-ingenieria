@@ -14,6 +14,7 @@ interface AutoRule {
     trigger_module: string; trigger_event: string; trigger_condition: Record<string, unknown>;
     template_id: string; recipient_user_ids: string[]; custom_phones: string[];
     variable_mapping: Record<string, string>;
+    send_to_client: boolean;
     is_active: boolean; total_sent: number; total_failed: number;
     last_triggered_at: string | null; created_at: string;
     template?: WaTemplate;
@@ -54,6 +55,7 @@ const TRIGGER_MODULES: { key: string; label: string; icon: string; events: { key
     ]},
     { key: 'invoices', label: 'Facturas', icon: 'receipt_long', events: [
         { key: 'created', label: 'Factura Generada' },
+        { key: 'upcoming', label: 'Vence Pronto (3 días)' },
         { key: 'overdue', label: 'Factura Vencida' },
     ]},
     { key: 'fleet', label: 'Flotilla', icon: 'local_shipping', events: [
@@ -112,7 +114,7 @@ const AVAILABLE_VARIABLES = [
     { id: 'technician_name', label: 'Técnico' },
 ];
 
-export default function TareasTab() {
+export default function WhatsAppRules() {
     const navigate = useNavigate();
     const [rules, setRules] = useState<AutoRule[]>([]);
     const [templates, setTemplates] = useState<WaTemplate[]>([]);
@@ -131,7 +133,7 @@ export default function TareasTab() {
         trigger_module: '', trigger_event: '', trigger_condition: {} as Record<string, string>,
         template_id: '',
         recipient_user_ids: [] as string[], custom_phones: [] as string[],
-        variable_mapping: {} as Record<string, string>,
+        variable_mapping: {} as Record<string, string>, send_to_client: false,
     });
     const [customPhoneInput, setCustomPhoneInput] = useState('');
     // Template creation internal state
@@ -273,7 +275,7 @@ export default function TareasTab() {
     // -------------------------
 
     const resetForm = () => {
-        setForm({ name: '', description: '', trigger_module: '', trigger_event: '', trigger_condition: {}, template_id: '', recipient_user_ids: [], custom_phones: [], variable_mapping: {} });
+        setForm({ name: '', description: '', trigger_module: '', trigger_event: '', trigger_condition: {}, template_id: '', recipient_user_ids: [], custom_phones: [], variable_mapping: {}, send_to_client: false });
         setCustomPhoneInput('');
         setFormStep(0);
         setEditingId(null);
@@ -285,7 +287,7 @@ export default function TareasTab() {
             trigger_module: form.trigger_module, trigger_event: form.trigger_event,
             trigger_condition: form.trigger_condition, template_id: form.template_id,
             recipient_user_ids: form.recipient_user_ids, custom_phones: form.custom_phones,
-            variable_mapping: form.variable_mapping,
+            variable_mapping: form.variable_mapping, send_to_client: form.send_to_client,
         };
         if (editingId) {
             await supabase.from('wa_automation_rules').update(payload).eq('id', editingId);
@@ -315,6 +317,7 @@ export default function TareasTab() {
             trigger_condition: r.trigger_condition as Record<string, string>,
             template_id: r.template_id, recipient_user_ids: r.recipient_user_ids || [],
             custom_phones: r.custom_phones || [], variable_mapping: r.variable_mapping,
+            send_to_client: r.send_to_client || false,
         });
         setEditingId(r.id);
         setFormStep(0);
@@ -364,10 +367,51 @@ export default function TareasTab() {
 
     const stepLabels = ['Activador', 'Plantilla', 'Destinatarios', 'Variables'];
 
-    if (loading) return <div className="flex flex-1 items-center justify-center"><div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /></div>;
+    const tabs = [
+        { label: 'Dashboard', icon: 'space_dashboard', path: '/whatsapp' },
+        { label: 'Conversaciones', icon: 'chat', path: '/whatsapp/conversations' },
+        { label: 'Envío Directo', icon: 'send', path: '/whatsapp/send' },
+        { label: 'Campañas', icon: 'campaign', path: '/whatsapp/campaigns' },
+        { label: 'Plantillas', icon: 'description', path: '/whatsapp/templates' },
+        { label: 'Reportes', icon: 'analytics', path: '/whatsapp/reports' },
+        { label: 'Reglas (Auto)', icon: 'bolt', path: '/whatsapp/rules' },
+    ];
+
+    if (loading) return <div className="flex flex-1 items-center justify-center p-8"><div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /></div>;
 
     return (
-        <div>
+        <div className="flex-1 overflow-y-auto">
+            {/* Nav Header */}
+            <div className="border-b border-slate-200 bg-white/80 backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/80">
+                <div className="px-6 pt-6 pb-0">
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/25">
+                                <span className="material-symbols-outlined text-white text-[22px]">chat</span>
+                            </div>
+                            <div>
+                                <h1 className="text-xl font-bold text-slate-900 dark:text-white">WhatsApp Marketing</h1>
+                                <p className="text-xs text-slate-500">Notificaciones automatizadas & comunicación con clientes</p>
+                            </div>
+                        </div>
+                    </div>
+                    {/* Tabs */}
+                    <div className="flex gap-1">
+                        {tabs.map(tab => (
+                            <button key={tab.path} onClick={() => navigate(tab.path)}
+                                className={`flex items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-xs font-semibold transition-all ${tab.path === '/whatsapp/rules'
+                                    ? 'bg-white text-emerald-700 border-b-2 border-emerald-500 dark:bg-slate-800 dark:text-emerald-400'
+                                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 dark:hover:text-slate-300'
+                                    }`}>
+                                <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
+                                {tab.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-6">
             {/* Header */}
             <div className="mb-6 flex items-center justify-between">
                 <div>
@@ -401,12 +445,10 @@ export default function TareasTab() {
                 </div>
             </div>
 
-            <div className="flex gap-6 border-b border-slate-200 dark:border-slate-800 px-6">
-                 <button onClick={() => setViewMode('rules')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${viewMode === 'rules' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Reglas de Automatización</button>
-                 <button onClick={() => setViewMode('templates')} className={`pb-3 text-sm font-semibold border-b-2 transition-all ${viewMode === 'templates' ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'}`}>Plantillas de Equipo</button>
+                </div>
             </div>
 
-            <div className="p-6">
+            <div className="p-6 border-t border-slate-200 dark:border-slate-800">
                 {viewMode === 'rules' ? (
                     /* Rules List */
                     rules.length === 0 ? (
@@ -667,6 +709,10 @@ export default function TareasTab() {
                         {/* Step 2: Recipients */}
                         {formStep === 2 && (
                             <div className="space-y-4">
+                                <label className="flex items-center gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-50/50 p-4 font-bold text-emerald-900 cursor-pointer mb-2 dark:bg-emerald-900/20 dark:text-emerald-100">
+                                    <input type="checkbox" checked={form.send_to_client} onChange={e => setForm({ ...form, send_to_client: e.target.checked })} className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
+                                    <span>📤 Enviar mensaje directamente al Cliente Asociado (Extraerá su celular auto)</span>
+                                </label>
                                 <div>
                                     <label className={labelClass}>Miembros del Equipo (con teléfono registrado)</label>
                                     <div className="space-y-1 max-h-[250px] overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-700">
@@ -702,7 +748,7 @@ export default function TareasTab() {
                                 </div>
                                 <div className="flex justify-between">
                                     <button onClick={() => setFormStep(1)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-500 dark:border-slate-700">← Atrás</button>
-                                    <button onClick={() => setFormStep(3)} disabled={form.recipient_user_ids.length === 0 && form.custom_phones.length === 0}
+                                    <button onClick={() => setFormStep(3)} disabled={!form.send_to_client && form.recipient_user_ids.length === 0 && form.custom_phones.length === 0}
                                         className="rounded-lg bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-40">Siguiente →</button>
                                 </div>
                             </div>
@@ -743,7 +789,7 @@ export default function TareasTab() {
                                         <p>📌 <strong>{form.name}</strong></p>
                                         <p>⚡ Cuando: <strong>{selectedModule?.label}</strong> → <strong>{selectedEvent?.label}</strong>{form.trigger_condition?.new_status ? ` = ${form.trigger_condition.new_status}` : ''}</p>
                                         <p>📝 Plantilla: <strong>{selectedTemplate?.name}</strong></p>
-                                        <p>👥 Destinatarios: <strong>{form.recipient_user_ids.length}</strong> usuarios + <strong>{form.custom_phones.length}</strong> teléfonos</p>
+                                        <p>👥 Destinatarios: {form.send_to_client ? <span className="text-emerald-600 font-bold">Cliente Asociado</span> : ''} {form.send_to_client && (form.recipient_user_ids.length > 0 || form.custom_phones.length > 0) ? ' + ' : ''} {(form.recipient_user_ids.length > 0 || form.custom_phones.length > 0) && `Equipo (${form.recipient_user_ids.length} usuarios, ${form.custom_phones.length} extras)`}</p>
                                     </div>
                                 </div>
 
