@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { triggerWaAutomation } from '../../lib/waAutomation';
 import {
     Project,
     ProjectStatus,
@@ -112,6 +113,21 @@ export default function ProjectsList() {
             ];
 
             await supabase.from('team_tasks').insert(tasksToInsert);
+
+            // → Trigger WA Automation: Proyecto creado manual
+            triggerWaAutomation({
+                module: 'projects',
+                event: 'created',
+                record: {
+                    title: project.title,
+                    project_number: project.project_number,
+                    client_name: project.client?.company_name || 'Sin Asignar',
+                    status_label: 'Pendiente',
+                    project_manager: project.project_manager || 'Admin',
+                },
+                referenceId: project.id,
+            });
+
             alert(`Proyecto creado. \n✓ Space (M8) generado \n✓ Tareas pre-trabajo asignadas (M8) a ${form.project_manager || 'Admin'}`);
         }
 
