@@ -114,7 +114,7 @@ const AVAILABLE_VARIABLES = [
     { id: 'technician_name', label: 'Técnico' },
 ];
 
-export default function WhatsAppRules() {
+export default function WhatsAppRules({ clientMode = true }: { clientMode?: boolean } = {}) {
     const navigate = useNavigate();
     const [rules, setRules] = useState<AutoRule[]>([]);
     const [templates, setTemplates] = useState<WaTemplate[]>([]);
@@ -133,7 +133,7 @@ export default function WhatsAppRules() {
         trigger_module: '', trigger_event: '', trigger_condition: {} as Record<string, string>,
         template_id: '',
         recipient_user_ids: [] as string[], custom_phones: [] as string[],
-        variable_mapping: {} as Record<string, string>, send_to_client: false,
+        variable_mapping: {} as Record<string, string>, send_to_client: clientMode,
     });
     const [customPhoneInput, setCustomPhoneInput] = useState('');
     // Template creation internal state
@@ -151,7 +151,7 @@ export default function WhatsAppRules() {
     const fetchAll = useCallback(async () => {
         setLoading(true);
         const [rRes, tRes, uRes] = await Promise.all([
-            supabase.from('wa_automation_rules').select('*, template:wa_templates(*)').order('created_at', { ascending: false }),
+            supabase.from('wa_automation_rules').select('*, template:wa_templates(*)').eq('send_to_client', clientMode).order('created_at', { ascending: false }),
             supabase.from('wa_templates').select('*').eq('usage_type', 'team').order('name'),
             supabase.from('app_users').select('id, full_name, email, phone, avatar_color').not('phone', 'is', null).order('full_name'),
         ]);
@@ -275,7 +275,7 @@ export default function WhatsAppRules() {
     // -------------------------
 
     const resetForm = () => {
-        setForm({ name: '', description: '', trigger_module: '', trigger_event: '', trigger_condition: {}, template_id: '', recipient_user_ids: [], custom_phones: [], variable_mapping: {}, send_to_client: false });
+        setForm({ name: '', description: '', trigger_module: '', trigger_event: '', trigger_condition: {}, template_id: '', recipient_user_ids: [], custom_phones: [], variable_mapping: {}, send_to_client: clientMode });
         setCustomPhoneInput('');
         setFormStep(0);
         setEditingId(null);
@@ -380,8 +380,9 @@ export default function WhatsAppRules() {
     if (loading) return <div className="flex flex-1 items-center justify-center p-8"><div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" /></div>;
 
     return (
-        <div className="flex-1 overflow-y-auto">
-            {/* Nav Header */}
+        <div className={clientMode ? 'flex-1 overflow-y-auto' : ''}>
+            {/* Nav Header — solo en modo Cliente (WhatsApp module) */}
+            {clientMode && (
             <div className="border-b border-slate-200 bg-white/80 backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/80">
                 <div className="px-6 pt-6 pb-0">
                     <div className="flex items-center justify-between mb-4">
@@ -410,16 +411,17 @@ export default function WhatsAppRules() {
                     </div>
                 </div>
             </div>
+            )}
 
-            <div className="p-6">
+            <div className={clientMode ? 'p-6' : ''}>
             {/* Header */}
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                          <span className="material-symbols-outlined text-emerald-500">bolt</span>
-                         Automatizaciones Internas
+                         {clientMode ? 'Automatizaciones a Clientes' : 'Automatizaciones Internas'}
                     </h3>
-                    <p className="text-sm text-slate-500">Notificaciones de equipo vía WhatsApp cuando ocurren eventos en los módulos</p>
+                    <p className="text-sm text-slate-500">{clientMode ? 'Notificaciones automáticas a tus clientes vía WhatsApp' : 'Notificaciones de equipo vía WhatsApp cuando ocurren eventos en los módulos'}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button onClick={syncStatusFromMeta} disabled={syncingStatus}
@@ -455,7 +457,7 @@ export default function WhatsAppRules() {
                         <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                             <span className="material-symbols-outlined text-[64px] mb-4">bolt</span>
                             <p className="text-lg font-semibold text-slate-600 dark:text-slate-300">Sin automatizaciones</p>
-                            <p className="text-sm mt-1">Crea reglas para notificar al equipo por WhatsApp cuando sucedan eventos</p>
+                            <p className="text-sm mt-1">{clientMode ? 'Crea reglas para notificar a tus clientes por WhatsApp automáticamente' : 'Crea reglas para notificar al equipo por WhatsApp cuando sucedan eventos'}</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -709,10 +711,18 @@ export default function WhatsAppRules() {
                         {/* Step 2: Recipients */}
                         {formStep === 2 && (
                             <div className="space-y-4">
-                                <label className="flex items-center gap-3 rounded-xl border-2 border-emerald-500 bg-emerald-50/50 p-4 font-bold text-emerald-900 cursor-pointer mb-2 dark:bg-emerald-900/20 dark:text-emerald-100">
-                                    <input type="checkbox" checked={form.send_to_client} onChange={e => setForm({ ...form, send_to_client: e.target.checked })} className="h-5 w-5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" />
-                                    <span>📤 Enviar mensaje directamente al Cliente Asociado (Extraerá su celular auto)</span>
-                                </label>
+                                {clientMode && (
+                                <div className="rounded-xl border-2 border-emerald-500 bg-emerald-50/50 p-4 mb-2 dark:bg-emerald-900/20">
+                                    <p className="font-bold text-emerald-900 dark:text-emerald-100 flex items-center gap-2">📤 Se enviará al Cliente Asociado automáticamente</p>
+                                    <p className="text-xs text-emerald-700/70 mt-1 dark:text-emerald-300/70">El sistema extraerá el celular del cliente desde la base de datos del módulo correspondiente.</p>
+                                </div>
+                                )}
+                                {!clientMode && (
+                                <div className="rounded-xl border-2 border-sky-400 bg-sky-50/50 p-4 mb-2 dark:bg-sky-900/20">
+                                    <p className="font-bold text-sky-900 dark:text-sky-100 flex items-center gap-2">👥 Notificación Interna al Equipo</p>
+                                    <p className="text-xs text-sky-700/70 mt-1 dark:text-sky-300/70">Selecciona los miembros del equipo que recibirán esta notificación.</p>
+                                </div>
+                                )}
                                 <div>
                                     <label className={labelClass}>Miembros del Equipo (con teléfono registrado)</label>
                                     <div className="space-y-1 max-h-[250px] overflow-y-auto rounded-lg border border-slate-200 p-2 dark:border-slate-700">
