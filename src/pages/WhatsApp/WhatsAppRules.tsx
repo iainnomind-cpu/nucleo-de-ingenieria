@@ -447,10 +447,7 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
                 </div>
             </div>
 
-                </div>
-            </div>
-
-            <div className="p-6 border-t border-slate-200 dark:border-slate-800">
+            <div className={clientMode ? "p-6" : "mt-4"}>
                 {viewMode === 'rules' ? (
                     /* Rules List */
                     rules.length === 0 ? (
@@ -915,6 +912,7 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
                     </form>
                 </div>
             )}
+        </div>
         </div>
     );
 }
