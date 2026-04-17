@@ -21,6 +21,8 @@ export default function ConversationsInbox() {
     const [newConvForm, setNewConvForm] = useState({ phone_number: '', client_name: '' });
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
+    const selectedConvRef = useRef<WaConversation | null>(null);
+
     const fetchConversations = useCallback(async () => {
         let query = supabase.from('wa_conversations').select('*, client:clients(id, company_name)').order('last_message_at', { ascending: false });
         if (filterStatus !== 'all') query = query.eq('status', filterStatus);
@@ -41,11 +43,42 @@ export default function ConversationsInbox() {
         if (selectedConv) fetchMessages(selectedConv.id);
     }, [selectedConv, fetchMessages]);
 
+    // Realtime: auto-refresh conversations list and current chat
+    useEffect(() => {
+        const convSub = supabase.channel('inbox_conversations')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_conversations' }, () => {
+                fetchConversations();
+            })
+            .subscribe();
+
+        const msgSub = supabase.channel('inbox_messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'wa_messages' }, (payload) => {
+                const newMsg = payload.new as any;
+                // If message belongs to the currently open conversation, refresh messages
+                if (selectedConvRef.current && newMsg.conversation_id === selectedConvRef.current.id) {
+                    fetchMessages(selectedConvRef.current.id);
+                    // Auto-clear unread since user is looking at this conversation
+                    if (newMsg.direction === 'inbound') {
+                        supabase.from('wa_conversations').update({ unread_count: 0 }).eq('id', selectedConvRef.current.id).then();
+                    }
+                }
+                fetchConversations();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(convSub);
+            supabase.removeChannel(msgSub);
+        };
+    }, [fetchConversations, fetchMessages]);
+
     const selectConv = (conv: WaConversation) => {
         setSelectedConv(conv);
-        // Mark as read
+        selectedConvRef.current = conv;
+        // Mark as read immediately in local state + DB
         if (conv.unread_count > 0) {
-            supabase.from('wa_conversations').update({ unread_count: 0 }).eq('id', conv.id).then(() => fetchConversations());
+            setConversations(prev => prev.map(c => c.id === conv.id ? { ...c, unread_count: 0 } : c));
+            supabase.from('wa_conversations').update({ unread_count: 0 }).eq('id', conv.id).then();
         }
     };
 
