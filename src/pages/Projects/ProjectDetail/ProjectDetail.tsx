@@ -11,7 +11,7 @@ import {
     INCIDENT_TYPE_LABELS, INCIDENT_TYPE_ICONS,
     SEVERITY_LABELS, SEVERITY_COLORS,
     WEATHER_LABELS, WEATHER_ICONS,
-    TEAM_MEMBERS, formatCurrencyMXN,
+    formatCurrencyMXN,
     IncidentType, Severity, Weather, FieldExpense, ExpenseType, EXPENSE_TYPE_LABELS, EXPENSE_TYPE_ICONS
 } from '../../../types/projects';
 import { PhotoAttachment } from '../../../types/photos';
@@ -47,7 +47,7 @@ export default function ProjectDetail() {
     const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
 
     const [loading, setLoading] = useState(true);
-    const [teamMembers, setTeamMembers] = useState<string[]>(TEAM_MEMBERS);
+    const [teamMembers, setTeamMembers] = useState<string[]>([]);
 
     // Forms
     const [showTaskForm, setShowTaskForm] = useState(false);
@@ -72,7 +72,7 @@ export default function ProjectDetail() {
             supabase.from('inventory_movements').select('*, product:inventory_products(*)').eq('reference_id', id).eq('movement_type', 'exit'),
             supabase.from('inventory_products').select('*').eq('is_active', true).order('name'),
             supabase.from('field_expenses').select('*').eq('project_id', id).order('created_at', { ascending: false }),
-            supabase.from('system_settings').select('value').eq('key', 'team_directory').single(),
+            supabase.from('app_users').select('full_name').eq('is_active', true).order('full_name'),
             supabase.from('vehicle_mileage').select('calculated_trip_cost').eq('project_id', id),
             supabase.from('vehicle_maintenance').select('cost').eq('project_id', id),
             supabase.from('project_vehicles').select('*, vehicle:vehicles(id, plates, brand, model, year, vehicle_type, status, cost_per_km, current_mileage)').eq('project_id', id).order('assigned_date'),
@@ -108,10 +108,11 @@ export default function ProjectDetail() {
         setProjectVehicles((pvRes.data as ProjectVehicle[]) || []);
         setAvailableVehicles((avRes.data as Vehicle[]) || []);
 
-        if (sysRes.data?.value && Array.isArray(sysRes.data.value)) {
-            setTeamMembers(sysRes.data.value);
+        // Users from app_users
+        if (sysRes.data && Array.isArray(sysRes.data)) {
+            setTeamMembers(sysRes.data.map(u => u.full_name).filter(Boolean));
         } else {
-            setTeamMembers(TEAM_MEMBERS);
+            setTeamMembers([]);
         }
 
         setLoading(false);
@@ -800,7 +801,7 @@ export default function ProjectDetail() {
                         <div className={sectionClass}>
                             <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white">Asignar Equipo</h3>
                             <div className="flex flex-wrap gap-2">
-                                {TEAM_MEMBERS.map(m => {
+                                {teamMembers.map(m => {
                                     const assigned = project.assigned_team?.includes(m);
                                     return (
                                         <button key={m} onClick={async () => {
@@ -886,7 +887,7 @@ export default function ProjectDetail() {
                         <form onSubmit={handleAddTask} className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                                 <div className="md:col-span-2"><label className={labelClass}>Título *</label><input value={taskForm.title} onChange={e => setTaskForm({ ...taskForm, title: e.target.value })} required className={inputClass} placeholder="Descripción de la tarea" /></div>
-                                <div><label className={labelClass}>Asignado a</label><select value={taskForm.assigned_to} onChange={e => setTaskForm({ ...taskForm, assigned_to: e.target.value })} className={inputClass}><option value="">Sin asignar</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                                <div><label className={labelClass}>Asignado a</label><select value={taskForm.assigned_to} onChange={e => setTaskForm({ ...taskForm, assigned_to: e.target.value })} className={inputClass}><option value="">Sin asignar</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
                                 <div><label className={labelClass}>Fecha Límite</label><input type="date" value={taskForm.due_date} onChange={e => setTaskForm({ ...taskForm, due_date: e.target.value })} className={inputClass} /></div>
                                 <div><label className={labelClass}>Horas Estimadas</label><input type="number" step="0.5" value={taskForm.estimated_hours} onChange={e => setTaskForm({ ...taskForm, estimated_hours: e.target.value })} className={inputClass} placeholder="8" /></div>
                             </div>
@@ -942,7 +943,7 @@ export default function ProjectDetail() {
                         <form onSubmit={handleAddLog} className="mb-4 rounded-lg border border-primary/20 bg-primary/5 p-4">
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                                 <div><label className={labelClass}>Fecha</label><input type="date" value={logForm.log_date} onChange={e => setLogForm({ ...logForm, log_date: e.target.value })} className={inputClass} required /></div>
-                                <div><label className={labelClass}>Autor</label><select value={logForm.author} onChange={e => setLogForm({ ...logForm, author: e.target.value })} className={inputClass}><option value="">Seleccionar...</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                                <div><label className={labelClass}>Autor</label><select value={logForm.author} onChange={e => setLogForm({ ...logForm, author: e.target.value })} className={inputClass}><option value="">Seleccionar...</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
                                 <div><label className={labelClass}>Clima</label><select value={logForm.weather} onChange={e => setLogForm({ ...logForm, weather: e.target.value as Weather })} className={inputClass}>{(Object.keys(WEATHER_LABELS) as Weather[]).map(w => <option key={w} value={w}>{WEATHER_LABELS[w]}</option>)}</select></div>
                                 <div className="grid grid-cols-2 gap-2">
                                     <div><label className={labelClass}>Llegada</label><input type="time" value={logForm.arrival_time} onChange={e => setLogForm({ ...logForm, arrival_time: e.target.value })} className={inputClass} /></div>
@@ -1024,7 +1025,7 @@ export default function ProjectDetail() {
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                 <div><label className={labelClass}>Tipo *</label><select value={incForm.incident_type} onChange={e => setIncForm({ ...incForm, incident_type: e.target.value as IncidentType })} className={inputClass}>{(Object.keys(INCIDENT_TYPE_LABELS) as IncidentType[]).map(t => <option key={t} value={t}>{INCIDENT_TYPE_LABELS[t]}</option>)}</select></div>
                                 <div><label className={labelClass}>Severidad</label><select value={incForm.severity} onChange={e => setIncForm({ ...incForm, severity: e.target.value as Severity })} className={inputClass}>{(Object.keys(SEVERITY_LABELS) as Severity[]).map(s => <option key={s} value={s}>{SEVERITY_LABELS[s]}</option>)}</select></div>
-                                <div><label className={labelClass}>Reportado Por</label><select value={incForm.reported_by} onChange={e => setIncForm({ ...incForm, reported_by: e.target.value })} className={inputClass}><option value="">Seleccionar...</option>{TEAM_MEMBERS.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                                <div><label className={labelClass}>Reportado Por</label><select value={incForm.reported_by} onChange={e => setIncForm({ ...incForm, reported_by: e.target.value })} className={inputClass}><option value="">Seleccionar...</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
                                 <div className="md:col-span-3"><label className={labelClass}>Título *</label><input value={incForm.title} onChange={e => setIncForm({ ...incForm, title: e.target.value })} required className={inputClass} placeholder="Ej: Llanta ponchada en camino al pozo" /></div>
                                 <div className="md:col-span-3"><label className={labelClass}>Descripción</label><textarea value={incForm.description} onChange={e => setIncForm({ ...incForm, description: e.target.value })} className={inputClass + ' resize-none'} rows={2} placeholder="Detalles del incidente..." /></div>
                                 <div><label className={labelClass}>Impacto en Costo (MXN)</label><input type="number" step="0.01" value={incForm.cost_impact} onChange={e => setIncForm({ ...incForm, cost_impact: e.target.value })} className={inputClass} placeholder="2500" /></div>
