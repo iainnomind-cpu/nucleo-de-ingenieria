@@ -1,13 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
-
-// Extend jsPDF type for autotable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF;
-    lastAutoTable: { finalY: number };
-  }
-}
+import autoTable from 'jspdf-autotable';
 
 interface ReportData {
   // Ventas
@@ -170,7 +162,7 @@ export function generateExecutiveReport(data: ReportData) {
     { label: 'MRR Contratos', value: fmt(data.mrr), detail: `${data.activeContracts} contratos activos` },
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [['Indicador', 'Valor', 'Detalle']],
     body: metrics.map(m => [m.label, m.value, m.detail]),
@@ -190,7 +182,7 @@ export function generateExecutiveReport(data: ReportData) {
       1: { halign: 'center', cellWidth: 40 },
     },
   });
-  y = doc.lastAutoTable.finalY + 8;
+  y = (doc as any).lastAutoTable.finalY + 8;
 
   // ─── ALERTAS EJECUTIVAS ───
   if (data.alerts.length > 0) {
@@ -232,7 +224,7 @@ export function generateExecutiveReport(data: ReportData) {
     ['Facturas Vencidas', `${data.overdueInvoices} facturas`, { positive: false }],
   ];
 
-  doc.autoTable({
+  autoTable(doc, {
     startY: y,
     head: [['Concepto', 'Monto']],
     body: finRows.map(r => [r[0], r[1]]),
@@ -261,7 +253,7 @@ export function generateExecutiveReport(data: ReportData) {
       }
     },
   });
-  y = doc.lastAutoTable.finalY + 4;
+  y = (doc as any).lastAutoTable.finalY + 4;
 
   // ─── INSIGHTS ───
   y = checkPageBreak(doc, y, 50, pageWidth);
@@ -299,7 +291,7 @@ export function generateExecutiveReport(data: ReportData) {
   if (data.recentInvoices.length > 0) {
     y = checkPageBreak(doc, y, 50, pageWidth);
     y = drawSectionTitle(doc, y, 'Facturas Recientes');
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['Factura', 'Cliente', 'Total', 'Estado']],
       body: data.recentInvoices.map(i => [i.invoice_number, i.client_name, fmt(i.total), statusLabels[i.status] || i.status]),
@@ -318,14 +310,14 @@ export function generateExecutiveReport(data: ReportData) {
         }
       },
     });
-    y = doc.lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 8;
   }
 
   // ─── PROYECTOS RECIENTES ───
   if (data.recentProjects.length > 0) {
     y = checkPageBreak(doc, y, 50, pageWidth);
     y = drawSectionTitle(doc, y, 'Proyectos Recientes');
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['# Proyecto', 'Título', 'Tipo', 'Estado']],
       body: data.recentProjects.map(p => [p.project_number, p.title, p.project_type, statusLabels[p.status] || p.status]),
@@ -343,7 +335,7 @@ export function generateExecutiveReport(data: ReportData) {
         }
       },
     });
-    y = doc.lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 8;
   }
 
   // ─── RENDIMIENTO DEL EQUIPO ───
@@ -360,7 +352,7 @@ export function generateExecutiveReport(data: ReportData) {
       return [t.name, t.assigned.toString(), t.completed.toString(), pending.toString(), `${completionPct}%`, perf];
     });
 
-    doc.autoTable({
+    autoTable(doc, {
       startY: y,
       head: [['Miembro', 'Asignadas', 'Completadas', 'Pendientes', '% Completado', 'Desempeño']],
       body: teamBody,
@@ -377,7 +369,7 @@ export function generateExecutiveReport(data: ReportData) {
         4: { halign: 'center', fontStyle: 'bold' },
       },
     });
-    y = doc.lastAutoTable.finalY + 8;
+    y = (doc as any).lastAutoTable.finalY + 8;
   }
 
   // ─── ADD PAGE NUMBERS ───
