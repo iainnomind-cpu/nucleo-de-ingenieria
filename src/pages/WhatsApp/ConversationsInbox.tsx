@@ -145,7 +145,7 @@ export default function ConversationsInbox() {
         { label: 'Campañas', icon: 'campaign', path: '/whatsapp/campaigns' },
         { label: 'Plantillas', icon: 'description', path: '/whatsapp/templates' },
         { label: 'Reportes', icon: 'analytics', path: '/whatsapp/reports' },
-        { label: 'Automatizaciones', icon: 'bolt', path: '/whatsapp/automations' },
+
     ];
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
