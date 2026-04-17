@@ -62,6 +62,7 @@ export default function WhatsAppDashboard() {
         { label: 'Campañas', icon: 'campaign', path: '/whatsapp/campaigns' },
         { label: 'Plantillas', icon: 'description', path: '/whatsapp/templates' },
         { label: 'Reportes', icon: 'analytics', path: '/whatsapp/reports' },
+        { label: 'Reglas (Auto)', icon: 'bolt', path: '/whatsapp/rules' },
     ];
 
     if (loading) return (
