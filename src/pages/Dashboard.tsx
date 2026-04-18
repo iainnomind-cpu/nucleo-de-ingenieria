@@ -143,6 +143,60 @@ export default function Dashboard() {
                 });
             }
         }
+
+        // 3. Mantenimientos (Recordatorios basados en días configurados en reglas)
+        const { data: reminderRules } = await supabase.from('wa_automation_rules')
+            .select('trigger_condition')
+            .eq('trigger_module', 'maintenance')
+            .eq('trigger_event', 'reminder')
+            .eq('is_active', true);
+            
+        if (reminderRules && reminderRules.length > 0) {
+            // Recolectar dependencias de días únicas solicitadas
+            const rulesDays = new Set<number>();
+            reminderRules.forEach(r => {
+                const dB = Number((r.trigger_condition as any)?.days_before);
+                if (!isNaN(dB) && dB > 0) rulesDays.add(dB);
+            });
+            
+            if (rulesDays.size > 0) {
+                const targetDates: string[] = [];
+                const daysToDateMap: Record<string, number> = {};
+                for (const days of rulesDays) {
+                    const tDate = new Date();
+                    tDate.setDate(tDate.getDate() + days);
+                    const tStr = tDate.toISOString().split('T')[0];
+                    targetDates.push(tStr);
+                    daysToDateMap[tStr] = days;
+                }
+                
+                const { data: schedules } = await supabase.from('maintenance_schedules')
+                    .select('*, equipment:installed_equipment(name), client:clients(company_name, phone)')
+                    .in('next_service_date', targetDates)
+                    .not('status', 'in', '("completed","cancelled")');
+                    
+                if (schedules) {
+                    for (const sch of schedules) {
+                        const daysConfigured = daysToDateMap[sch.next_service_date];
+                        triggerWaAutomation({
+                            module: 'maintenance',
+                            event: 'reminder',
+                            condition: { days_before: String(daysConfigured) },
+                            record: {
+                                title: sch.title,
+                                service_type: sch.service_type,
+                                assigned_to: sch.assigned_to,
+                                equipment_name: (sch.equipment as any)?.name || '',
+                                client_name: (sch.client as any)?.company_name || 'Cliente',
+                                scheduled_date: sch.next_service_date
+                            },
+                            referenceId: sch.id,
+                        });
+                    }
+                }
+            }
+        }
+
       } catch (err) {
         console.error('Error during silent cron:', err);
       }

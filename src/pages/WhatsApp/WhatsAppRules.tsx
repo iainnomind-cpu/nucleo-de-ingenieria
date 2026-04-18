@@ -46,7 +46,10 @@ const TRIGGER_MODULES: { key: string; label: string; icon: string; events: { key
         { key: 'created', label: 'Reparación Reportada' },
     ]},
     { key: 'maintenance', label: 'Mantenimiento', icon: 'build', events: [
-        { key: 'upcoming', label: 'Mantenimiento Próximo' },
+        { key: 'upcoming', label: 'Mantenimiento Agendado (Inmediato)' },
+        { key: 'reminder', label: 'Recordatorio Previo', conditionOptions: [{ key: 'days_before', label: 'Días previos', values: [
+            { value: '1', label: '1 día antes' }, { value: '3', label: '3 días antes' }, { value: '7', label: '7 días antes' }, { value: '15', label: '15 días antes' }
+        ]}]},
         { key: 'completed', label: 'Mantenimiento Completado' },
     ]},
     { key: 'quotes', label: 'Cotizaciones', icon: 'request_quote', events: [
