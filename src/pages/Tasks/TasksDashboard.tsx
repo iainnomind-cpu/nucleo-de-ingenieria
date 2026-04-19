@@ -11,8 +11,10 @@ import {
 type ViewMode = 'kanban' | 'my_day' | 'manager' | 'calendar';
 
 export default function TasksDashboard() {
-    const { user } = useAuth();
+    const { user, hasPermission } = useAuth();
     const CURRENT_USER = user?.full_name || 'Director';
+    // Permission: can this user assign tasks to OTHER people?
+    const canAssignOthers = hasPermission('tasks', 'create');
 
     const [tasks, setTasks] = useState<TeamTask[]>([]);
     const [loading, setLoading] = useState(true);
@@ -36,7 +38,12 @@ export default function TasksDashboard() {
     const fetchAll = useCallback(async () => {
         setLoading(true);
         let q = supabase.from('team_tasks').select('*, project:projects(id, project_number, title)').order('due_date', { ascending: true });
-        if (filterUser) q = q.eq('assigned_to', filterUser);
+        // If user can't assign others, only show their own tasks
+        if (!canAssignOthers && !filterUser) {
+            q = q.eq('assigned_to', CURRENT_USER);
+        } else if (filterUser) {
+            q = q.eq('assigned_to', filterUser);
+        }
         if (filterPriority) q = q.eq('priority', filterPriority);
         const [tRes, pRes, usersRes] = await Promise.all([
             q, 
@@ -51,16 +58,18 @@ export default function TasksDashboard() {
             setTeamMembers([]);
         }
         setLoading(false);
-    }, [filterUser, filterPriority]);
+    }, [filterUser, filterPriority, canAssignOthers, CURRENT_USER]);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        // Enforce: non-privileged users can only assign to themselves
+        const assignedTo = canAssignOthers ? form.assigned_to : CURRENT_USER;
         const payload = {
             title: form.title,
             description: form.description || null,
-            assigned_to: form.assigned_to,
+            assigned_to: assignedTo,
             created_by: CURRENT_USER,
             priority: form.priority,
             due_date: form.due_date || null,
@@ -240,16 +249,18 @@ export default function TasksDashboard() {
                             { key: 'kanban', icon: 'view_kanban', label: 'Kanban' },
                             { key: 'my_day', icon: 'today', label: 'Mi Día' },
                             { key: 'calendar', icon: 'calendar_month', label: 'Calendario' },
-                            { key: 'manager', icon: 'supervisor_account', label: 'Manager' },
+                            ...(canAssignOthers ? [{ key: 'manager' as const, icon: 'supervisor_account', label: 'Manager' }] : []),
                         ] as const).map(v => (
-                            <button key={v.key} onClick={() => setView(v.key)} className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${view === v.key ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
+                            <button key={v.key} onClick={() => setView(v.key as ViewMode)} className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-all ${view === v.key ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                                 <span className="material-symbols-outlined text-[14px]">{v.icon}</span>{v.label}
                             </button>
                         ))}
                     </div>
-                    <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-                        <option value="">Todos</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
-                    </select>
+                    {canAssignOthers && (
+                        <select value={filterUser} onChange={e => setFilterUser(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                            <option value="">Todos</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
+                        </select>
+                    )}
                     <select value={filterPriority} onChange={e => setFilterPriority(e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
                         <option value="">Prioridad</option>
                         {(['low', 'normal', 'high', 'urgent'] as TaskPriority[]).map(p => <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>)}
@@ -290,7 +301,18 @@ export default function TasksDashboard() {
                     </h3>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                         <div className="md:col-span-2"><label className={labelClass}>Tarea *</label><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="Verificar bomba pozo Limonera..." className={inputClass} /></div>
-                        <div><label className={labelClass}>Responsable *</label><select value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} required className={inputClass}><option value="">Seleccionar</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}</select></div>
+                        <div><label className={labelClass}>Responsable *</label>
+                            {canAssignOthers ? (
+                                <select value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} required className={inputClass}>
+                                    <option value="">Seleccionar</option>{teamMembers.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            ) : (
+                                <div className="flex items-center gap-2">
+                                    <input value={CURRENT_USER} disabled className={inputClass + ' bg-slate-100 dark:bg-slate-700 cursor-not-allowed'} />
+                                    <span className="text-[10px] text-slate-400 whitespace-nowrap">Solo tú</span>
+                                </div>
+                            )}
+                        </div>
                         <div><label className={labelClass}>Prioridad</label><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as TaskPriority })} className={inputClass}>{(['low', 'normal', 'high', 'urgent'] as TaskPriority[]).map(p => <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>)}</select></div>
                         <div><label className={labelClass}>Fecha Límite</label><input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} className={inputClass} /></div>
                         <div><label className={labelClass}>Proyecto</label><select value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })} className={inputClass}><option value="">Ninguno</option>{projects.map(p => <option key={p.id} value={p.id}>{p.project_number} — {p.title}</option>)}</select></div>
