@@ -18,6 +18,11 @@ import {
     getStockStatus,
     STOCK_STATUS_CONFIG,
     formatCurrencyInv,
+    InventoryArea,
+    AREA_LABELS,
+    AREA_ICONS,
+    AREA_COLORS,
+    getAreaFromCode,
 } from '../../types/inventory';
 
 export default function InventoryList() {
@@ -26,6 +31,7 @@ export default function InventoryList() {
     const [loading, setLoading] = useState(true);
     const [filterCat, setFilterCat] = useState<ProductCategory | 'all'>('all');
     const [filterStock, setFilterStock] = useState<'all' | 'ok' | 'low' | 'out' | 'critical'>('all');
+    const [filterArea, setFilterArea] = useState<InventoryArea | 'all'>('all');
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<InventoryProduct | null>(null);
@@ -35,7 +41,7 @@ export default function InventoryList() {
     const [form, setForm] = useState({
         code: '', name: '', category: 'ferreteria' as ProductCategory, subcategory: '', unit: 'pieza' as ProductUnit,
         current_stock: '', min_stock: '', max_stock: '', unit_cost: '', supplier: '', location: '',
-        criticality: 'normal' as Criticality, description: '',
+        criticality: 'normal' as Criticality, description: '', area: 'oficina' as InventoryArea,
     });
 
     // Movement form
@@ -48,19 +54,20 @@ export default function InventoryList() {
         setLoading(true);
         let q = supabase.from('inventory_products').select('*').eq('is_active', true).order('category').order('name');
         if (filterCat !== 'all') q = q.eq('category', filterCat);
+        if (filterArea !== 'all') q = q.eq('area', filterArea);
         if (search.trim()) q = q.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
         const { data } = await q;
         let filtered = (data as InventoryProduct[]) || [];
         if (filterStock !== 'all') filtered = filtered.filter(p => getStockStatus(p) === filterStock);
         setProducts(filtered);
         setLoading(false);
-    }, [filterCat, filterStock, search]);
+    }, [filterCat, filterStock, filterArea, search]);
 
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
     const openCreateForm = () => {
         setEditing(null);
-        setForm({ code: '', name: '', category: 'ferreteria', subcategory: '', unit: 'pieza', current_stock: '0', min_stock: '0', max_stock: '', unit_cost: '0', supplier: '', location: '', criticality: 'normal', description: '' });
+        setForm({ code: '', name: '', category: 'ferreteria', subcategory: '', unit: 'pieza', current_stock: '0', min_stock: '0', max_stock: '', unit_cost: '0', supplier: '', location: '', criticality: 'normal', description: '', area: 'oficina' });
         setShowForm(true);
     };
 
@@ -70,7 +77,7 @@ export default function InventoryList() {
             code: p.code, name: p.name, category: p.category, subcategory: p.subcategory || '', unit: p.unit,
             current_stock: p.current_stock.toString(), min_stock: p.min_stock.toString(), max_stock: p.max_stock?.toString() || '',
             unit_cost: p.unit_cost.toString(), supplier: p.supplier || '', location: p.location || '',
-            criticality: p.criticality, description: p.description || '',
+            criticality: p.criticality, description: p.description || '', area: p.area || 'oficina',
         });
         setShowForm(true);
     };
@@ -82,7 +89,7 @@ export default function InventoryList() {
             unit: form.unit, current_stock: parseFloat(form.current_stock) || 0, min_stock: parseFloat(form.min_stock) || 0,
             max_stock: form.max_stock ? parseFloat(form.max_stock) : null, unit_cost: parseFloat(form.unit_cost) || 0,
             supplier: form.supplier || null, location: form.location || null, criticality: form.criticality,
-            description: form.description || null,
+            description: form.description || null, area: form.area,
         };
         if (editing) {
             await supabase.from('inventory_products').update(payload).eq('id', editing.id);
@@ -205,6 +212,15 @@ export default function InventoryList() {
                         <option value="all">Todas las categorías</option>
                         {(Object.keys(CATEGORY_LABELS) as ProductCategory[]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                     </select>
+                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 self-center" />
+                    {(['all', 'oficina', 'bodega'] as const).map(a => (
+                        <button key={a} onClick={() => setFilterArea(a as InventoryArea | 'all')}
+                            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all ${filterArea === a ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                            <span className="material-symbols-outlined text-[14px]">{a === 'all' ? 'apps' : AREA_ICONS[a]}</span>
+                            {a === 'all' ? 'Todas' : AREA_LABELS[a]}
+                        </button>
+                    ))}
+                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 self-center" />
                     {(['all', 'ok', 'low', 'out', 'critical'] as const).map(s => (
                         <button key={s} onClick={() => setFilterStock(s)}
                             className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all ${filterStock === s ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
@@ -220,8 +236,9 @@ export default function InventoryList() {
                 <form onSubmit={handleSubmit} className="rounded-xl border border-primary/20 bg-primary/5 p-6">
                     <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">{editing ? 'Editar Producto' : 'Nuevo Producto'}</h3>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <div><label className={labelClass}>Código *</label><input value={form.code} onChange={e => setForm({ ...form, code: e.target.value })} required placeholder="INV-0001" className={inputClass} /></div>
+                        <div><label className={labelClass}>Código *</label><input value={form.code} onChange={e => { const code = e.target.value; setForm({ ...form, code, area: getAreaFromCode(code) }); }} required placeholder="FER-ALAM10-004" className={inputClass} /></div>
                         <div className="md:col-span-2"><label className={labelClass}>Nombre *</label><input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Tubería PVC 4in" className={inputClass} /></div>
+                        <div><label className={labelClass}>Área</label><select value={form.area} onChange={e => setForm({ ...form, area: e.target.value as InventoryArea })} className={inputClass}>{(Object.keys(AREA_LABELS) as InventoryArea[]).map(a => <option key={a} value={a}>{AREA_LABELS[a]}</option>)}</select></div>
                         <div><label className={labelClass}>Categoría</label><select value={form.category} onChange={e => setForm({ ...form, category: e.target.value as ProductCategory })} className={inputClass}>{(Object.keys(CATEGORY_LABELS) as ProductCategory[]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></div>
                         <div><label className={labelClass}>Unidad</label><select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value as ProductUnit })} className={inputClass}>{(Object.keys(UNIT_LABELS) as ProductUnit[]).map(u => <option key={u} value={u}>{UNIT_LABELS[u]}</option>)}</select></div>
                         <div><label className={labelClass}>Stock Actual</label><input type="number" step="0.01" value={form.current_stock} onChange={e => setForm({ ...form, current_stock: e.target.value })} className={inputClass} /></div>
@@ -299,7 +316,13 @@ export default function InventoryList() {
                                         <td className="px-4 py-3 font-mono text-xs font-bold text-primary">{p.code}</td>
                                         <td className="px-4 py-3">
                                             <p className="font-medium text-slate-900 dark:text-white">{p.name}</p>
-                                            {p.location && <p className="text-xs text-slate-400 mt-0.5">📍 {p.location}</p>}
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                {p.location && <span className="text-xs text-slate-400">📍 {p.location}</span>}
+                                                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${AREA_COLORS[p.area || 'oficina'].bg} ${AREA_COLORS[p.area || 'oficina'].text}`}>
+                                                    <span className="material-symbols-outlined text-[11px]">{AREA_ICONS[p.area || 'oficina']}</span>
+                                                    {AREA_LABELS[p.area || 'oficina']}
+                                                </span>
+                                            </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <span className="inline-flex items-center gap-1 text-xs text-slate-500">

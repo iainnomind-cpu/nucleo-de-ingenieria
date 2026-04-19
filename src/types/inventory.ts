@@ -1,9 +1,10 @@
-export type ProductCategory = 'ferreteria' | 'hidraulica' | 'electrica' | 'herramienta' | 'consumible' | 'otro';
+export type ProductCategory = 'ferreteria' | 'hidraulica' | 'electrica' | 'herramienta' | 'consumible' | 'epp' | 'papeleria' | 'souvenirs' | 'otro';
 export type ProductUnit = 'pieza' | 'metro' | 'litro' | 'kg' | 'rollo' | 'tramo' | 'caja';
 export type Criticality = 'normal' | 'high_rotation' | 'critical_path';
 export type MovementType = 'entry' | 'exit' | 'adjustment';
 export type MovementReason = 'purchase' | 'project_consumption' | 'return' | 'adjustment' | 'damaged' | 'initial';
 export type PurchaseStatus = 'pending' | 'ordered' | 'received' | 'cancelled';
+export type InventoryArea = 'oficina' | 'bodega';
 
 export interface InventoryProduct {
     id: string;
@@ -20,6 +21,7 @@ export interface InventoryProduct {
     last_purchase_price: number | null;
     supplier: string | null;
     location: string | null;
+    area: InventoryArea;
     criticality: Criticality;
     is_active: boolean;
     notes: string | null;
@@ -67,6 +69,9 @@ export const CATEGORY_LABELS: Record<ProductCategory, string> = {
     electrica: 'Eléctrica',
     herramienta: 'Herramienta',
     consumible: 'Consumible',
+    epp: 'EPP',
+    papeleria: 'Papelería',
+    souvenirs: 'Souvenirs',
     otro: 'Otro',
 };
 
@@ -76,6 +81,9 @@ export const CATEGORY_ICONS: Record<ProductCategory, string> = {
     electrica: 'bolt',
     herramienta: 'construction',
     consumible: 'local_drink',
+    epp: 'health_and_safety',
+    papeleria: 'description',
+    souvenirs: 'redeem',
     otro: 'category',
 };
 
@@ -137,4 +145,27 @@ export const STOCK_STATUS_CONFIG: Record<StockStatus, { label: string; color: st
 
 export function formatCurrencyInv(value: number): string {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
+}
+
+// ── Área (Bodega / Oficina) ──────────────────────────────────────
+export const AREA_LABELS: Record<InventoryArea, string> = {
+    oficina: 'Oficina',
+    bodega: 'Bodega',
+};
+
+export const AREA_ICONS: Record<InventoryArea, string> = {
+    oficina: 'apartment',
+    bodega: 'warehouse',
+};
+
+export const AREA_COLORS: Record<InventoryArea, { bg: string; text: string; border: string }> = {
+    oficina: { bg: 'bg-sky-100 dark:bg-sky-900/30', text: 'text-sky-700 dark:text-sky-400', border: 'border-sky-200 dark:border-sky-800' },
+    bodega: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-800' },
+};
+
+/** Determina el área de un producto basándose en el prefijo de su código */
+const BODEGA_PREFIXES = ['MM', 'MAQ', 'MACO', 'LIM', 'HER'];
+export function getAreaFromCode(code: string): InventoryArea {
+    const prefix = code.split('-')[0].toUpperCase();
+    return BODEGA_PREFIXES.includes(prefix) ? 'bodega' : 'oficina';
 }
