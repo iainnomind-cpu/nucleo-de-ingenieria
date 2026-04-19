@@ -221,9 +221,9 @@ function OperativosTab() {
                 </div>
             </div>
 
-            {/* Sidebar: Preview */}
+            {/* Sidebar: Preview + Proactive Config */}
             <div className="xl:col-span-1">
-                <div className="sticky top-8">
+                <div className="sticky top-8 space-y-6">
                     <div className={sectionClass}>
                         <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                             <span className="material-symbols-outlined text-primary text-[20px]">preview</span>
@@ -241,6 +241,9 @@ function OperativosTab() {
                             <div className="flex justify-between text-slate-600 dark:text-slate-400"><span>IVA</span><span className="font-mono font-bold">{defaults.tax_percent}%</span></div>
                         </div>
                     </div>
+
+                    {/* Proactive Maintenance Recipients */}
+                    <ProactiveRecipientsConfig />
                 </div>
             </div>
         </div>
@@ -700,3 +703,104 @@ function UsuariosTab() {
     );
 }
 
+// ============================================================
+// Proactive Maintenance Recipients Config (used in OperativosTab sidebar)
+// ============================================================
+function ProactiveRecipientsConfig() {
+    const [users, setUsers] = useState<{ id: string; full_name: string }[]>([]);
+    const [selected, setSelected] = useState<string[]>([]);
+    const [saved, setSaved] = useState<string[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [saveOk, setSaveOk] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            const [usersRes, settingRes] = await Promise.all([
+                supabase.from('app_users').select('id, full_name').eq('is_active', true).order('full_name'),
+                supabase.from('system_settings').select('value').eq('key', 'proactive_maint_recipients').single(),
+            ]);
+            setUsers(usersRes.data || []);
+            const val = Array.isArray(settingRes.data?.value) ? settingRes.data.value as string[] : [];
+            setSelected(val);
+            setSaved(val);
+            setLoading(false);
+        })();
+    }, []);
+
+    const toggle = (name: string) => {
+        setSelected(prev => prev.includes(name) ? prev.filter(n => n !== name) : [...prev, name]);
+    };
+
+    const hasChanges = JSON.stringify(selected.sort()) !== JSON.stringify(saved.sort());
+
+    const handleSave = async () => {
+        setSaving(true);
+        await supabase.from('system_settings').upsert({
+            key: 'proactive_maint_recipients',
+            value: selected as unknown as Record<string, unknown>,
+            description: 'Lista de nombres de usuario que recibirán notificaciones de mantenimiento proactivo.',
+        });
+        setSaved([...selected]);
+        setSaveOk(true);
+        setTimeout(() => setSaveOk(false), 3000);
+        setSaving(false);
+    };
+
+    if (loading) return <div className="rounded-xl border border-slate-200/60 bg-white/50 p-6 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/50"><div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent mx-auto" /></div>;
+
+    return (
+        <div className="rounded-xl border border-slate-200/60 bg-white/50 p-6 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
+            <h3 className="mb-1 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                <span className="material-symbols-outlined text-amber-500 text-[20px]">track_changes</span>
+                Alertas de Mantenimiento Proactivo
+            </h3>
+            <p className="mb-4 text-[11px] text-slate-500 leading-tight">
+                Selecciona qué usuarios recibirán notificaciones internas cuando se detecte un equipo sin mantenimiento reciente.
+            </p>
+
+            <div className="space-y-2">
+                {users.map(u => (
+                    <button
+                        key={u.id}
+                        onClick={() => toggle(u.full_name)}
+                        className={`flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-all ${
+                            selected.includes(u.full_name)
+                                ? 'border-primary/30 bg-primary/5'
+                                : 'border-slate-200/60 bg-white/30 hover:border-slate-300 dark:border-slate-700/40 dark:bg-slate-800/30'
+                        }`}
+                    >
+                        <div className={`flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
+                            selected.includes(u.full_name)
+                                ? 'border-primary bg-primary text-white'
+                                : 'border-slate-300 dark:border-slate-600'
+                        }`}>
+                            {selected.includes(u.full_name) && <span className="material-symbols-outlined text-[14px]">check</span>}
+                        </div>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{u.full_name}</span>
+                    </button>
+                ))}
+            </div>
+
+            {selected.length === 0 && (
+                <p className="mt-3 text-[10px] text-amber-500 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[12px]">info</span>
+                    Sin destinatarios configurados — no se enviarán notificaciones.
+                </p>
+            )}
+
+            {hasChanges && (
+                <div className="mt-4 flex gap-2">
+                    <button onClick={handleSave} disabled={saving}
+                        className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm ${saveOk ? 'bg-emerald-500' : 'bg-primary'}`}>
+                        {saving ? 'Guardando...' : saveOk ? '✓ Guardado' : 'Guardar'}
+                    </button>
+                    <button onClick={() => setSelected([...saved])}
+                        className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500 dark:border-slate-700">
+                        Revertir
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}

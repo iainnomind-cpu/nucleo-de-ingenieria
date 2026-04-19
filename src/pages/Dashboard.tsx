@@ -5,6 +5,7 @@ import GoogleMapView, { MapPin } from '../components/GoogleMap';
 import { NUCLEO_HQ } from '../lib/maps';
 import { generateExecutiveReport } from '../lib/reportGenerator';
 import { triggerWaAutomation } from '../lib/waAutomation';
+import { checkProactiveMaintenance } from '../lib/proactiveMaintenanceCheck';
 
 interface DashboardData {
   // Ventas
@@ -195,6 +196,14 @@ export default function Dashboard() {
                     }
                 }
             }
+        }
+
+        // 4. Mantenimiento Proactivo — detectar equipos sin servicio reciente
+        const { data: proactiveSetting } = await supabase.from('system_settings').select('value').eq('key', 'last_proactive_maint_check').single();
+        const lastProactiveRun = typeof proactiveSetting?.value === 'string' ? proactiveSetting.value.replace(/"/g, '') : null;
+        if (lastProactiveRun !== today) {
+          await supabase.from('system_settings').upsert({ key: 'last_proactive_maint_check', value: today });
+          await checkProactiveMaintenance();
         }
 
       } catch (err) {

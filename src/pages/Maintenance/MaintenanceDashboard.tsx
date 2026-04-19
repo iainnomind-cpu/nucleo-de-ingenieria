@@ -10,6 +10,9 @@ import {
     WARRANTY_STATUS_LABELS, WARRANTY_STATUS_COLORS,
     getDaysUntil, getUrgencyColor, formatCurrencyMaint,
     EquipmentStatus,
+    ProactiveMaintenanceAlert, ProactiveAlertStatus,
+    PROACTIVE_ALERT_STATUS_LABELS, PROACTIVE_ALERT_STATUS_COLORS,
+    getProactiveUrgency,
 } from '../../types/maintenance';
 import GoogleMapView, { MapPin } from '../../components/GoogleMap';
 import { NUCLEO_HQ, PinColor } from '../../lib/maps';
@@ -22,7 +25,9 @@ export default function MaintenanceDashboard() {
     const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
     const [warranties, setWarranties] = useState<(EquipmentWarranty & { equipment?: InstalledEquipment })[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<'calendar' | 'equipment' | 'warranties' | 'map'>('calendar');
+    const [tab, setTab] = useState<'calendar' | 'equipment' | 'warranties' | 'map' | 'proactive'>('calendar');
+    const [proactiveAlerts, setProactiveAlerts] = useState<ProactiveMaintenanceAlert[]>([]);
+    const [sendingWaId, setSendingWaId] = useState<string | null>(null);
     const [showEquipForm, setShowEquipForm] = useState(false);
     const [showScheduleForm, setShowScheduleForm] = useState(false);
 
@@ -41,16 +46,18 @@ export default function MaintenanceDashboard() {
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
-        const [eqRes, schRes, warRes, clRes] = await Promise.all([
+        const [eqRes, schRes, warRes, clRes, proRes] = await Promise.all([
             supabase.from('installed_equipment').select('*, client:clients(id, company_name)').order('well_name').order('name'),
             supabase.from('maintenance_schedules').select('*, equipment:installed_equipment(id, name, well_name), client:clients(id, company_name)').order('next_service_date'),
             supabase.from('equipment_warranties').select('*, equipment:installed_equipment(id, name, well_name)').order('end_date'),
             supabase.from('clients').select('id, company_name').order('company_name'),
+            supabase.from('proactive_maintenance_alerts').select('*').in('alert_status', ['pending', 'notified', 'wa_sent']).order('days_overdue', { ascending: false }),
         ]);
         setEquipment((eqRes.data as InstalledEquipment[]) || []);
         setSchedules((schRes.data as MaintenanceSchedule[]) || []);
         setWarranties(warRes.data || []);
         setClients(clRes.data || []);
+        setProactiveAlerts((proRes.data as ProactiveMaintenanceAlert[]) || []);
         setLoading(false);
     }, []);
 
@@ -345,6 +352,7 @@ export default function MaintenanceDashboard() {
             <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
                 {[
                     { key: 'calendar', icon: 'calendar_month', label: `Agenda (${upcoming.length})` },
+                    { key: 'proactive', icon: 'track_changes', label: `Proactivo`, badge: proactiveAlerts.length },
                     { key: 'map', icon: 'map', label: 'Mapa' },
                     { key: 'equipment', icon: 'precision_manufacturing', label: `Equipos (${equipment.length})` },
                     { key: 'warranties', icon: 'verified_user', label: `Garantías (${warranties.length})` },
@@ -352,6 +360,9 @@ export default function MaintenanceDashboard() {
                     <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
                         className={`flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all ${tab === t.key ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}>
                         <span className="material-symbols-outlined text-[18px]">{t.icon}</span>{t.label}
+                        {'badge' in t && (t as any).badge > 0 && (
+                            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">{(t as any).badge}</span>
+                        )}
                     </button>
                 ))}
             </div>
@@ -470,6 +481,223 @@ export default function MaintenanceDashboard() {
                                 );
                             })}
                         </div>
+                    )}
+                </div>
+            )}
+
+            {/* TAB: Proactive */}
+            {tab === 'proactive' && (
+                <div className="space-y-4">
+                    {proactiveAlerts.length === 0 ? (
+                        <div className={sectionClass}>
+                            <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+                                <span className="material-symbols-outlined text-[64px] mb-4 text-emerald-300">verified</span>
+                                <p className="text-lg font-semibold text-slate-600 dark:text-slate-300">Sin alertas proactivas</p>
+                                <p className="text-sm mt-1 text-center max-w-md">Todos los equipos están al día con su mantenimiento o ya tienen servicios agendados. El sistema revisa automáticamente una vez al día.</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="rounded-xl border border-amber-200/60 bg-amber-50/30 p-4 dark:border-amber-800/40 dark:bg-amber-900/10">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-amber-500 text-[24px]">track_changes</span>
+                                    <div>
+                                        <p className="text-sm font-bold text-amber-800 dark:text-amber-300">
+                                            {proactiveAlerts.length} equipo(s) requieren atención
+                                        </p>
+                                        <p className="text-xs text-amber-600/70 dark:text-amber-400/70">
+                                            Estos clientes no han recibido mantenimiento en más tiempo del recomendado. Envía un recordatorio por WhatsApp o agenda un servicio.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                                {proactiveAlerts.map(pa => {
+                                    const urgency = getProactiveUrgency(pa.days_overdue);
+                                    const statusColors = PROACTIVE_ALERT_STATUS_COLORS[pa.alert_status];
+                                    return (
+                                        <div key={pa.id} className="rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/50 transition-all hover:shadow-md">
+                                            <div className="flex items-start justify-between mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${urgency.bgColor}`}>
+                                                        <span className={`material-symbols-outlined text-[20px] ${urgency.color}`}>
+                                                            {EQUIPMENT_TYPE_ICONS[pa.equipment_type as EquipmentType] || 'build'}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{pa.equipment_name}</p>
+                                                        <p className="text-xs text-slate-500">{pa.client_name}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${urgency.bgColor} ${urgency.color}`}>
+                                                        {urgency.label}
+                                                    </span>
+                                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${statusColors.bg} ${statusColors.text}`}>
+                                                        {PROACTIVE_ALERT_STATUS_LABELS[pa.alert_status]}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Info row */}
+                                            <div className="flex items-center gap-4 mb-3 text-xs text-slate-500 flex-wrap">
+                                                <span className="flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[14px]">schedule</span>
+                                                    {pa.days_overdue} días vencido
+                                                </span>
+                                                <span className="flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[14px]">repeat</span>
+                                                    Cada {pa.recommended_months} meses
+                                                </span>
+                                                {pa.last_service_date && (
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px]">event</span>
+                                                        Último: {new Date(pa.last_service_date).toLocaleDateString('es-MX')}
+                                                    </span>
+                                                )}
+                                                {pa.client_phone && (
+                                                    <span className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[14px] text-emerald-500">phone</span>
+                                                        {pa.client_phone}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Progress bar */}
+                                            <div className="mb-4">
+                                                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                                    <div className={`h-full rounded-full transition-all ${
+                                                        pa.days_overdue >= 180 ? 'bg-red-500' :
+                                                        pa.days_overdue >= 90 ? 'bg-orange-500' :
+                                                        pa.days_overdue >= 30 ? 'bg-amber-500' : 'bg-sky-500'
+                                                    }`} style={{ width: `${Math.min((pa.days_overdue / (pa.recommended_months * 30)) * 100, 100)}%` }} />
+                                                </div>
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {pa.alert_status !== 'wa_sent' && pa.client_phone && (
+                                                    <button
+                                                        onClick={async () => {
+                                                            if (!confirm(`¿Enviar recordatorio de mantenimiento por WhatsApp a ${pa.client_name} (${pa.client_phone})?`)) return;
+                                                            setSendingWaId(pa.id);
+                                                            try {
+                                                                const monthsSince = Math.floor(pa.days_overdue / 30) + pa.recommended_months;
+                                                                const { data: templates } = await supabase.from('wa_templates')
+                                                                    .select('*').eq('meta_status', 'approved')
+                                                                    .ilike('name', '%mantenimiento%').limit(1);
+                                                                
+                                                                if (templates && templates.length > 0) {
+                                                                    const tpl = templates[0];
+                                                                    const variables = [pa.client_name, pa.equipment_name, String(monthsSince)];
+                                                                    const res = await fetch('/api/whatsapp-send', {
+                                                                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                                                                        body: JSON.stringify({
+                                                                            phone: pa.client_phone,
+                                                                            template_name: tpl.meta_name || tpl.name,
+                                                                            template_language: tpl.language || 'es_MX',
+                                                                            variables,
+                                                                        }),
+                                                                    });
+                                                                    const data = await res.json();
+                                                                    if (data.success) {
+                                                                        await supabase.from('proactive_maintenance_alerts').update({
+                                                                            alert_status: 'wa_sent',
+                                                                            wa_sent_at: new Date().toISOString(),
+                                                                            wa_message_id: data.message_id || null,
+                                                                        }).eq('id', pa.id);
+                                                                        window.alert('✅ Recordatorio enviado por WhatsApp');
+                                                                    } else {
+                                                                        window.alert(`❌ Error al enviar: ${data.message || 'Error desconocido'}`);
+                                                                    }
+                                                                } else {
+                                                                    await triggerWaAutomation({
+                                                                        module: 'maintenance',
+                                                                        event: 'reminder',
+                                                                        record: {
+                                                                            equipment_name: pa.equipment_name,
+                                                                            client_name: pa.client_name,
+                                                                            client_phone: pa.client_phone,
+                                                                            service_type: pa.equipment_type,
+                                                                            scheduled_date: new Date().toISOString().split('T')[0],
+                                                                        },
+                                                                        referenceId: pa.equipment_id,
+                                                                    });
+                                                                    await supabase.from('proactive_maintenance_alerts').update({
+                                                                        alert_status: 'wa_sent', wa_sent_at: new Date().toISOString(),
+                                                                    }).eq('id', pa.id);
+                                                                    window.alert('✅ Recordatorio procesado vía reglas de automatización');
+                                                                }
+                                                                fetchAll();
+                                                            } catch (err) { window.alert('Error de red al enviar'); }
+                                                            finally { setSendingWaId(null); }
+                                                        }}
+                                                        disabled={sendingWaId === pa.id}
+                                                        className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-600 transition-all disabled:opacity-50"
+                                                    >
+                                                        {sendingWaId === pa.id ? (
+                                                            <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-[16px]">chat</span>
+                                                        )}
+                                                        Enviar WhatsApp
+                                                    </button>
+                                                )}
+                                                {!pa.client_phone && (
+                                                    <span className="text-[10px] text-red-400 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[12px]">warning</span>
+                                                        Sin teléfono registrado
+                                                    </span>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        setSchForm({
+                                                            equipment_id: pa.equipment_id,
+                                                            service_type: 'revision_general',
+                                                            title: `Mantenimiento proactivo — ${pa.equipment_name}`,
+                                                            next_service_date: '',
+                                                            assigned_to: '',
+                                                            alert_days_before: '15',
+                                                        });
+                                                        setShowScheduleForm(true);
+                                                        supabase.from('proactive_maintenance_alerts').update({
+                                                            alert_status: 'scheduled',
+                                                        }).eq('id', pa.id).then(() => fetchAll());
+                                                    }}
+                                                    className="flex items-center gap-1.5 rounded-lg border border-primary bg-primary/5 px-3 py-2 text-xs font-bold text-primary hover:bg-primary/10 transition-all"
+                                                >
+                                                    <span className="material-symbols-outlined text-[16px]">calendar_add_on</span>
+                                                    Agendar
+                                                </button>
+                                                <button
+                                                    onClick={async () => {
+                                                        const reason = prompt('¿Razón para descartar? (opcional)');
+                                                        if (reason === null) return;
+                                                        await supabase.from('proactive_maintenance_alerts').update({
+                                                            alert_status: 'dismissed',
+                                                            dismissed_at: new Date().toISOString(),
+                                                            dismissed_reason: reason || 'Descartado manualmente',
+                                                        }).eq('id', pa.id);
+                                                        fetchAll();
+                                                    }}
+                                                    className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800 transition-all"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">close</span>
+                                                    Descartar
+                                                </button>
+                                                {pa.alert_status === 'wa_sent' && (
+                                                    <span className="ml-auto text-[10px] text-emerald-500 flex items-center gap-1">
+                                                        <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                                                        Enviado {pa.wa_sent_at ? new Date(pa.wa_sent_at).toLocaleDateString('es-MX') : ''}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
                     )}
                 </div>
             )}

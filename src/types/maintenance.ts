@@ -271,3 +271,54 @@ export function getUrgencyColor(days: number): string {
     if (days <= 30) return 'text-sky-500';
     return 'text-slate-400';
 }
+
+// ═══════════════════════════════════════════════════
+// Proactive Maintenance Alerts
+// ═══════════════════════════════════════════════════
+
+export type ProactiveAlertStatus = 'pending' | 'notified' | 'wa_sent' | 'scheduled' | 'dismissed';
+
+export interface ProactiveMaintenanceAlert {
+    id: string;
+    equipment_id: string;
+    client_id: string | null;
+    equipment_name: string;
+    client_name: string;
+    client_phone: string | null;
+    equipment_type: string;
+    last_service_date: string | null;
+    days_overdue: number;
+    recommended_months: number;
+    alert_status: ProactiveAlertStatus;
+    wa_sent_at: string | null;
+    wa_message_id: string | null;
+    notified_admin_at: string | null;
+    scheduled_id: string | null;
+    dismissed_at: string | null;
+    dismissed_reason: string | null;
+    created_at: string;
+    updated_at: string;
+}
+
+export const PROACTIVE_ALERT_STATUS_LABELS: Record<ProactiveAlertStatus, string> = {
+    pending: 'Pendiente',
+    notified: 'Notificado',
+    wa_sent: 'WhatsApp Enviado',
+    scheduled: 'Agendado',
+    dismissed: 'Descartado',
+};
+
+export const PROACTIVE_ALERT_STATUS_COLORS: Record<ProactiveAlertStatus, { bg: string; text: string; icon: string }> = {
+    pending: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', icon: 'schedule' },
+    notified: { bg: 'bg-sky-100 dark:bg-sky-900/30', text: 'text-sky-700 dark:text-sky-400', icon: 'notifications_active' },
+    wa_sent: { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-400', icon: 'chat' },
+    scheduled: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-400', icon: 'event_available' },
+    dismissed: { bg: 'bg-slate-100 dark:bg-slate-700', text: 'text-slate-500 dark:text-slate-400', icon: 'do_not_disturb_on' },
+};
+
+export function getProactiveUrgency(daysOverdue: number): { label: string; color: string; bgColor: string } {
+    if (daysOverdue >= 180) return { label: 'Crítico', color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30' };
+    if (daysOverdue >= 90) return { label: 'Alto', color: 'text-orange-600', bgColor: 'bg-orange-100 dark:bg-orange-900/30' };
+    if (daysOverdue >= 30) return { label: 'Medio', color: 'text-amber-600', bgColor: 'bg-amber-100 dark:bg-amber-900/30' };
+    return { label: 'Bajo', color: 'text-sky-600', bgColor: 'bg-sky-100 dark:bg-sky-900/30' };
+}
