@@ -57,6 +57,37 @@ export default function InvoiceDetail() {
         const newStatus: InvoiceStatus = newBalance <= 0 ? 'paid' : 'partial';
         await supabase.from('invoices').update({ amount_paid: newPaid, balance: Math.max(0, newBalance), status: newStatus }).eq('id', id);
 
+        // ─── START AUTOMATION: Primer Pago → Activar Proyecto ───
+        if (payments.length === 0 && invoice.project_id) {
+            const { data: rule } = await supabase
+                .from('business_rules')
+                .select('*')
+                .eq('trigger_event', 'invoice_first_payment')
+                .eq('is_active', true)
+                .maybeSingle();
+
+            if (rule) {
+                const targetStatus = rule.config?.target_status || 'preparation';
+                // Solo activamos si estaba en 'pending' o 'planning'
+                await supabase
+                    .from('projects')
+                    .update({ status: targetStatus })
+                    .eq('id', invoice.project_id)
+                    .in('status', ['pending', 'planning']);
+
+                await supabase.from('app_notifications').insert({
+                    user_name: 'all',
+                    title: '🚀 Proyecto Activado',
+                    message: `Anticipo/Pago recibido para ${invoice.invoice_number}. El proyecto ha sido liberado para iniciar.`,
+                    type: 'project',
+                    icon: 'rocket_launch',
+                    link: `/projects/${invoice.project_id}`,
+                    source: 'finance',
+                });
+            }
+        }
+        // ─── END AUTOMATION ───
+
         // If fully paid, trigger "Pagado / Liberado" automation
         if (newStatus === 'paid') {
             const clientName = invoice.client?.company_name || 'Cliente';

@@ -286,7 +286,7 @@ export default function QuoteDetail() {
             quote_id: quote.id,
             title: `Proyecto: ${quote.title}`,
             description: quote.description || `Proyecto derivado de la cotización ${quote.quote_number}`,
-            status: 'planning',
+            status: hasPayment ? 'preparation' : 'pending',
             priority: 'normal',
             start_date: new Date().toISOString().split('T')[0],
             estimated_days: quote.estimated_days || 30,
