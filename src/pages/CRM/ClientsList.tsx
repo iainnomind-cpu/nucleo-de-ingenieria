@@ -93,7 +93,7 @@ export default function ClientsList() {
     const overdueClients = clients.filter((c) => c.status === 'overdue').length;
 
     return (
-        <div className="flex flex-1 flex-col gap-6 p-8">
+        <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
             {/* Header */}
             <div className="flex flex-col gap-1">
                 <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
@@ -216,7 +216,7 @@ export default function ClientsList() {
 
                 {/* MAP VIEW */}
                 {viewMode === 'map' && (
-                    <div className="p-4">
+                    <div className="p-4 h-64 sm:h-96">
                         {(() => {
                             const geoClients = clients.filter(c => c.latitude && c.longitude);
                             if (geoClients.length === 0) return (
