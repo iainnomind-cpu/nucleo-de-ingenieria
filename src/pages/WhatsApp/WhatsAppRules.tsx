@@ -209,7 +209,7 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
             const { error } = await supabase.from('wa_templates').insert(payload);
             if (error) { console.error('Error inserting template:', error); alert('Error al crear plantilla: ' + error.message); return; }
         }
-        setShowTemplateForm(false); setEditingTemplateId(null); resetTemplateForm(); fetchAll();
+        setShowTemplateForm(false); setEditingTemplateId(null); resetTemplateForm(); setViewMode('templates'); fetchAll();
     };
 
     const submitToMeta = async (id: string, name: string) => {
@@ -418,34 +418,62 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
 
             <div className={clientMode ? 'p-6' : ''}>
             {/* Header */}
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                         <span className="material-symbols-outlined text-emerald-500">bolt</span>
-                         {clientMode ? 'Automatizaciones a Clientes' : 'Automatizaciones Internas'}
-                    </h3>
-                    <p className="text-sm text-slate-500">{clientMode ? 'Notificaciones automáticas a tus clientes vía WhatsApp' : 'Notificaciones de equipo vía WhatsApp cuando ocurren eventos en los módulos'}</p>
+            <div className="mb-6 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                             <span className="material-symbols-outlined text-emerald-500">bolt</span>
+                             {clientMode ? 'Automatizaciones a Clientes' : 'Automatizaciones Internas'}
+                        </h3>
+                        <p className="text-sm text-slate-500">{clientMode ? 'Notificaciones automáticas a tus clientes vía WhatsApp' : 'Notificaciones de equipo vía WhatsApp cuando ocurren eventos en los módulos'}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={syncStatusFromMeta} disabled={syncingStatus}
+                            className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition-all disabled:opacity-50 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 dark:hover:bg-sky-900/40">
+                            {syncingStatus ? (
+                                <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
+                            ) : (
+                                <span className="material-symbols-outlined text-[18px]">sync</span>
+                            )}
+                            {syncingStatus ? 'Sincronizando...' : 'Refrescar Estados'}
+                        </button>
+                        <button onClick={() => { setShowTemplateForm(true); setEditingTemplateId(null); resetTemplateForm(); }}
+                            className="flex items-center gap-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 transition-all">
+                            <span className="material-symbols-outlined text-[18px]">post_add</span>Nueva Plantilla
+                        </button>
+                        <button
+                            onClick={() => { resetForm(); setShowForm(true); }}
+                            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40"
+                        >
+                            <span className="material-symbols-outlined text-[20px]">add</span>
+                            Nueva Regla
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={syncStatusFromMeta} disabled={syncingStatus}
-                        className="flex items-center gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-100 transition-all disabled:opacity-50 dark:border-sky-800 dark:bg-sky-900/20 dark:text-sky-400 dark:hover:bg-sky-900/40">
-                        {syncingStatus ? (
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-sky-600 border-t-transparent" />
-                        ) : (
-                            <span className="material-symbols-outlined text-[18px]">sync</span>
-                        )}
-                        {syncingStatus ? 'Sincronizando...' : 'Refrescar Estados'}
-                    </button>
-                    <button onClick={() => { setShowTemplateForm(true); setEditingTemplateId(null); resetTemplateForm(); }}
-                        className="flex items-center gap-2 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 px-4 py-2.5 text-sm font-semibold text-emerald-700 dark:text-emerald-400 hover:bg-emerald-200 transition-all">
-                        <span className="material-symbols-outlined text-[18px]">post_add</span>Nueva Plantilla
+
+                {/* View Mode Toggle: Reglas vs Plantillas */}
+                <div className="flex items-center gap-1 rounded-xl border border-slate-200/60 bg-white/50 p-1 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/50">
+                    <button
+                        onClick={() => setViewMode('rules')}
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                            viewMode === 'rules'
+                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800'
+                        }`}
+                    >
+                        <span className="material-symbols-outlined text-[18px]">bolt</span>
+                        Reglas ({rules.length})
                     </button>
                     <button
-                        onClick={() => { resetForm(); setShowForm(true); }}
-                        className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/20 hover:shadow-emerald-500/40"
+                        onClick={() => setViewMode('templates')}
+                        className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all ${
+                            viewMode === 'templates'
+                                ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800'
+                        }`}
                     >
-                        <span className="material-symbols-outlined text-[20px]">add</span>
-                        Nueva Regla
+                        <span className="material-symbols-outlined text-[18px]">description</span>
+                        Plantillas ({templates.length})
                     </button>
                 </div>
             </div>
