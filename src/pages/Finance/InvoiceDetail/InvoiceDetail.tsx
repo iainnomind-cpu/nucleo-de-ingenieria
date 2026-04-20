@@ -9,6 +9,7 @@ import {
     EXPENSE_CATEGORY_LABELS, EXPENSE_CATEGORY_ICONS,
     formatCurrencyFin,
 } from '../../../types/finance';
+import { triggerWaAutomation } from '../../../lib/waAutomation';
 
 export default function InvoiceDetail() {
     const { id } = useParams<{ id: string }>();
@@ -57,35 +58,19 @@ export default function InvoiceDetail() {
         const newStatus: InvoiceStatus = newBalance <= 0 ? 'paid' : 'partial';
         await supabase.from('invoices').update({ amount_paid: newPaid, balance: Math.max(0, newBalance), status: newStatus }).eq('id', id);
 
-        // ─── START AUTOMATION: Primer Pago → Activar Proyecto ───
-        if (payments.length === 0 && invoice.project_id) {
-            const { data: rule } = await supabase
-                .from('business_rules')
-                .select('*')
-                .eq('trigger_event', 'invoice_first_payment')
-                .eq('is_active', true)
-                .maybeSingle();
-
-            if (rule) {
-                const targetStatus = rule.config?.target_status || 'preparation';
-                // Solo activamos si estaba en 'pending' o 'planning'
-                await supabase
-                    .from('projects')
-                    .update({ status: targetStatus })
-                    .eq('id', invoice.project_id)
-                    .in('status', ['pending', 'planning']);
-
-                await supabase.from('app_notifications').insert({
-                    user_name: 'all',
-                    title: '🚀 Proyecto Activado',
-                    message: `Anticipo/Pago recibido para ${invoice.invoice_number}. El proyecto ha sido liberado para iniciar.`,
-                    type: 'project',
-                    icon: 'rocket_launch',
-                    link: `/projects/${invoice.project_id}`,
-                    source: 'finance',
-                });
-            }
-        }
+        // ─── START AUTOMATION: WhatsApp Notificación de Pago ───
+        triggerWaAutomation({
+            module: 'invoices',
+            event: 'payment_received',
+            record: {
+                invoice_number: invoice.invoice_number,
+                client_name: invoice.client?.company_name || 'Cliente',
+                amount: formatCurrencyFin(invoice.total),
+                payment_amount: formatCurrencyFin(amount),
+                due_date: new Date(invoice.due_date).toLocaleDateString('es-MX'),
+            },
+            referenceId: invoice.id,
+        });
         // ─── END AUTOMATION ───
 
         // If fully paid, trigger "Pagado / Liberado" automation

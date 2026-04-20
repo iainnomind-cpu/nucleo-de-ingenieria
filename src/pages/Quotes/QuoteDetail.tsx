@@ -263,6 +263,22 @@ export default function QuoteDetail() {
 
             // 3. Auto-convert to project
             alert('¡Anticipo registrado con éxito! Creando el proyecto...');
+            
+            // ─── START AUTOMATION: WhatsApp Notificación de Anticipo ───
+            triggerWaAutomation({
+                module: 'quotes',
+                event: 'payment_received',
+                record: {
+                    quote_number: quote.quote_number,
+                    client_name: quote.client?.company_name || 'Cliente',
+                    amount: formatCurrency(quote.total),
+                    payment_amount: formatCurrency(amount),
+                    title: quote.title,
+                },
+                referenceId: quote.id,
+            });
+            // ─── END AUTOMATION ───
+            
             await handleConvertToProject(true); // Pass flag to indicate paid
 
         } catch (err: any) {

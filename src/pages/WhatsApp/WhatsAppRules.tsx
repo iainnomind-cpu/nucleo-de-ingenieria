@@ -55,11 +55,13 @@ const TRIGGER_MODULES: { key: string; label: string; icon: string; events: { key
     { key: 'quotes', label: 'Cotizaciones', icon: 'request_quote', events: [
         { key: 'approved', label: 'Cotización Aprobada' },
         { key: 'created', label: 'Cotización Creada' },
+        { key: 'payment_received', label: 'Anticipo/Pago Registrado' },
     ]},
     { key: 'invoices', label: 'Facturas', icon: 'receipt_long', events: [
         { key: 'created', label: 'Factura Generada' },
         { key: 'upcoming', label: 'Vence Pronto (3 días)' },
         { key: 'overdue', label: 'Factura Vencida' },
+        { key: 'payment_received', label: 'Pago Registrado' },
     ]},
     { key: 'fleet', label: 'Flotilla', icon: 'local_shipping', events: [
         { key: 'created', label: 'Viaje Registrado' },
@@ -95,7 +97,8 @@ const VARIABLE_SUGGESTIONS: Record<string, { label: string; path: string }[]> = 
     invoices: [
         { label: 'No. Factura', path: 'record.invoice_number' },
         { label: 'Cliente', path: 'record.client_name' },
-        { label: 'Monto', path: 'record.amount' },
+        { label: 'Monto Total', path: 'record.amount' },
+        { label: 'Monto Pagado (Este Pago)', path: 'record.payment_amount' },
         { label: 'Vencimiento', path: 'record.due_date' },
     ],
     fleet: [
