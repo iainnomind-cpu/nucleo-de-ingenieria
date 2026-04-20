@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import {
@@ -34,6 +34,27 @@ export default function TemplatesList() {
         header_type: 'none' as TemplateHeaderType, header_content: '',
         body: '', footer: '', variables: '', meta_status: 'draft' as MetaStatus,
     });
+    const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const insertVariableAtCursor = (varLabel: string) => {
+        const tag = `{{${varLabel}}}`;
+        const textarea = bodyTextareaRef.current;
+        if (textarea) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const before = form.body.substring(0, start);
+            const after = form.body.substring(end);
+            const newBody = before + tag + after;
+            setForm({ ...form, body: newBody });
+            requestAnimationFrame(() => {
+                textarea.focus();
+                const newPos = start + tag.length;
+                textarea.setSelectionRange(newPos, newPos);
+            });
+        } else {
+            setForm({ ...form, body: form.body + tag });
+        }
+    };
 
     const fetchTemplates = useCallback(async () => {
         setLoading(true);
@@ -430,7 +451,7 @@ export default function TemplatesList() {
                                     <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Cuerpo del Mensaje *</label>
                                     <span className="text-[10px] text-slate-400">Arrastra o haz clic en las variables para insertarlas</span>
                                 </div>
-                                <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} required rows={5} className={inputClass}
+                                <textarea ref={bodyTextareaRef} value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} required rows={5} className={inputClass}
                                     placeholder="Hola {{Nombre Cliente}}, le recordamos que su servicio..." />
                                 
                                 <div className="mt-2.5 rounded-lg border border-emerald-100 bg-emerald-50/50 p-3 dark:border-emerald-900/30 dark:bg-emerald-900/10">
@@ -440,7 +461,7 @@ export default function TemplatesList() {
                                             <div key={v.id} 
                                                 draggable 
                                                 onDragStart={(e) => e.dataTransfer.setData('text/plain', `{{${v.label}}}`)}
-                                                onClick={() => setForm({ ...form, body: form.body + (form.body.endsWith(' ') || form.body.length === 0 ? '' : ' ') + `{{${v.label}}}` })}
+                                                onClick={() => insertVariableAtCursor(v.label)}
                                                 className="cursor-pointer rounded-full bg-white border border-emerald-200 px-2.5 py-1 text-[11px] font-medium text-emerald-700 shadow-sm transition-all hover:bg-emerald-500 hover:text-white dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-400 dark:hover:bg-emerald-600 dark:hover:text-white"
                                             >
                                                 {v.label}

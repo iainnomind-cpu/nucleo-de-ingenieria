@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { WaTemplate, META_STATUS_LABELS,
@@ -149,6 +149,28 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
         header_type: 'none' as TemplateHeaderType, header_content: '',
         body: '', footer: '', variables: '', meta_status: 'draft' as MetaStatus,
     });
+    const bodyTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+    const insertVariableAtCursor = (varLabel: string) => {
+        const tag = `{{${varLabel}}}`;
+        const textarea = bodyTextareaRef.current;
+        if (textarea) {
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const before = formTemplate.body.substring(0, start);
+            const after = formTemplate.body.substring(end);
+            const newBody = before + tag + after;
+            setFormTemplate({ ...formTemplate, body: newBody });
+            // Restore cursor position after the inserted variable
+            requestAnimationFrame(() => {
+                textarea.focus();
+                const newPos = start + tag.length;
+                textarea.setSelectionRange(newPos, newPos);
+            });
+        } else {
+            setFormTemplate({ ...formTemplate, body: formTemplate.body + tag });
+        }
+    };
 
 
     const fetchAll = useCallback(async () => {
@@ -922,12 +944,12 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
                             )}
                             <div className="col-span-2">
                                 <label className={labelClass}>Cuerpo del Mensaje * (Usa {'{{Variables}}'} dando click abajo)</label>
-                                <textarea value={formTemplate.body} onChange={e => setFormTemplate({ ...formTemplate, body: e.target.value })} required rows={4} className={inputClass} placeholder="Escribe el mensaje aquí..." />
+                                <textarea ref={bodyTextareaRef} value={formTemplate.body} onChange={e => setFormTemplate({ ...formTemplate, body: e.target.value })} required rows={4} className={inputClass} placeholder="Escribe el mensaje aquí..." />
                                 <div className="mt-2 rounded-lg border border-emerald-100 bg-emerald-50 p-2 dark:border-emerald-900/30 dark:bg-emerald-900/10">
                                     <p className="mb-1 text-[10px] font-bold text-emerald-700">Variables Frecuentes:</p>
                                     <div className="flex flex-wrap gap-1">
                                         {AVAILABLE_VARIABLES.map(v => (
-                                            <button key={v.id} type="button" onClick={() => setFormTemplate({ ...formTemplate, body: formTemplate.body + `{{${v.label}}}` })}
+                                            <button key={v.id} type="button" onClick={() => insertVariableAtCursor(v.label)}
                                                 className="rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold text-emerald-600 shadow-sm hover:bg-emerald-500 hover:text-white transition">
                                                 {v.label}
                                             </button>
