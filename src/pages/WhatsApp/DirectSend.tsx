@@ -187,6 +187,7 @@ export default function DirectSend() {
                 revenue_generated: 0,
             });
         }
+    };
 
     const stepsConfig = [
         { key: 'template' as const, label: '1. Plantilla', icon: 'description' },
