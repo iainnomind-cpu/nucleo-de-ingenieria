@@ -26,6 +26,12 @@ export default function QuoteDetail() {
     const [sendingInProgress, setSendingInProgress] = useState(false);
     const [sendResultMsgs, setSendResultMsgs] = useState<string[]>([]);
 
+    // Payment Flow States
+    const [quoteInvoice, setQuoteInvoice] = useState<any>(null);
+    const [totalPaid, setTotalPaid] = useState(0);
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
+    const [paymentForm, setPaymentForm] = useState({ amount: '', payment_method: 'transfer' });
+
     const fetchQuote = useCallback(async () => {
         if (!id) return;
         setLoading(true);
@@ -58,6 +64,18 @@ export default function QuoteDetail() {
                 .eq('parent_quote_id', id)
                 .order('version');
             setVersions((vers as Quote[]) || []);
+        }
+
+        // Fetch related invoice (generated when approved)
+        if (data.status === 'approved') {
+            const invNum = `F-${data.quote_number.replace('COT-', '')}`;
+            const { data: invData } = await supabase.from('invoices').select('*').eq('invoice_number', invNum).maybeSingle();
+            setQuoteInvoice(invData);
+            if (invData) {
+                const { data: paymentsData } = await supabase.from('payments').select('amount').eq('invoice_id', invData.id);
+                const paid = (paymentsData || []).reduce((acc: number, p: any) => acc + Number(p.amount), 0);
+                setTotalPaid(paid);
+            }
         }
 
         setLoading(false);
@@ -213,7 +231,47 @@ export default function QuoteDetail() {
         navigate(`/quotes/${newQ.id}`);
     };
 
-    const handleConvertToProject = async () => {
+    const handleAddPayment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quote || !quoteInvoice) return;
+
+        const amount = parseFloat(paymentForm.amount);
+        if (isNaN(amount) || amount <= 0) { alert('Monto inválido'); return; }
+
+        try {
+            // 1. Insert Payment
+            const { data: payment, error: payErr } = await supabase.from('payments').insert({
+                invoice_id: quoteInvoice.id,
+                amount,
+                payment_method: paymentForm.payment_method,
+                payment_date: new Date().toISOString().split('T')[0],
+                notes: `Anticipo registrado desde cotización ${quote.quote_number}`,
+            }).select().single();
+            if (payErr) throw payErr;
+
+            // 2. Update Invoice balance and status
+            const newPaid = totalPaid + amount;
+            const newBalance = quoteInvoice.total - newPaid;
+            const newStatus = newBalance <= 0 ? 'paid' : 'partial';
+
+            const { error: invErr } = await supabase.from('invoices').update({
+                amount_paid: newPaid,
+                balance: newBalance,
+                status: newStatus
+            }).eq('id', quoteInvoice.id);
+            if (invErr) throw invErr;
+
+            // 3. Auto-convert to project
+            alert('¡Anticipo registrado con éxito! Creando el proyecto...');
+            await handleConvertToProject(true); // Pass flag to indicate paid
+
+        } catch (err: any) {
+            console.error('Error adding payment:', err);
+            alert('Error al registrar pago: ' + err.message);
+        }
+    };
+
+    const handleConvertToProject = async (hasPayment = false) => {
         if (!quote) return;
 
         // Generate Project Number
@@ -248,6 +306,11 @@ export default function QuoteDetail() {
         // Also link to opportunity if exists
         if (quote.opportunity_id) {
             await supabase.from('sales_opportunities').update({ stage: 'closed_won' }).eq('id', quote.opportunity_id);
+        }
+
+        // Link invoice to the project
+        if (quoteInvoice) {
+            await supabase.from('invoices').update({ project_id: project.id }).eq('id', quoteInvoice.id);
         }
 
         // → M8: Auto-create Space for the Project
@@ -654,15 +717,66 @@ export default function QuoteDetail() {
                             </button>
                         </>
                     )}
-                    {quote.status === 'approved' && (
-                        <button onClick={handleConvertToProject}
-                            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md hover:shadow-lg">
-                            <span className="material-symbols-outlined text-[18px]">rocket_launch</span>
-                            Convertir a Proyecto
+                    {quote.status === 'approved' && !quote.converted_project_id && (
+                        <button onClick={() => handleConvertToProject(false)}
+                            className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                            <span className="material-symbols-outlined text-[18px]">skip_next</span>
+                            Omitir Anticipo (Crédito)
                         </button>
                     )}
                 </div>
             </div>
+
+            {/* Bloque de Anticipo Requerido */}
+            {quote.status === 'approved' && !quote.converted_project_id && quoteInvoice && (
+                <div className="rounded-xl border-2 border-primary bg-primary/5 p-6 shadow-sm dark:border-primary/50 dark:bg-primary/10">
+                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className="material-symbols-outlined text-primary text-[28px]">payments</span>
+                                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Anticipo Requerido</h3>
+                            </div>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 max-w-xl">
+                                La cotización ha sido aprobada y se generó la factura en borrador <strong>{quoteInvoice.invoice_number}</strong>. Para convertir esta cotización en un proyecto operativo y asignar tareas al equipo, registra el anticipo.
+                            </p>
+                        </div>
+
+                        {!showPaymentForm ? (
+                            <button onClick={() => setShowPaymentForm(true)}
+                                className="flex items-center justify-center gap-2 rounded-xl bg-primary px-6 py-3 font-bold text-white shadow-lg shadow-primary/30 transition-all hover:-translate-y-0.5 hover:shadow-primary/40 whitespace-nowrap">
+                                <span className="material-symbols-outlined">add_card</span>
+                                Registrar Pago / Anticipo
+                            </button>
+                        ) : (
+                            <form onSubmit={handleAddPayment} className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-white p-4 shadow-sm dark:bg-slate-900 md:w-80">
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Monto del Anticipo</label>
+                                    <div className="relative mt-1">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                                        <input type="number" step="0.01" required value={paymentForm.amount}
+                                            onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })}
+                                            className="w-full rounded-md border border-slate-300 pl-8 pr-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                            placeholder="0.00" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Método de Pago</label>
+                                    <select value={paymentForm.payment_method} onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}
+                                        className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                                        <option value="transfer">Transferencia</option>
+                                        <option value="cash">Efectivo</option>
+                                        <option value="check">Cheque</option>
+                                    </select>
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                    <button type="button" onClick={() => setShowPaymentForm(false)} className="flex-1 rounded-md border border-slate-300 py-2 text-sm font-medium hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800">Cancelar</button>
+                                    <button type="submit" className="flex-1 rounded-md bg-emerald-500 py-2 text-sm font-medium text-white hover:bg-emerald-600">Guardar Pago</button>
+                                </div>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                 {/* Main content */}
