@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './lib/AuthContext';
 import Login from './pages/Auth/Login';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
+import { SidebarProvider } from './lib/SidebarContext';
 import Dashboard from './pages/Dashboard';
 import ClientsList from './pages/CRM/ClientsList';
 import ClientDetail from './pages/CRM/ClientDetail/ClientDetail';
@@ -61,10 +62,11 @@ function ProtectedApp() {
   }
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark">
-      <Sidebar />
-      <main className="flex flex-1 flex-col overflow-y-auto bg-background-light dark:bg-background-dark">
-        <Header />
+    <SidebarProvider>
+      <div className="flex h-screen w-full overflow-hidden bg-background-light dark:bg-background-dark">
+        <Sidebar />
+        <main className="flex flex-1 flex-col overflow-y-auto bg-background-light dark:bg-background-dark min-w-0">
+          <Header />
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
@@ -163,8 +165,9 @@ function ProtectedApp() {
           {/* Catch-all: redirigir a dashboard */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
-      </main>
-    </div>
+        </main>
+      </div>
+    </SidebarProvider>
   );
 }
 
