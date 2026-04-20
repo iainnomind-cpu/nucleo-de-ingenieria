@@ -319,12 +319,16 @@ export default function ProjectDetail() {
         if (project.client_id && selectedEqTypes.length > 0) {
             let count = 0;
             for (const eqType of selectedEqTypes) {
+                const eqLabel = EQUIPMENT_TYPE_LABELS[eqType] || eqType;
                 const { data: eqData } = await supabase.from('installed_equipment').insert({
                     client_id: project.client_id,
+                    project_id: project.id,
+                    name: `${eqLabel} — ${project.title}`,
                     equipment_type: eqType,
-                    location_description: project.location || project.title,
+                    location: project.location || project.title,
                     installation_date: actual_end,
-                    status: 'active'
+                    status: 'active',
+                    notes: `Instalado en proyecto ${project.project_number}`,
                 }).select().single();
 
                 if (eqData) {
@@ -333,17 +337,20 @@ export default function ProjectDetail() {
                     nextDate.setMonth(nextDate.getMonth() + frequency);
                     await supabase.from('maintenance_schedules').insert({
                         equipment_id: eqData.id,
+                        client_id: project.client_id,
+                        title: `Revisión General — ${eqLabel} (${project.client?.company_name || 'Cliente'})`,
+                        description: `Mantenimiento preventivo automático — Proyecto ${project.project_number}`,
                         service_type: 'revision_general',
                         frequency_months: frequency,
                         last_service_date: actual_end,
                         next_service_date: nextDate.toISOString().split('T')[0],
-                        assigned_to: project.project_manager || 'Admin',
+                        assigned_to: project.project_manager || 'Joel',
                         status: 'scheduled',
                     });
                     count++;
                 }
             }
-            alert(`✅ ${count} equipo(s) instalados y su mantenimiento preventivo programado a futuro (M5)`);
+            alert(`✅ ${count} equipo(s) instalados y mantenimiento preventivo programado.`);
         }
 
         // → M6: Generate pending invoice

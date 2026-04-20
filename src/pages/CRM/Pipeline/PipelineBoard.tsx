@@ -217,6 +217,60 @@ export default function PipelineBoard() {
                     source: 'pipeline',
                 });
 
+                // ── 6. AUTO-GENERAR FACTURA del proyecto ──
+                // Buscar si ya existe un proyecto creado para esta oportunidad
+                const { data: linkedProject } = await supabase.from('projects')
+                    .select('id, project_number, quoted_amount, client_id')
+                    .eq('title', opp.title)
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (linkedProject && linkedProject.quoted_amount > 0) {
+                    const invoiceNumber = `F-${linkedProject.project_number.replace('PRY-', '')}`;
+                    const subtotal = Math.round((linkedProject.quoted_amount / 1.16) * 100) / 100;
+                    const taxAmount = Math.round((linkedProject.quoted_amount - subtotal) * 100) / 100;
+                    
+                    await supabase.from('invoices').insert({
+                        invoice_number: invoiceNumber,
+                        client_id: linkedProject.client_id || opp.client_id,
+                        project_id: linkedProject.id,
+                        invoice_type: 'project',
+                        status: 'sent',
+                        issue_date: todayStr,
+                        due_date: (() => { const d = new Date(); d.setDate(d.getDate() + 15); return d.toISOString().split('T')[0]; })(),
+                        subtotal,
+                        tax_rate: 16,
+                        tax_amount: taxAmount,
+                        total: linkedProject.quoted_amount,
+                        amount_paid: 0,
+                        balance: linkedProject.quoted_amount,
+                        currency: 'MXN',
+                        notes: `Factura generada automáticamente desde Pipeline CRM — Oportunidad: ${opp.title}`,
+                    });
+                } else if (opp.estimated_value && opp.estimated_value > 0) {
+                    // Si no hay proyecto vinculado aún, crear factura con datos de la oportunidad
+                    const subtotal = Math.round((opp.estimated_value / 1.16) * 100) / 100;
+                    const taxAmount = Math.round((opp.estimated_value - subtotal) * 100) / 100;
+
+                    await supabase.from('invoices').insert({
+                        invoice_number: `F-OPP-${opp.id.substring(0, 8).toUpperCase()}`,
+                        client_id: opp.client_id,
+                        invoice_type: 'project',
+                        status: 'sent',
+                        issue_date: todayStr,
+                        due_date: dueDateStr,
+                        subtotal,
+                        tax_rate: 16,
+                        tax_amount: taxAmount,
+                        total: opp.estimated_value,
+                        amount_paid: 0,
+                        balance: opp.estimated_value,
+                        currency: 'MXN',
+                        notes: `Factura generada automáticamente — Oportunidad ganada: ${opp.title} (${clientName})`,
+                    });
+                }
+
                 // ── 5. Notificaciones Externas (WhatsApp y Email) ──
                 const externalTargets = [
                     { name: 'Joel Rincón Cuevas', email: 'joelrincon_nucleoing@hotmail.com', phone: '+523414201583' },

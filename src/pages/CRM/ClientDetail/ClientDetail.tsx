@@ -148,21 +148,26 @@ export default function ClientDetail() {
                     assetForm.asset_type === 'pump' ? 'bomba' : 'variador';
             const { data: eqData } = await supabase.from('installed_equipment').insert({
                 client_id: id,
+                name: assetForm.name,
                 equipment_type: eqType,
                 brand: assetForm.brand || null,
                 model: assetForm.model || null,
                 serial_number: null,
                 installation_date: assetForm.installation_date || new Date().toISOString().split('T')[0],
                 status: 'active',
-                location_description: assetForm.name,
+                location: assetForm.name,
             }).select().single();
 
             // → M5: Auto-create first maintenance schedule (revision general in 90 days)
             if (eqData) {
                 const nextDate = new Date();
                 nextDate.setDate(nextDate.getDate() + 90);
+                const eqLabel = ASSET_TYPE_LABELS[assetForm.asset_type] || eqType;
                 await supabase.from('maintenance_schedules').insert({
                     equipment_id: eqData.id,
+                    client_id: id,
+                    title: `Revisión General — ${eqLabel} (${client?.company_name || 'Cliente'})`,
+                    description: `Mantenimiento preventivo programado al registrar activo: ${assetForm.name}`,
                     service_type: 'revision_general',
                     frequency_months: 3,
                     last_service_date: new Date().toISOString().split('T')[0],

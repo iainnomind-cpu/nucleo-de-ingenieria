@@ -24,7 +24,7 @@ export default function ProjectsList() {
     const [showForm, setShowForm] = useState(false);
 
     // Form
-    const [form, setForm] = useState({ title: '', client_id: '', work_type: '', priority: 'normal', location: '', estimated_days: '1', project_manager: '', notes: '' });
+    const [form, setForm] = useState({ title: '', client_id: '', work_type: '', priority: 'normal', location: '', estimated_days: '1', project_manager: '', notes: '', quoted_amount: '' });
     const [clients, setClients] = useState<{ id: string; company_name: string }[]>([]);
 
     const fetchProjects = useCallback(async () => {
@@ -46,6 +46,7 @@ export default function ProjectsList() {
         const { count } = await supabase.from('projects').select('*', { count: 'exact', head: true });
         const projectNumber = `PRY-${year}-${String((count || 0) + 1).padStart(4, '0')}`;
 
+        const quotedAmount = parseFloat(form.quoted_amount) || 0;
         const { data: project, error } = await supabase.from('projects').insert({
             project_number: projectNumber,
             title: form.title,
@@ -56,6 +57,7 @@ export default function ProjectsList() {
             estimated_days: parseInt(form.estimated_days) || 1,
             project_manager: form.project_manager || null,
             notes: form.notes || null,
+            quoted_amount: quotedAmount,
         }).select('*, client:clients(id, company_name)').single();
 
         if (error) { alert('Error: ' + error.message); return; }
@@ -122,6 +124,32 @@ export default function ProjectsList() {
 
             await supabase.from('team_tasks').insert(tasksToInsert);
 
+            // → AUTO-GENERAR FACTURA si hay monto cotizado
+            if (quotedAmount > 0) {
+                const subtotal = Math.round((quotedAmount / 1.16) * 100) / 100;
+                const taxAmount = Math.round((quotedAmount - subtotal) * 100) / 100;
+                const dueDateInv = new Date();
+                dueDateInv.setDate(dueDateInv.getDate() + 15);
+
+                await supabase.from('invoices').insert({
+                    invoice_number: `F-${projectNumber.replace('PRY-', '')}`,
+                    client_id: form.client_id || null,
+                    project_id: project.id,
+                    invoice_type: 'project',
+                    status: 'sent',
+                    issue_date: new Date().toISOString().split('T')[0],
+                    due_date: dueDateInv.toISOString().split('T')[0],
+                    subtotal,
+                    tax_rate: 16,
+                    tax_amount: taxAmount,
+                    total: quotedAmount,
+                    amount_paid: 0,
+                    balance: quotedAmount,
+                    currency: 'MXN',
+                    notes: `Factura generada automáticamente al crear proyecto ${projectNumber}`,
+                });
+            }
+
             // → Trigger WA Automation: Proyecto creado manual
             triggerWaAutomation({
                 module: 'projects',
@@ -136,11 +164,11 @@ export default function ProjectsList() {
                 referenceId: project.id,
             });
 
-            alert(`Proyecto creado. \n✓ Space (M8) generado \n✓ Tareas pre-trabajo asignadas (M8) a ${form.project_manager || 'Admin'}`);
+            alert(`Proyecto creado exitosamente.\n✓ Factura generada${quotedAmount > 0 ? ` por ${formatCurrencyMXN(quotedAmount)}` : ''}\n✓ Space contextual generado\n✓ Tareas asignadas a: Samara, Paulina, Joel, Alejandro`);
         }
 
         setShowForm(false);
-        setForm({ title: '', client_id: '', work_type: '', priority: 'normal', location: '', estimated_days: '1', project_manager: '', notes: '' });
+        setForm({ title: '', client_id: '', work_type: '', priority: 'normal', location: '', estimated_days: '1', project_manager: '', notes: '', quoted_amount: '' });
         fetchProjects();
     };
 
@@ -198,6 +226,7 @@ export default function ProjectsList() {
                         <div><label className={labelClass}>Ubicación</label><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="Dirección o coordenadas" className={inputClass} /></div>
                         <div><label className={labelClass}>Días Estimados</label><input type="number" min="1" value={form.estimated_days} onChange={e => setForm({ ...form, estimated_days: e.target.value })} className={inputClass} /></div>
                         <div><label className={labelClass}>Responsable</label><input value={form.project_manager} onChange={e => setForm({ ...form, project_manager: e.target.value })} placeholder="Nombre del PM" className={inputClass} /></div>
+                        <div><label className={labelClass}>Monto Cotizado (MXN)</label><input type="number" step="0.01" value={form.quoted_amount} onChange={e => setForm({ ...form, quoted_amount: e.target.value })} placeholder="Ej: 150000" className={inputClass} /></div>
                     </div>
                     <div className="mt-4 flex gap-2">
                         <button type="submit" className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white">Crear Proyecto</button>
