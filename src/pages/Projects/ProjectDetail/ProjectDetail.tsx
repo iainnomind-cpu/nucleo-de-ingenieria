@@ -671,7 +671,14 @@ export default function ProjectDetail() {
                         <p className="text-sm text-slate-500">{project.title}</p>
                     </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                    {/* Payment status indicator for preparation phase */}
+                    {(project.status === 'preparation' || project.status === 'pending') && (
+                        <span className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold ${totalPaid > 0 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
+                            <span className="material-symbols-outlined text-[14px]">{totalPaid > 0 ? 'check_circle' : 'payments'}</span>
+                            {totalPaid > 0 ? `Anticipo: ${formatCurrencyMXN(totalPaid)}` : 'Sin anticipo'}
+                        </span>
+                    )}
                     {STATUS_FLOW.map((s, idx) => {
                         const currentIdx = STATUS_FLOW.indexOf(project.status);
                         const isNext = idx === currentIdx + 1;
@@ -777,6 +784,98 @@ export default function ProjectDetail() {
                                 </p>
                             )}
                         </div>
+
+                        {/* ═══ PAGO CONTEXTUAL: Aparece en flujo cuando no hay pagos ═══ */}
+                        {(project.status === 'pending' || project.status === 'preparation') && totalPaid === 0 && (
+                            <div className="rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-orange-50 p-5 shadow-sm dark:border-amber-700 dark:from-amber-900/20 dark:to-orange-900/10">
+                                <div className="flex items-start gap-3 mb-3">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/40">
+                                        <span className="material-symbols-outlined text-[24px]">warning</span>
+                                    </div>
+                                    <div className="flex-1">
+                                        <h3 className="text-sm font-bold text-amber-800 dark:text-amber-300">Anticipo / Pago Requerido</h3>
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                                            Según el proceso operativo, este proyecto <strong>no puede avanzar a campo</strong> sin un anticipo o pago registrado (salvo clientes de confianza comercial).
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Quick payment inline */}
+                                {showPaymentForm ? (
+                                    <form onSubmit={handleAddPayment} className="rounded-lg border border-amber-200 bg-white p-4 dark:border-amber-800 dark:bg-slate-800">
+                                        <h4 className="mb-3 text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[14px] text-emerald-500">payments</span>
+                                            Registrar Anticipo / Primer Pago
+                                        </h4>
+                                        {projectInvoices.length === 0 && (
+                                            <p className="mb-3 text-[11px] text-slate-400 bg-slate-50 rounded p-2 dark:bg-slate-700/50">
+                                                💡 Primero necesitas crear una factura desde <button type="button" onClick={() => navigate('/finance/invoices')} className="text-primary font-bold underline">Finanzas → Facturas</button>, o ir a la pestaña <button type="button" onClick={() => setTab('payments')} className="text-primary font-bold underline">Pagos</button>.
+                                            </p>
+                                        )}
+                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                            <div>
+                                                <label className={labelClass}>Factura *</label>
+                                                <select value={paymentForm.invoice_id} onChange={e => setPaymentForm({ ...paymentForm, invoice_id: e.target.value })} required className={inputClass}>
+                                                    <option value="">Seleccionar...</option>
+                                                    {projectInvoices.map((inv: any) => (
+                                                        <option key={inv.id} value={inv.id}>{inv.invoice_number} — {formatCurrencyMXN(inv.total)}</option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Monto del Anticipo *</label>
+                                                <input type="number" step="0.01" value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} required className={inputClass} placeholder="Ej: 25000" />
+                                            </div>
+                                            <div>
+                                                <label className={labelClass}>Método</label>
+                                                <select value={paymentForm.payment_method} onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })} className={inputClass}>
+                                                    <option value="transfer">Transferencia</option>
+                                                    <option value="cash">Efectivo</option>
+                                                    <option value="check">Cheque</option>
+                                                    <option value="card">Tarjeta</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 flex gap-2">
+                                            <button type="submit" disabled={projectInvoices.length === 0} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 disabled:cursor-not-allowed">Registrar Anticipo</button>
+                                            <button type="button" onClick={() => setShowPaymentForm(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-500 dark:border-slate-700">Cancelar</button>
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <div className="flex flex-wrap gap-2">
+                                        <button onClick={() => setShowPaymentForm(true)}
+                                            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all">
+                                            <span className="material-symbols-outlined text-[18px]">payments</span>
+                                            Registrar Anticipo Ahora
+                                        </button>
+                                        <button onClick={() => setTab('payments')}
+                                            className="flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-4 py-2.5 text-sm font-semibold text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:bg-slate-800 dark:text-amber-400">
+                                            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                                            Ver pestaña Pagos
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Payment Status Badge (when payments exist) */}
+                        {totalPaid > 0 && (project.status === 'pending' || project.status === 'preparation') && (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-900/10">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-emerald-500 text-[20px]">verified</span>
+                                        <div>
+                                            <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">Anticipo Registrado ✓</p>
+                                            <p className="text-[10px] text-emerald-600 dark:text-emerald-500">Cobrado: {formatCurrencyMXN(totalPaid)} de {formatCurrencyMXN(project.quoted_amount)}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setTab('payments')} className="text-xs text-emerald-600 underline hover:text-emerald-800">Ver detalle</button>
+                                </div>
+                                <div className="mt-2 h-2 rounded-full bg-emerald-100 dark:bg-emerald-900/30 overflow-hidden">
+                                    <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${Math.min(100, project.quoted_amount > 0 ? (totalPaid / project.quoted_amount) * 100 : 0)}%` }} />
+                                </div>
+                            </div>
+                        )}
 
                         {/* Info */}
                         <div className={sectionClass}>
