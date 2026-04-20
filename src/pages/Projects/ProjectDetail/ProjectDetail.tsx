@@ -24,7 +24,7 @@ import {
     VEHICLE_STATUS_LABELS, VEHICLE_STATUS_COLORS
 } from '../../../types/fleet';
 
-type Tab = 'overview' | 'tasks' | 'fieldlogs' | 'incidents' | 'materials' | 'viaticos' | 'vehicles';
+type Tab = 'overview' | 'tasks' | 'fieldlogs' | 'incidents' | 'materials' | 'viaticos' | 'vehicles' | 'payments';
 const STATUS_FLOW: ProjectStatus[] = ['pending', 'preparation', 'in_field', 'completed', 'invoiced'];
 
 export default function ProjectDetail() {
@@ -42,6 +42,12 @@ export default function ProjectDetail() {
     const [expenseCost, setExpenseCost] = useState(0);
     const [fleetCost, setFleetCost] = useState(0);
 
+    // Payments
+    const [projectInvoices, setProjectInvoices] = useState<any[]>([]);
+    const [totalPaid, setTotalPaid] = useState(0);
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
+    const [paymentForm, setPaymentForm] = useState({ invoice_id: '', amount: '', payment_method: 'transfer', reference: '', notes: '' });
+
     // Vehicles assignment
     const [projectVehicles, setProjectVehicles] = useState<ProjectVehicle[]>([]);
     const [availableVehicles, setAvailableVehicles] = useState<Vehicle[]>([]);
@@ -56,6 +62,7 @@ export default function ProjectDetail() {
     const [showMaterialForm, setShowMaterialForm] = useState(false);
     const [showExpenseForm, setShowExpenseForm] = useState(false);
     const [showVehicleForm, setShowVehicleForm] = useState(false);
+    const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
     
     // Auto-maintenance Modal
     const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -114,6 +121,16 @@ export default function ProjectDetail() {
         } else {
             setTeamMembers([]);
         }
+
+        // Project Invoices & Payments
+        const { data: invData } = await supabase
+            .from('invoices')
+            .select('*, payments(*)')
+            .eq('project_id', id)
+            .order('issue_date', { ascending: false });
+        const invoices = invData || [];
+        setProjectInvoices(invoices);
+        setTotalPaid(invoices.reduce((s: number, inv: any) => s + Number(inv.amount_paid || 0), 0));
 
         setLoading(false);
     }, [id, navigate]);
@@ -576,6 +593,48 @@ export default function ProjectDetail() {
         fetchAll();
     };
 
+    // Register Payment
+    const handleAddPayment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!project || !paymentForm.invoice_id || !paymentForm.amount) return;
+        const amount = parseFloat(paymentForm.amount);
+        if (amount <= 0) return;
+
+        // Insert payment
+        await supabase.from('payments').insert({
+            invoice_id: paymentForm.invoice_id,
+            amount,
+            payment_method: paymentForm.payment_method,
+            reference: paymentForm.reference || null,
+            notes: paymentForm.notes || null,
+            received_by: 'Samara',
+        });
+
+        // Update invoice totals
+        const inv = projectInvoices.find((i: any) => i.id === paymentForm.invoice_id);
+        if (inv) {
+            const newPaid = Number(inv.amount_paid || 0) + amount;
+            const newBalance = Math.max(0, Number(inv.total) - newPaid);
+            const newStatus = newBalance <= 0 ? 'paid' : newPaid > 0 ? 'partial' : inv.status;
+            await supabase.from('invoices').update({ amount_paid: newPaid, balance: newBalance, status: newStatus }).eq('id', inv.id);
+        }
+
+        setPaymentForm({ invoice_id: '', amount: '', payment_method: 'transfer', reference: '', notes: '' });
+        setShowPaymentForm(false);
+        fetchAll();
+    };
+
+    // Client Signature Upload
+    const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!project || !e.target.files?.[0]) return;
+        const file = e.target.files[0];
+        const path = `signatures/${project.id}_${Date.now()}.${file.name.split('.').pop()}`;
+        const { error } = await supabase.storage.from('photos').upload(path, file);
+        if (error) { alert('Error subiendo firma: ' + error.message); return; }
+        const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+        setSignatureUrl(urlData.publicUrl);
+    };
+
     // KPIs & Financials
     const tasksCompleted = tasks.filter(t => t.status === 'completed').length;
     const totalIncidentCost = incidents.reduce((sum, i) => sum + i.cost_impact, 0);
@@ -649,6 +708,7 @@ export default function ProjectDetail() {
                     { key: 'incidents', icon: 'warning', label: `Incidencias (${incidents.length})` },
                     { key: 'materials', icon: 'inventory_2', label: `Materiales (${materialsUsed.length})` },
                     { key: 'viaticos', icon: 'payments', label: `Viáticos (${expenses.length})` },
+                    { key: 'payments', icon: 'account_balance', label: `Pagos (${projectInvoices.length})` },
                     { key: 'vehicles', icon: 'local_shipping', label: `Vehículos (${projectVehicles.length})` },
                 ].map(t => (
                     <button key={t.key} onClick={() => setTab(t.key as Tab)}
@@ -787,13 +847,61 @@ export default function ProjectDetail() {
                             </div>
                         </div>
                         <div className={sectionClass}>
-                            <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white">Progreso</h3>
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-xs"><span className="text-slate-500">Tareas</span><span className="font-bold">{tasksCompleted}/{tasks.length}</span></div>
-                                <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
-                                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: tasks.length > 0 ? `${(tasksCompleted / tasks.length) * 100}%` : '0%' }} />
+                            <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary text-[18px]">monitoring</span>
+                                Control de Avance
+                            </h3>
+                            <div className="space-y-3">
+                                {/* Physical Progress (Tasks) */}
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Avance Físico (Tareas)</span><span className="font-bold text-primary">{tasks.length > 0 ? Math.round((tasksCompleted / tasks.length) * 100) : 0}%</span></div>
+                                    <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                        <div className="h-full rounded-full bg-gradient-to-r from-primary to-sky-400 transition-all" style={{ width: tasks.length > 0 ? `${(tasksCompleted / tasks.length) * 100}%` : '0%' }} />
+                                    </div>
                                 </div>
-                                <div className="flex justify-between text-xs"><span className="text-slate-500">Bitácoras</span><span className="font-bold">{logs.length}</span></div>
+                                {/* Financial Progress (Payments) */}
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Avance Financiero (Cobro)</span><span className="font-bold text-emerald-500">{project.quoted_amount > 0 ? Math.round((totalPaid / project.quoted_amount) * 100) : 0}%</span></div>
+                                    <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                        <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all" style={{ width: project.quoted_amount > 0 ? `${Math.min(100, (totalPaid / project.quoted_amount) * 100)}%` : '0%' }} />
+                                    </div>
+                                </div>
+                                {/* Cost Progress */}
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1"><span className="text-slate-500">Consumo de Presupuesto</span><span className={`font-bold ${project.quoted_amount > 0 && projectActualCost > project.quoted_amount ? 'text-red-500' : 'text-amber-500'}`}>{project.quoted_amount > 0 ? Math.round((projectActualCost / project.quoted_amount) * 100) : 0}%</span></div>
+                                    <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all ${project.quoted_amount > 0 && projectActualCost > project.quoted_amount ? 'bg-gradient-to-r from-red-500 to-rose-400' : 'bg-gradient-to-r from-amber-400 to-orange-400'}`} style={{ width: project.quoted_amount > 0 ? `${Math.min(100, (projectActualCost / project.quoted_amount) * 100)}%` : '0%' }} />
+                                    </div>
+                                </div>
+                                <div className="text-xs flex justify-between text-slate-400 pt-1"><span>Bitácoras: {logs.length}</span><span>Incidencias: {incidents.length}</span></div>
+                            </div>
+                        </div>
+
+                        {/* Profitability Panel */}
+                        <div className={sectionClass}>
+                            <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[18px]" style={{ color: projectMargin > 0 ? '#10b981' : '#ef4444' }}>analytics</span>
+                                Rentabilidad
+                            </h3>
+                            <div className="space-y-2 text-xs">
+                                <div className="flex justify-between"><span className="text-slate-500">Margen Bruto</span><span className={`font-bold ${projectMargin > 0 ? 'text-emerald-500' : 'text-red-500'}`}>{formatCurrencyMXN(projectMargin)}</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500">Margen %</span><span className={`font-bold ${projectMargin > 0 ? 'text-emerald-500' : 'text-red-500'}`}>{project.quoted_amount > 0 ? Math.round((projectMargin / project.quoted_amount) * 100) : 0}%</span></div>
+                                {project.estimated_days > 0 && project.actual_start && (
+                                    <div className="flex justify-between">
+                                        <span className="text-slate-500">Eficiencia Tiempo</span>
+                                        <span className="font-bold text-slate-700 dark:text-slate-300">
+                                            {(() => {
+                                                const start = new Date(project.actual_start);
+                                                const end = project.actual_end ? new Date(project.actual_end) : new Date();
+                                                const realDays = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) || 1;
+                                                return `${realDays}d real / ${project.estimated_days}d est.`;
+                                            })()}
+                                        </span>
+                                    </div>
+                                )}
+                                <div className={`mt-2 rounded-lg p-2 text-center text-xs font-bold ${projectMargin > 0 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'}`}>
+                                    {projectMargin > 0 ? '✅ Proyecto Rentable' : '⚠️ Proyecto en Pérdida'}
+                                </div>
                             </div>
                         </div>
 
@@ -1507,6 +1615,126 @@ export default function ProjectDetail() {
                     )}
                 </div>
             )}
+            {/* TAB: Payments */}
+            {tab === 'payments' && (
+                <div className={sectionClass}>
+                    <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span className="material-symbols-outlined text-primary text-[20px]">account_balance</span>
+                            Facturación y Pagos del Proyecto
+                        </h3>
+                        <div className="flex gap-2">
+                            <button onClick={() => navigate('/finance/invoices')}
+                                className="flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400">
+                                <span className="material-symbols-outlined text-[14px]">open_in_new</span>Ir a Facturas
+                            </button>
+                            <button onClick={() => setShowPaymentForm(!showPaymentForm)}
+                                className="flex items-center gap-1 rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-white shadow-sm">
+                                <span className="material-symbols-outlined text-[16px]">add</span>Registrar Pago
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Payment KPIs */}
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="rounded-lg border border-slate-200/60 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/50">
+                            <p className="text-[10px] font-semibold uppercase text-slate-400">Total Facturado</p>
+                            <p className="text-lg font-bold text-slate-900 dark:text-white">{formatCurrencyMXN(projectInvoices.reduce((s: number, i: any) => s + Number(i.total || 0), 0))}</p>
+                        </div>
+                        <div className="rounded-lg border border-emerald-200/60 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-900/20">
+                            <p className="text-[10px] font-semibold uppercase text-emerald-600">Total Pagado</p>
+                            <p className="text-lg font-bold text-emerald-600">{formatCurrencyMXN(totalPaid)}</p>
+                        </div>
+                        <div className="rounded-lg border border-amber-200/60 bg-amber-50/50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+                            <p className="text-[10px] font-semibold uppercase text-amber-600">Saldo Pendiente</p>
+                            <p className="text-lg font-bold text-amber-600">{formatCurrencyMXN(projectInvoices.reduce((s: number, i: any) => s + Number(i.balance || 0), 0))}</p>
+                        </div>
+                    </div>
+
+                    {/* Payment Form */}
+                    {showPaymentForm && (
+                        <form onSubmit={handleAddPayment} className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50/30 p-4 dark:border-emerald-900 dark:bg-emerald-900/10">
+                            <h4 className="mb-3 text-xs font-bold text-emerald-700 dark:text-emerald-400">Registrar Pago / Anticipo</h4>
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                <div>
+                                    <label className={labelClass}>Factura *</label>
+                                    <select value={paymentForm.invoice_id} onChange={e => setPaymentForm({ ...paymentForm, invoice_id: e.target.value })} required className={inputClass}>
+                                        <option value="">Seleccionar factura...</option>
+                                        {projectInvoices.map((inv: any) => (
+                                            <option key={inv.id} value={inv.id}>{inv.invoice_number} — Saldo: {formatCurrencyMXN(inv.balance)}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Monto *</label>
+                                    <input type="number" step="0.01" value={paymentForm.amount} onChange={e => setPaymentForm({ ...paymentForm, amount: e.target.value })} required className={inputClass} placeholder="50000" />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Método</label>
+                                    <select value={paymentForm.payment_method} onChange={e => setPaymentForm({ ...paymentForm, payment_method: e.target.value })} className={inputClass}>
+                                        <option value="transfer">Transferencia</option>
+                                        <option value="cash">Efectivo</option>
+                                        <option value="check">Cheque</option>
+                                        <option value="card">Tarjeta</option>
+                                    </select>
+                                </div>
+                                <div><label className={labelClass}>Referencia</label><input value={paymentForm.reference} onChange={e => setPaymentForm({ ...paymentForm, reference: e.target.value })} className={inputClass} placeholder="No. transferencia..." /></div>
+                                <div className="md:col-span-2"><label className={labelClass}>Notas</label><input value={paymentForm.notes} onChange={e => setPaymentForm({ ...paymentForm, notes: e.target.value })} className={inputClass} placeholder="Anticipo, pago parcial..." /></div>
+                            </div>
+                            <div className="mt-3 flex gap-2">
+                                <button type="submit" className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white">Registrar Pago</button>
+                                <button type="button" onClick={() => setShowPaymentForm(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-500 dark:border-slate-700">Cancelar</button>
+                            </div>
+                        </form>
+                    )}
+
+                    {/* Invoices List */}
+                    {projectInvoices.length === 0 ? (
+                        <div className="py-8 text-center">
+                            <span className="material-symbols-outlined text-[48px] text-slate-300">receipt_long</span>
+                            <p className="mt-2 text-sm text-slate-500">No hay facturas para este proyecto.</p>
+                            <p className="text-xs text-slate-400 mt-1">Se generarán automáticamente al completar el proyecto, o puedes crear una desde Finanzas &gt; Facturas.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {projectInvoices.map((inv: any) => (
+                                <div key={inv.id} className="rounded-lg border border-slate-200/60 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/50">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-mono text-xs font-bold text-primary">{inv.invoice_number}</span>
+                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${inv.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : inv.status === 'partial' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'}`}>
+                                                {inv.status === 'paid' ? 'Pagada' : inv.status === 'partial' ? 'Parcial' : inv.status === 'sent' ? 'Enviada' : 'Borrador'}
+                                            </span>
+                                        </div>
+                                        <span className="text-xs text-slate-400">{new Date(inv.issue_date).toLocaleDateString('es-MX')}</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2 text-xs">
+                                        <div><span className="text-slate-400">Total:</span> <span className="font-bold text-slate-900 dark:text-white">{formatCurrencyMXN(inv.total)}</span></div>
+                                        <div><span className="text-slate-400">Pagado:</span> <span className="font-bold text-emerald-600">{formatCurrencyMXN(inv.amount_paid)}</span></div>
+                                        <div><span className="text-slate-400">Saldo:</span> <span className={`font-bold ${inv.balance > 0 ? 'text-red-500' : 'text-emerald-600'}`}>{formatCurrencyMXN(inv.balance)}</span></div>
+                                    </div>
+                                    {/* Payment progress bar */}
+                                    <div className="mt-2 h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all ${inv.balance <= 0 ? 'bg-emerald-500' : 'bg-amber-400'}`} style={{ width: `${inv.total > 0 ? (inv.amount_paid / inv.total) * 100 : 0}%` }} />
+                                    </div>
+                                    {/* Payment history */}
+                                    {inv.payments && inv.payments.length > 0 && (
+                                        <div className="mt-3 border-t border-slate-100 pt-2 dark:border-slate-700">
+                                            <p className="text-[10px] font-semibold text-slate-400 mb-1">Historial de Pagos:</p>
+                                            {inv.payments.map((p: any) => (
+                                                <div key={p.id} className="flex items-center justify-between text-[11px] py-0.5">
+                                                    <span className="text-slate-500">{new Date(p.payment_date).toLocaleDateString('es-MX')} — {p.payment_method === 'transfer' ? 'Transferencia' : p.payment_method === 'cash' ? 'Efectivo' : p.payment_method}</span>
+                                                    <span className="font-bold text-emerald-600">+{formatCurrencyMXN(p.amount)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Completion Modal: Select Equipment for Maintenance Scheduling */}
             {showCompletionModal && (
@@ -1548,6 +1776,28 @@ export default function ProjectDetail() {
                                     </button>
                                 );
                             })}
+                        </div>
+                        
+                        {/* Client Signature */}
+                        <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
+                            <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-[18px] text-primary">draw</span>
+                                Firma del Cliente (Cierre Técnico)
+                            </h4>
+                            <p className="text-xs text-slate-400 mb-3">Sube una foto de la firma del cliente o documento firmado de conformidad.</p>
+                            <div className="flex items-center gap-3">
+                                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-all">
+                                    <span className="material-symbols-outlined text-[16px]">upload</span>
+                                    {signatureUrl ? 'Cambiar Firma' : 'Subir Firma'}
+                                    <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleSignatureUpload} />
+                                </label>
+                                {signatureUrl && (
+                                    <div className="flex items-center gap-2">
+                                        <img src={signatureUrl} alt="Firma" className="h-12 rounded border border-slate-200 dark:border-slate-700" />
+                                        <span className="text-[10px] text-emerald-600 font-bold">✓ Firma cargada</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         
                         <div className="flex justify-end gap-3 border-t border-slate-100 pt-6 dark:border-slate-800">
