@@ -216,6 +216,38 @@ export default function PipelineBoard() {
                     link: '/tasks',
                     source: 'pipeline',
                 });
+
+                // ── 5. Notificaciones Externas (WhatsApp y Email) ──
+                const externalTargets = [
+                    { name: 'Joel Rincón Cuevas', email: 'joelrincon_nucleoing@hotmail.com', phone: '+523414201583' },
+                    { name: 'Paulina', email: 'paulinasanchez_nucleoing@hotmail.com', phone: '+523123186426' },
+                    { name: 'Samara', email: 'paulinasanchez_nucleoing@hotmail.com', phone: '+523411475608' },
+                ];
+
+                const externalMessage = `🚨 *¡NUEVO PROYECTO GANADO! - Acción Requerida* 🚨\n\n¡Hola equipo!\nSe acaba de cerrar un nuevo proyecto en el CRM y requiere su atención inmediata para iniciar el flujo operativo.\n\n🏢 *Cliente:* ${clientName}\n📋 *Proyecto:* ${opp.title}\n💰 *Valor Estimado:* ${formatCurrency(opp.estimated_value || 0)}\n📅 *Fecha de Cierre:* ${new Date().toLocaleDateString('es-MX')}\n\n*Siguientes Pasos Asignados:*\n💵 *Samara (Finanzas):* Iniciar proceso de facturación y cobranza.\n📦 *Paulina (Administración):* Revisión de materiales e inventario.\n🔧 *Joel (Operaciones):* Validación de equipos, preparación técnica y logística.\n\nPor favor, revisen sus tareas asignadas en el Tablero del ERP para más detalles.\n\n¡Excelente trabajo a todos! 🚀`;
+
+                externalTargets.forEach(target => {
+                    // Enviar WhatsApp (fire and forget)
+                    fetch('/api/whatsapp-send', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: target.phone,
+                            message: externalMessage
+                        })
+                    }).catch(console.error);
+
+                    // Enviar Email (fire and forget)
+                    fetch('/api/send-email', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            to: target.email,
+                            subject: `🚨 ¡NUEVO PROYECTO GANADO! - ${clientName}`,
+                            body: externalMessage.replace(/\*/g, '').replace(/\n/g, '<br>')
+                        })
+                    }).catch(console.error);
+                });
             }
         }
 

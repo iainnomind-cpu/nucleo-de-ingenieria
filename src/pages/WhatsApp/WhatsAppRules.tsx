@@ -162,7 +162,7 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
         setTemplates((tRes.data as WaTemplate[]) || []);
         setUsers((uRes.data as AppUser[]) || []);
         setLoading(false);
-    }, []);
+    }, [clientMode]);
 
     useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -200,7 +200,7 @@ export default function WhatsAppRules({ clientMode = true }: { clientMode?: bool
         const payload = {
             name: formTemplate.name.toLowerCase().replace(/[^a-z0-9_]/g, '_'), category: formTemplate.category, language: formTemplate.language,
             header_type: formTemplate.header_type !== 'none' ? formTemplate.header_type : null, header_content: formTemplate.header_content || null,
-            body: finalBody, footer: formTemplate.footer || null, variables: finalVariables, usage_type: 'team', meta_status: formTemplate.meta_status,
+            body: finalBody, footer: formTemplate.footer || null, variables: finalVariables, usage_type: clientMode ? 'marketing' : 'team', meta_status: formTemplate.meta_status,
         };
         if (editingTemplateId) {
             const { error } = await supabase.from('wa_templates').update(payload).eq('id', editingTemplateId);
