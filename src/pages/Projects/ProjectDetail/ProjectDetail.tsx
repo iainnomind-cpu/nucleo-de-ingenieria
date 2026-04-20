@@ -16,6 +16,7 @@ import {
 } from '../../../types/projects';
 import { PhotoAttachment } from '../../../types/photos';
 import PhotoUploader, { PhotoGallery } from '../../../components/PhotoUploader';
+import SignatureCanvas from 'react-signature-canvas';
 import { InventoryProduct, InventoryMovement, formatCurrencyInv, UNIT_LABELS } from '../../../types/inventory';
 import { getNavigationUrl, getStaticMapUrl, getCurrentPosition } from '../../../lib/maps';
 import { EquipmentType, EQUIPMENT_MAINTENANCE_RULES, EQUIPMENT_TYPE_LABELS } from '../../../types/maintenance';
@@ -63,6 +64,7 @@ export default function ProjectDetail() {
     const [showExpenseForm, setShowExpenseForm] = useState(false);
     const [showVehicleForm, setShowVehicleForm] = useState(false);
     const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
+    const sigCanvas = useRef<any>(null);
     
     // Auto-maintenance Modal
     const [showCompletionModal, setShowCompletionModal] = useState(false);
@@ -304,6 +306,8 @@ export default function ProjectDetail() {
                 client_name: project.client?.company_name || '',
                 status_label: PROJECT_STATUS_LABELS[newStatus],
                 project_manager: project.project_manager || '',
+                start_date: project.start_date ? new Date(project.start_date).toLocaleDateString('es-MX') : 'Sin fecha',
+                actual_end: project.actual_end ? new Date(project.actual_end).toLocaleDateString('es-MX') : 'En progreso',
             },
             referenceId: project.id,
         });
@@ -314,6 +318,25 @@ export default function ProjectDetail() {
     const handleCompleteProject = async () => {
         if (!project) return;
         const actual_end = new Date().toISOString().split('T')[0];
+
+        let uploadedSignatureUrl = signatureUrl;
+        if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
+            const dataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
+            try {
+                const res = await fetch(dataUrl);
+                const blob = await res.blob();
+                const file = new File([blob], `signature_${Date.now()}.png`, { type: 'image/png' });
+                
+                const path = `signatures/${project.id}_${Date.now()}.png`;
+                const { error } = await supabase.storage.from('photos').upload(path, file);
+                if (!error) {
+                    const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+                    uploadedSignatureUrl = urlData.publicUrl;
+                }
+            } catch (err) {
+                console.error("Error al guardar la firma", err);
+            }
+        }
 
         // M5: Equipment & Maintenance Schedules (Automatic)
         if (project.client_id && selectedEqTypes.length > 0) {
@@ -385,7 +408,7 @@ export default function ProjectDetail() {
             });
         }
 
-        await supabase.from('projects').update({ status: 'completed', actual_end }).eq('id', project.id);
+        await supabase.from('projects').update({ status: 'completed', actual_end, client_signature_url: uploadedSignatureUrl }).eq('id', project.id);
 
         // → M9: WhatsApp automation trigger
         triggerWaAutomation({
@@ -398,6 +421,8 @@ export default function ProjectDetail() {
                 client_name: project.client?.company_name || '',
                 status_label: PROJECT_STATUS_LABELS.completed,
                 project_manager: project.project_manager || '',
+                start_date: project.start_date ? new Date(project.start_date).toLocaleDateString('es-MX') : 'Sin fecha',
+                actual_end: actual_end ? new Date(actual_end).toLocaleDateString('es-MX') : 'Completado',
             },
             referenceId: project.id,
         });
@@ -1846,8 +1871,9 @@ export default function ProjectDetail() {
             {showCompletionModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
                     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowCompletionModal(false)} />
-                    <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-900">
-                        <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">Finalizar Proyecto</h3>
+                    <div className="relative w-full max-w-lg max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+                        <div className="p-6 overflow-y-auto flex-1">
+                            <h3 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">Finalizar Proyecto</h3>
                         <p className="mb-6 text-sm text-slate-500">
                             ¿Qué equipos se instalaron en este proyecto? Selecciona todas las piezas mayores. 
                             El sistema generará **automáticamente** los mantenimientos preventivos a futuro según el documento del cliente.
@@ -1886,27 +1912,43 @@ export default function ProjectDetail() {
                         
                         {/* Client Signature */}
                         <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-                            <h4 className="mb-2 text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[18px] text-primary">draw</span>
-                                Firma del Cliente (Cierre Técnico)
-                            </h4>
-                            <p className="text-xs text-slate-400 mb-3">Sube una foto de la firma del cliente o documento firmado de conformidad.</p>
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-between mb-2">
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[18px] text-primary">draw</span>
+                                    Firma del Cliente (Cierre Técnico)
+                                </h4>
+                                <button type="button" onClick={() => sigCanvas.current?.clear()} className="text-[10px] text-slate-400 hover:text-slate-600 underline">Borrar</button>
+                            </div>
+                            <p className="text-xs text-slate-400 mb-3">El cliente debe firmar de conformidad en el recuadro blanco.</p>
+                            
+                            <div className="w-full rounded-lg border-2 border-dashed border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900 overflow-hidden">
+                                <SignatureCanvas 
+                                    ref={sigCanvas} 
+                                    penColor="black" 
+                                    canvasProps={{ className: "w-full h-[150px]", style: { width: '100%', height: '150px' } }} 
+                                />
+                            </div>
+
+                            <div className="mt-3 flex items-center justify-center">
+                                <span className="text-[10px] text-slate-400">O también puedes:</span>
+                            </div>
+                            <div className="mt-2 flex items-center gap-3 justify-center">
                                 <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-all">
                                     <span className="material-symbols-outlined text-[16px]">upload</span>
-                                    {signatureUrl ? 'Cambiar Firma' : 'Subir Firma'}
+                                    {signatureUrl ? 'Cambiar Foto de Firma' : 'Subir Foto de Firma'}
                                     <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleSignatureUpload} />
                                 </label>
                                 {signatureUrl && (
                                     <div className="flex items-center gap-2">
-                                        <img src={signatureUrl} alt="Firma" className="h-12 rounded border border-slate-200 dark:border-slate-700" />
-                                        <span className="text-[10px] text-emerald-600 font-bold">✓ Firma cargada</span>
+                                        <img src={signatureUrl} alt="Firma" className="h-8 rounded border border-slate-200 dark:border-slate-700" />
+                                        <span className="text-[10px] text-emerald-600 font-bold">✓ Cargada</span>
                                     </div>
                                 )}
                             </div>
                         </div>
+                        </div> {/* End of scrollable area */}
                         
-                        <div className="flex justify-end gap-3 border-t border-slate-100 pt-6 dark:border-slate-800">
+                        <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 rounded-b-2xl p-4 dark:bg-slate-800 dark:border-slate-800">
                             <button
                                 type="button"
                                 onClick={() => setShowCompletionModal(false)}

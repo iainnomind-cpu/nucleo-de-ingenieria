@@ -75,6 +75,8 @@ const VARIABLE_SUGGESTIONS: Record<string, { label: string; path: string }[]> = 
         { label: 'Cliente', path: 'record.client_name' },
         { label: 'Estado', path: 'record.status_label' },
         { label: 'Responsable', path: 'record.project_manager' },
+        { label: 'Fecha de Inicio', path: 'record.start_date' },
+        { label: 'Fecha de Fin (Real)', path: 'record.actual_end' },
     ],
     repairs: [
         { label: 'Equipo', path: 'record.equipment_name' },
