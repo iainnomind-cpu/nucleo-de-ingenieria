@@ -54,41 +54,55 @@ export default function RepairsDashboard() {
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         const eq = equipment.find((x: any) => x.id === form.equipment_id);
-        await supabase.from('equipment_repairs').insert({
-            equipment_id: form.equipment_id,
-            client_id: eq?.client_id || null,
-            failure_description: form.failure_description,
-            failure_type: form.failure_type,
-            urgency: form.urgency,
-            reported_by: form.reported_by || null,
-            pickup_method: form.pickup_method,
-            pickup_location: form.pickup_location || null,
-            pickup_date: form.pickup_date || null,
-            external_provider: form.external_provider || null,
-            shipping_carrier_to: form.shipping_carrier_to || null,
-            assigned_to: form.assigned_to || null,
-            status: 'reported',
-        });
-        // Auto-save new workshop
-        if (form.external_provider && !workshops.find(w => w.name === form.external_provider)) {
-            await supabase.from('external_workshops').insert({ name: form.external_provider });
-        }
-        setShowForm(false);
-        setForm({ equipment_id: '', failure_description: '', failure_type: 'other', urgency: 'normal', reported_by: '', pickup_method: 'pickup', pickup_location: '', pickup_date: '', external_provider: '', shipping_carrier_to: '', assigned_to: '' });
-
-        // → M9: WA automation
-        triggerWaAutomation({
-            module: 'repairs',
-            event: 'created',
-            record: {
-                equipment_name: eq?.well_name || eq?.name || '',
-                client_name: eq?.client?.company_name || '',
+        
+        try {
+            const { data: newRepair, error } = await supabase.from('equipment_repairs').insert({
+                equipment_id: form.equipment_id,
+                client_id: eq?.client_id || null,
                 failure_description: form.failure_description,
-                status_label: 'Reportado',
-            },
-        });
+                failure_type: form.failure_type,
+                urgency: form.urgency,
+                reported_by: form.reported_by || null,
+                pickup_method: form.pickup_method,
+                pickup_location: form.pickup_location || null,
+                pickup_date: form.pickup_date || null,
+                external_provider: form.external_provider || null,
+                shipping_carrier_to: form.shipping_carrier_to || null,
+                assigned_to: form.assigned_to || null,
+                status: 'reported',
+            }).select().single();
 
-        fetchAll();
+            if (error) throw error;
+
+            // Auto-save new workshop
+            if (form.external_provider && !workshops.find(w => w.name === form.external_provider)) {
+                await supabase.from('external_workshops').insert({ name: form.external_provider });
+            }
+
+            setShowForm(false);
+            setForm({ equipment_id: '', failure_description: '', failure_type: 'other', urgency: 'normal', reported_by: '', pickup_method: 'pickup', pickup_location: '', pickup_date: '', external_provider: '', shipping_carrier_to: '', assigned_to: '' });
+
+            // → M9: WA automation
+            if (newRepair) {
+                triggerWaAutomation({
+                    module: 'repairs',
+                    event: 'created',
+                    record: {
+                        equipment_name: eq?.well_name || eq?.name || '',
+                        client_name: eq?.client?.company_name || '',
+                        failure_description: form.failure_description,
+                        status_label: 'Reportado',
+                    },
+                    referenceId: newRepair.id,
+                });
+            }
+
+            alert('Falla reportada exitosamente.');
+            fetchAll();
+        } catch (err: any) {
+            console.error('Error creating repair:', err);
+            alert('Error al guardar la falla: ' + (err.message || JSON.stringify(err)));
+        }
     };
 
     const handleStatusChange = async (id: string, newStatus: RepairStatus) => {
