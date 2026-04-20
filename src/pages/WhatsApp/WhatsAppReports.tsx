@@ -21,10 +21,27 @@ export default function WhatsAppReports() {
 
     const fetchData = useCallback(async () => {
         setLoading(true);
+        // Compute start date based on selected range
+        let startDate: string | null = null;
+        if (dateRange !== 'all') {
+            const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
+            const d = new Date();
+            d.setDate(d.getDate() - days);
+            startDate = d.toISOString();
+        }
+        // Build queries with optional date filter
+        const campaignQuery = supabase.from('wa_campaigns').select('*').order('created_at', { ascending: false });
+        const notifQuery = supabase.from('wa_notifications').select('*, client:clients(id, company_name)').order('created_at', { ascending: false });
+        const survQuery = supabase.from('wa_surveys').select('*, client:clients(id, company_name)').order('created_at', { ascending: false });
+        if (startDate) {
+            campaignQuery.gte('created_at', startDate);
+            notifQuery.gte('created_at', startDate);
+            survQuery.gte('created_at', startDate);
+        }
         const [campRes, notifRes, survRes] = await Promise.all([
-            supabase.from('wa_campaigns').select('*').order('created_at', { ascending: false }),
-            supabase.from('wa_notifications').select('*, client:clients(id, company_name)').order('created_at', { ascending: false }),
-            supabase.from('wa_surveys').select('*, client:clients(id, company_name)').order('created_at', { ascending: false }),
+            campaignQuery,
+            notifQuery,
+            survQuery,
         ]);
         setCampaigns((campRes.data as WaCampaign[]) || []);
         setNotifications((notifRes.data as WaNotification[]) || []);

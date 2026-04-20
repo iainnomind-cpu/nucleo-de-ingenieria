@@ -171,7 +171,22 @@ export default function DirectSend() {
         setSendResults(results);
         setSending(false);
         setShowResults(true);
-    };
+        // Insert a campaign record for reporting
+        const successful = results.filter(r => r.success).length;
+        if (successful > 0) {
+            await supabase.from('wa_campaigns').insert({
+                name: `Envío Directo: ${selectedTemplate?.name}`,
+                description: `Envío masivo vía Envío Directo a ${successful} clientes`,
+                campaign_type: 'custom',
+                is_active: true,
+                total_sent: successful,
+                total_delivered: 0,
+                total_read: 0,
+                total_responded: 0,
+                total_conversions: 0,
+                revenue_generated: 0,
+            });
+        }
 
     const stepsConfig = [
         { key: 'template' as const, label: '1. Plantilla', icon: 'description' },
