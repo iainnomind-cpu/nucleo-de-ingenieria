@@ -8,6 +8,7 @@ import {
 import AddressAutocomplete from '../../components/AddressAutocomplete';
 import MapPinPicker from '../../components/MapPinPicker';
 import type { GeoResult } from '../../lib/maps';
+import { useAuth } from '../../lib/AuthContext';
 
 interface Props {
     client: Client | null;
@@ -30,6 +31,7 @@ const growthOptions: { value: GrowthPotential; label: string }[] = [
 ];
 
 export default function ClientFormModal({ client, onClose, onSave }: Props) {
+    const { user } = useAuth();
     const [saving, setSaving] = useState(false);
     const [showMap, setShowMap] = useState(false);
     const [form, setForm] = useState({
@@ -101,8 +103,9 @@ export default function ClientFormModal({ client, onClose, onSave }: Props) {
         if (client) {
             ({ error } = await supabase.from('clients').update(payload).eq('id', client.id));
         } else {
+            const insertPayload = { ...payload, created_by: user?.id || null };
             const { data: newClient, error: insertError } = await supabase
-                .from('clients').insert(payload).select().single();
+                .from('clients').insert(insertPayload).select().single();
             error = insertError;
 
             // → Pipeline Sync: Auto-crear oportunidad en "Prospección"

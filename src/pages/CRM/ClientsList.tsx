@@ -37,7 +37,7 @@ export default function ClientsList() {
         setLoading(true);
         let query = supabase
             .from('clients')
-            .select('*')
+            .select('*, created_by_user:app_users(full_name)')
             .order('updated_at', { ascending: false });
 
         if (filterStatus !== 'all') {
@@ -269,6 +269,7 @@ export default function ClientsList() {
                                     <th className="px-6 py-3.5 font-semibold text-slate-500 dark:text-slate-400">Industria</th>
                                     <th className="px-6 py-3.5 font-semibold text-slate-500 dark:text-slate-400">Estado</th>
                                     <th className="px-6 py-3.5 font-semibold text-slate-500 dark:text-slate-400">Score</th>
+                                    <th className="px-6 py-3.5 font-semibold text-slate-500 dark:text-slate-400">Prospectador</th>
                                     <th className="px-6 py-3.5 font-semibold text-slate-500 dark:text-slate-400">Ubicación</th>
                                     <th className="px-6 py-3.5 text-right font-semibold text-slate-500 dark:text-slate-400">Acciones</th>
                                 </tr>
@@ -276,7 +277,7 @@ export default function ClientsList() {
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center">
+                                        <td colSpan={8} className="px-6 py-12 text-center">
                                             <div className="flex flex-col items-center gap-3">
                                                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                                                 <span className="text-sm text-slate-500">Cargando clientes...</span>
@@ -285,7 +286,7 @@ export default function ClientsList() {
                                     </tr>
                                 ) : clients.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="px-6 py-12 text-center">
+                                        <td colSpan={8} className="px-6 py-12 text-center">
                                             <div className="flex flex-col items-center gap-3">
                                                 <span className="material-symbols-outlined text-[48px] text-slate-300 dark:text-slate-600">
                                                     person_off
@@ -348,6 +349,18 @@ export default function ClientsList() {
                                                 <span className={`font-bold ${getScoreColor(client.payment_score)}`}>
                                                     {client.payment_score ? client.payment_score.toFixed(1) : '—'}
                                                 </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {client.created_by_user ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="material-symbols-outlined text-[16px] text-primary">person_check</span>
+                                                        <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                                                            {client.created_by_user.full_name}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-slate-400">—</span>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4">
                                                 {client.latitude && client.longitude ? (

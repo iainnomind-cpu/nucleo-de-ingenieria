@@ -22,6 +22,8 @@ export interface Client {
     growth_potential: GrowthPotential | null;
     credit_days: number;
     is_trusted_client: boolean;
+    created_by: string | null;
+    created_by_user?: { full_name: string };
     created_at: string;
     updated_at: string;
 }
