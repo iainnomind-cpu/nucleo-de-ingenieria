@@ -50,6 +50,14 @@ export interface Quote {
     approved_by: string | null;
     approved_at: string | null;
     converted_project_id: string | null;
+    // New fields for Excel-format cotización
+    client_address: string | null;
+    property_name: string | null;
+    payment_terms: string | null;
+    delivery_days: string | null;
+    exchange_rate: number | null;
+    warranty_text: string | null;
+    intro_text: string | null;
     created_at: string;
     updated_at: string;
     // Joined
@@ -182,3 +190,80 @@ export function generateQuoteNumber(seq: number): string {
 export function formatCurrency(value: number): string {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
 }
+
+// ─── Convertir número a texto en español (para monto en letra) ───
+const UNIDADES = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
+const ESPECIALES = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISEIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
+const DECENAS = ['', 'DIEZ', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
+const CENTENAS = ['', 'CIENTO', 'DOSCIENTOS', 'TRESCIENTOS', 'CUATROCIENTOS', 'QUINIENTOS', 'SEISCIENTOS', 'SETECIENTOS', 'OCHOCIENTOS', 'NOVECIENTOS'];
+
+function convertGroup(n: number): string {
+    if (n === 0) return '';
+    if (n === 100) return 'CIEN';
+    let result = '';
+    const c = Math.floor(n / 100);
+    const r = n % 100;
+    if (c > 0) result += CENTENAS[c] + ' ';
+    if (r >= 10 && r <= 19) {
+        result += ESPECIALES[r - 10];
+    } else if (r >= 20 && r <= 29 && r !== 20) {
+        result += 'VEINTI' + UNIDADES[r - 20];
+    } else {
+        const d = Math.floor(r / 10);
+        const u = r % 10;
+        if (d > 0) result += DECENAS[d];
+        if (d > 0 && u > 0) result += ' Y ';
+        if (u > 0) result += UNIDADES[u];
+    }
+    return result.trim();
+}
+
+export function numberToWords(amount: number): string {
+    if (amount === 0) return 'CERO PESOS 00/100 M.N.';
+    const intPart = Math.floor(Math.abs(amount));
+    const cents = Math.round((Math.abs(amount) - intPart) * 100);
+    const centsStr = String(cents).padStart(2, '0');
+
+    if (intPart === 0) return `CERO PESOS ${centsStr}/100 M.N.`;
+
+    let words = '';
+    const millions = Math.floor(intPart / 1000000);
+    const thousands = Math.floor((intPart % 1000000) / 1000);
+    const hundreds = intPart % 1000;
+
+    if (millions > 0) {
+        if (millions === 1) words += 'UN MILLON ';
+        else words += convertGroup(millions) + ' MILLONES ';
+    }
+    if (thousands > 0) {
+        if (thousands === 1) words += 'MIL ';
+        else words += convertGroup(thousands) + ' MIL ';
+    }
+    if (hundreds > 0) {
+        words += convertGroup(hundreds) + ' ';
+    }
+
+    words = words.trim();
+    return `${words} PESOS ${centsStr}/100 M.N.`;
+}
+
+// Default policy texts based on the Excel format
+export const DEFAULT_POLICIES = {
+    price_restrictions: [
+        'Precios sujetos a cambio sin previo aviso.',
+        'La presente cotización tiene una vigencia de 10 días naturales.',
+        'Los modelos y características pueden variar.',
+    ],
+    warranty: [
+        'Garantia de 1 año natural en equipo, dispositivos, material de instalación y mano de obra.',
+        'La garantía no será válida por mal uso, maltrato, sabotaje, manipulación de terceras personas, descargas eléctricas o vicios oculto.',
+    ],
+    delivery: [
+        'Tiempo de instalación: no definida, previa calendarización de la misma.',
+    ],
+    payment: [
+        'Método de Pago: Efectivo, Cheque, Transferencia Interbancaria.',
+        'Numero de cuenta: 048 247 5650   CLABE.- 012 342 004824 756509  BBVA BANCOMER',
+    ],
+    closing: 'Con la seguridad de que la presente propuesta económica cumple ampliamente sus necesidades, en NUCLEO DE INGENIERIA quedamos de usted(es) como sus más atentos y seguros servidores.',
+};

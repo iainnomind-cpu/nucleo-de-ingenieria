@@ -10,6 +10,8 @@ import {
     QUOTE_STATUS_COLORS,
     RISK_LABELS,
     formatCurrency,
+    numberToWords,
+    DEFAULT_POLICIES,
 } from '../../types/quotes';
 
 export default function QuoteDetail() {
@@ -440,20 +442,12 @@ export default function QuoteDetail() {
 
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
+            const pageHeight = doc.internal.pageSize.getHeight();
+            const marginL = 14;
+            const marginR = pageWidth - 14;
+            const contentWidth = marginR - marginL;
 
-            // Header
-            doc.setFillColor(19, 182, 236); // primary color
-            doc.rect(0, 0, pageWidth, 40, 'F');
-            doc.setTextColor(255, 255, 255);
-            doc.setFontSize(22);
-            doc.setFont('helvetica', 'bold');
-            doc.text('COTIZACIÓN', 14, 20);
-            doc.setFontSize(12);
-            doc.text(quote.quote_number, 14, 30);
-            doc.setFontSize(10);
-            doc.text(`v${quote.version}`, pageWidth - 14, 20, { align: 'right' });
-            doc.text(new Date(quote.created_at).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' }), pageWidth - 14, 30, { align: 'right' });
-
+            // ─── HEADER: Logo + Company Name ───
             // Load logo
             let logoImg: HTMLImageElement | null = null;
             try {
@@ -467,122 +461,204 @@ export default function QuoteDetail() {
                 console.warn('Logo no encontrado'); 
             }
 
-            // Company info
-            let logoOffset = 0;
+            let y = 10;
             if (logoImg) {
                 const ratio = logoImg.height / logoImg.width;
-                const logoW = 35;
+                const logoW = 40;
                 const logoH = logoW * ratio;
-                // Center vertically between 40 and 65 (25px block) => y = 45
-                doc.addImage(logoImg, 'PNG', 14, 45, logoW, logoH);
-                logoOffset = logoW + 5;
+                doc.addImage(logoImg, 'PNG', marginL, y, logoW, Math.min(logoH, 30));
+                y = Math.max(y + logoH + 5, 45);
+            } else {
+                doc.setFontSize(18);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(19, 60, 90);
+                doc.text('NÚCLEO DE INGENIERÍA', marginL, 25);
+                y = 35;
             }
 
-            doc.setTextColor(50, 50, 50);
-            doc.setFontSize(14);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Núcleo de Ingeniería', 14 + logoOffset, 55);
-            doc.setFontSize(9);
-            doc.setFont('helvetica', 'normal');
-            doc.setTextColor(100, 100, 100);
-
-            // Client info
-            let y = logoImg ? Math.max(70, 45 + (35 * (logoImg.height / logoImg.width)) + 15) : 70;
+            // ─── CLIENT INFO (matching Excel format) ───
             doc.setFontSize(10);
             doc.setFont('helvetica', 'bold');
-            doc.setTextColor(50, 50, 50);
-            doc.text('Cliente:', 14, y);
-            doc.setFont('helvetica', 'normal');
-            doc.text(quote.client?.company_name || 'N/A', 50, y);
-            y += 7;
-            doc.text('Contacto:', 14, y);
-            doc.text(quote.client?.contact_name || 'N/A', 50, y);
-            y += 10;
-            doc.text('Título:', 14, y);
-            doc.setFont('helvetica', 'bold');
-            doc.text(quote.title, 50, y);
-            y += 7;
-            doc.setFont('helvetica', 'normal');
-            if (quote.work_type) { doc.text('Tipo:', 14, y); doc.text(quote.work_type, 50, y); y += 7; }
-            if (quote.description) { doc.text('Desc:', 14, y); doc.text(quote.description.substring(0, 80), 50, y); y += 7; }
+            doc.setTextColor(30, 30, 30);
 
-            // Technical vars
-            y += 5;
-            doc.setFillColor(240, 240, 240);
-            doc.rect(14, y - 5, pageWidth - 28, 20, 'F');
+            const clientName = quote.client?.company_name || 'N/A';
+            const contactName = quote.client?.contact_name || '';
+            const address = quote.client_address || 'CONOCIDO';
+            const propertyName = quote.property_name || '';
+
+            doc.text(`Empresa: ${clientName}`, marginL, y); y += 6;
+            doc.text(`Atención a: ${contactName}`, marginL, y); y += 6;
+            doc.text(`Domicilio: ${address}`, marginL, y); y += 6;
+            if (propertyName) {
+                doc.text(`Nombre del predio: ${propertyName}`, marginL, y); y += 6;
+            }
+
+            // Date
+            doc.setFont('helvetica', 'normal');
+            const dateStr = new Date(quote.created_at).toLocaleDateString('es-MX', { 
+                day: '2-digit', month: 'long', year: 'numeric' 
+            }).toUpperCase();
+            doc.text(dateStr, marginL, y); y += 4;
+
+            // "P r e s e n t e"
+            doc.setFont('helvetica', 'italic');
             doc.setFontSize(9);
-            const techVars = [
-                quote.well_depth ? `Profundidad: ${quote.well_depth}m` : '',
-                quote.motor_hp ? `HP: ${quote.motor_hp}` : '',
-                quote.distance_km ? `Distancia: ${quote.distance_km}km` : '',
-                `Personal: ${quote.crew_size}`,
-                `Riesgo: ${RISK_LABELS[quote.risk_level]}`,
-                `Días: ${quote.estimated_days}`,
-            ].filter(Boolean);
-            doc.text(techVars.join('  |  '), 18, y + 3);
-            y += 25;
+            doc.text('P r e s e n t e', marginL, y); y += 6;
 
-            // Items table
+            // Intro text
+            if (quote.intro_text) {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                const introLines = doc.splitTextToSize(quote.intro_text, contentWidth);
+                doc.text(introLines, marginL, y);
+                y += introLines.length * 4.5 + 4;
+            }
+
+            // ─── ITEMS TABLE (Cant. | Descripción | Precio Unitario | Importe Total) ───
+            // Calculate the items subtotal (suma) directly from items — NO margin, NO operational costs
+            const itemsSuma = items.reduce((sum, item) => sum + item.subtotal, 0);
+
             autoTable(doc, {
                 startY: y,
-                head: [['#', 'Concepto', 'Cant.', 'Unidad', 'P. Unitario', 'Subtotal']],
-                body: items.map((item, idx) => [
-                    idx + 1,
-                    item.description,
+                head: [['Cant.', 'Descripción', 'Precio Unitario', 'Importe Total']],
+                body: items.map(item => [
                     item.quantity.toString(),
-                    item.unit,
+                    item.description,
                     formatCurrency(item.unit_price),
                     formatCurrency(item.subtotal),
                 ]),
-                headStyles: { fillColor: [19, 182, 236], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 9 },
-                bodyStyles: { fontSize: 9 },
+                headStyles: { 
+                    fillColor: [19, 60, 90], 
+                    textColor: [255, 255, 255], 
+                    fontStyle: 'bold', 
+                    fontSize: 9,
+                    halign: 'center',
+                },
+                bodyStyles: { fontSize: 8.5, cellPadding: 3 },
+                columnStyles: {
+                    0: { cellWidth: 15, halign: 'center' },
+                    1: { cellWidth: 'auto' },
+                    2: { cellWidth: 30, halign: 'right' },
+                    3: { cellWidth: 32, halign: 'right', fontStyle: 'bold' },
+                },
                 alternateRowStyles: { fillColor: [248, 250, 252] },
-                margin: { left: 14, right: 14 },
+                margin: { left: marginL, right: 14 },
             });
 
-            // Totals
-            const finalY = (doc as any).lastAutoTable?.finalY || y + 30;
-            let ty = finalY + 10;
-            const rightX = pageWidth - 14;
+            let tableEndY = (doc as any).lastAutoTable?.finalY || y + 30;
 
-            const totalsData = [
-                ['Subtotal', formatCurrency(quote.subtotal)],
-                [`Margen (${quote.margin_percent}%)`, `+${formatCurrency(quote.margin_amount)}`],
-            ];
-            if (quote.discount_amount > 0) totalsData.push([`Descuento (${quote.discount_percent}%)`, `-${formatCurrency(quote.discount_amount)}`]);
-            totalsData.push([`IVA (${quote.tax_percent}%)`, formatCurrency(quote.tax_amount)]);
+            // ─── TOTALS: Suma → IVA 16% → Total (matching Excel exactly) ───
+            const taxRate = quote.tax_percent || 16;
+            const ivaAmount = itemsSuma * (taxRate / 100);
+            const totalFinal = itemsSuma + ivaAmount;
 
-            doc.setFontSize(9);
-            for (const [label, val] of totalsData) {
-                doc.setFont('helvetica', 'normal');
-                doc.text(label, rightX - 80, ty);
-                doc.text(val, rightX, ty, { align: 'right' });
-                ty += 7;
+            let ty = tableEndY + 4;
+            const totalsX = marginR - 80;
+
+            // Check page break for totals
+            if (ty + 35 > pageHeight - 60) {
+                doc.addPage();
+                ty = 20;
             }
+
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(30, 30, 30);
+
+            // Suma
+            doc.text('Suma:', totalsX, ty);
+            doc.text(formatCurrency(itemsSuma), marginR, ty, { align: 'right' });
+            ty += 7;
+
+            // IVA
+            doc.text(`Iva ${taxRate}%:`, totalsX, ty);
+            doc.text(formatCurrency(ivaAmount), marginR, ty, { align: 'right' });
+            ty += 7;
 
             // Total line
-            doc.setDrawColor(19, 182, 236);
-            doc.setLineWidth(0.5);
-            doc.line(rightX - 80, ty - 2, rightX, ty - 2);
-            doc.setFontSize(14);
-            doc.setFont('helvetica', 'bold');
-            doc.text('TOTAL', rightX - 80, ty + 5);
-            doc.setTextColor(19, 182, 236);
-            doc.text(formatCurrency(quote.total), rightX, ty + 5, { align: 'right' });
+            doc.setDrawColor(19, 60, 90);
+            doc.setLineWidth(0.8);
+            doc.line(totalsX, ty - 2, marginR, ty - 2);
+            doc.setFontSize(12);
+            doc.text('Total:', totalsX, ty + 4);
+            doc.setTextColor(19, 60, 90);
+            doc.text(formatCurrency(totalFinal), marginR, ty + 4, { align: 'right' });
+            ty += 12;
 
-            // Footer
-            ty += 20;
-            if (quote.valid_until) {
+            // ─── MONTO EN LETRA ───
+            doc.setFontSize(8);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(80, 80, 80);
+            const montoLetra = numberToWords(totalFinal);
+            const letraLines = doc.splitTextToSize(montoLetra, contentWidth);
+            doc.text(letraLines, marginL, ty);
+            ty += letraLines.length * 4 + 6;
+
+            // ─── POLÍTICAS (matching Excel sections) ───
+            const addPolicySection = (title: string, lines: string[]) => {
+                if (ty + 8 + lines.length * 4 > pageHeight - 15) {
+                    doc.addPage();
+                    ty = 20;
+                }
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(9);
+                doc.setTextColor(30, 30, 30);
+                doc.text(title, marginL, ty);
+                ty += 5;
+                doc.setFont('helvetica', 'normal');
                 doc.setFontSize(8);
-                doc.setTextColor(150, 150, 150);
-                doc.text(`Vigencia: ${new Date(quote.valid_until).toLocaleDateString('es-MX')}`, 14, ty);
+                doc.setTextColor(60, 60, 60);
+                lines.forEach(line => {
+                    const wrapped = doc.splitTextToSize(line, contentWidth);
+                    if (ty + wrapped.length * 3.5 > pageHeight - 15) {
+                        doc.addPage();
+                        ty = 20;
+                    }
+                    doc.text(wrapped, marginL, ty);
+                    ty += wrapped.length * 3.5 + 1;
+                });
+                ty += 3;
+            };
+
+            // Políticas de Precio
+            const tcText = quote.exchange_rate ? ` T.C. ${quote.exchange_rate.toFixed(2)}` : '';
+            const priceLines = [
+                `Precios sujetos a cambio sin previo aviso.${tcText}`,
+                `La presente cotización tiene una vigencia de ${quote.valid_until ? new Date(quote.valid_until).toLocaleDateString('es-MX') : '10 días naturales'}.`,
+                'Los modelos y características pueden variar.',
+            ];
+            addPolicySection('Políticas de Precio y Restricciones:', priceLines);
+
+            // Políticas de Garantía
+            const warrantyLines = quote.warranty_text 
+                ? [quote.warranty_text]
+                : DEFAULT_POLICIES.warranty;
+            addPolicySection('Políticas de Garantía:', warrantyLines);
+
+            // Políticas de Entrega
+            const deliveryLines = [
+                `Tiempo de entrega del sistema: De ${quote.delivery_days || '10 DIAS HABILES'} salvo previa venta, una vez dado el pago.`,
+                'Tiempo de instalación: no definida, previa calendarización de la misma.',
+            ];
+            addPolicySection('Políticas de Entrega e Instalación:', deliveryLines);
+
+            // Políticas de Pago
+            const paymentLines = [
+                `Forma de Pago: ${quote.payment_terms || '70% AL CONTRATAR 30% AL FINALIZAR'}`,
+                ...DEFAULT_POLICIES.payment,
+            ];
+            addPolicySection('Políticas y Medios de Pago:', paymentLines);
+
+            // Closing text
+            if (ty + 12 > pageHeight - 15) {
+                doc.addPage();
+                ty = 20;
             }
-            if (quote.notes) {
-                ty += 10;
-                doc.setFontSize(8);
-                doc.setTextColor(100, 100, 100);
-                doc.text('Notas: ' + quote.notes.substring(0, 200), 14, ty, { maxWidth: pageWidth - 28 });
-            }
+            doc.setFont('helvetica', 'italic');
+            doc.setFontSize(8);
+            doc.setTextColor(60, 60, 60);
+            const closingLines = doc.splitTextToSize(DEFAULT_POLICIES.closing, contentWidth);
+            doc.text(closingLines, marginL, ty);
 
             return doc;
         } catch (err) {
@@ -802,6 +878,9 @@ export default function QuoteDetail() {
                         <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">Información General</h3>
                         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 text-sm">
                             <div><span className="text-xs text-slate-400 block">Cliente</span><span className="font-medium text-slate-900 dark:text-white">{quote.client?.company_name || '—'}</span></div>
+                            <div><span className="text-xs text-slate-400 block">Contacto</span><span className="font-medium text-slate-900 dark:text-white">{quote.client?.contact_name || '—'}</span></div>
+                            <div><span className="text-xs text-slate-400 block">Domicilio</span><span className="font-medium text-slate-900 dark:text-white">{quote.client_address || '—'}</span></div>
+                            {quote.property_name && <div><span className="text-xs text-slate-400 block">Nombre del Predio</span><span className="font-medium text-slate-900 dark:text-white">{quote.property_name}</span></div>}
                             <div><span className="text-xs text-slate-400 block">Tipo de Trabajo</span><span className="font-medium text-slate-900 dark:text-white">{quote.work_type || '—'}</span></div>
                             <div><span className="text-xs text-slate-400 block">Profundidad</span><span className="font-medium text-slate-900 dark:text-white">{quote.well_depth ? `${quote.well_depth}m` : '—'}</span></div>
                             <div><span className="text-xs text-slate-400 block">HP Motor</span><span className="font-medium text-slate-900 dark:text-white">{quote.motor_hp || '—'}</span></div>
@@ -810,6 +889,12 @@ export default function QuoteDetail() {
                             <div><span className="text-xs text-slate-400 block">Personal</span><span className="font-medium text-slate-900 dark:text-white">{quote.crew_size}</span></div>
                             <div><span className="text-xs text-slate-400 block">Días Estimados</span><span className="font-medium text-slate-900 dark:text-white">{quote.estimated_days}</span></div>
                             <div><span className="text-xs text-slate-400 block">Vigencia</span><span className="font-medium text-slate-900 dark:text-white">{quote.valid_until ? new Date(quote.valid_until).toLocaleDateString('es-MX') : '—'}</span></div>
+                        </div>
+                        {/* Condiciones Comerciales */}
+                        <div className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 text-sm border-t border-slate-200 pt-4 dark:border-slate-700">
+                            <div><span className="text-xs text-slate-400 block">Forma de Pago</span><span className="font-medium text-slate-900 dark:text-white">{quote.payment_terms || '70% AL CONTRATAR 30% AL FINALIZAR'}</span></div>
+                            <div><span className="text-xs text-slate-400 block">Tiempo de Entrega</span><span className="font-medium text-slate-900 dark:text-white">{quote.delivery_days || '10 DIAS HABILES'}</span></div>
+                            {quote.exchange_rate && <div><span className="text-xs text-slate-400 block">Tipo de Cambio</span><span className="font-medium text-slate-900 dark:text-white">T.C. {quote.exchange_rate}</span></div>}
                         </div>
                         {quote.description && <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">{quote.description}</p>}
                     </div>
@@ -858,17 +943,37 @@ export default function QuoteDetail() {
 
                 {/* Sidebar: Totals + Versions */}
                 <div className="flex flex-col gap-6">
-                    {/* Totals */}
+                    {/* Totals - Client View (matching Excel: Suma + IVA + Total) */}
                     <div className="rounded-xl border border-slate-200/60 bg-white/50 p-6 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/50">
-                        <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">Resumen Financiero</h3>
+                        <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px] text-primary">receipt</span>
+                            Vista Cliente (PDF)
+                        </h3>
                         <div className="space-y-3 text-sm">
-                            <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal)}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Suma</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(items.reduce((s, i) => s + i.subtotal, 0))}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">IVA ({quote.tax_percent}%)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(items.reduce((s, i) => s + i.subtotal, 0) * (quote.tax_percent / 100))}</span></div>
+                            <div className="border-t-2 border-primary/30 pt-3 flex justify-between">
+                                <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
+                                <span className="text-2xl font-bold text-primary">{formatCurrency(items.reduce((s, i) => s + i.subtotal, 0) * (1 + quote.tax_percent / 100))}</span>
+                            </div>
+                            <p className="text-[10px] text-slate-400 italic">{numberToWords(items.reduce((s, i) => s + i.subtotal, 0) * (1 + quote.tax_percent / 100))}</p>
+                        </div>
+                    </div>
+
+                    {/* Internal Financials (not shown to client) */}
+                    <div className="rounded-xl border border-amber-200/60 bg-amber-50/30 p-6 shadow-sm dark:border-amber-800/30 dark:bg-amber-900/10">
+                        <h3 className="mb-4 text-sm font-bold text-amber-800 dark:text-amber-400 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">lock</span>
+                            Datos Internos (No aparece en PDF)
+                        </h3>
+                        <div className="space-y-2 text-sm">
+                            <div className="flex justify-between"><span className="text-slate-500">Subtotal (con costos op.)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal)}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500">Margen ({quote.margin_percent}%)</span><span className="text-emerald-600">+{formatCurrency(quote.margin_amount)}</span></div>
                             {quote.discount_amount > 0 && <div className="flex justify-between"><span className="text-slate-500">Descuento ({quote.discount_percent}%)</span><span className="text-red-500">-{formatCurrency(quote.discount_amount)}</span></div>}
                             <div className="flex justify-between"><span className="text-slate-500">IVA ({quote.tax_percent}%)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.tax_amount)}</span></div>
-                            <div className="border-t-2 border-primary/30 pt-3 flex justify-between">
-                                <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
-                                <span className="text-2xl font-bold text-primary">{formatCurrency(quote.total)}</span>
+                            <div className="border-t border-amber-200 pt-2 flex justify-between dark:border-amber-800">
+                                <span className="font-bold text-slate-900 dark:text-white">Total Interno</span>
+                                <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(quote.total)}</span>
                             </div>
                         </div>
                     </div>

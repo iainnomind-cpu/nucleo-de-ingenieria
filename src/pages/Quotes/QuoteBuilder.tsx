@@ -61,6 +61,13 @@ export default function QuoteBuilder() {
     const [maniobraCost, setManiobraCost] = useState('0');
     const [validUntil, setValidUntil] = useState('');
     const [notes, setNotes] = useState('');
+    // New fields for Excel-format cotización
+    const [clientAddress, setClientAddress] = useState('');
+    const [propertyName, setPropertyName] = useState('');
+    const [paymentTerms, setPaymentTerms] = useState('70% AL CONTRATAR 30% AL FINALIZAR');
+    const [deliveryDays, setDeliveryDays] = useState('10 DIAS HABILES');
+    const [exchangeRate, setExchangeRate] = useState('20.00');
+    const [introText, setIntroText] = useState('Atendiendo a su amable solicitud, ponemos a su consideración la siguiente propuesta económica para realizar los trabajos de');
 
     // Line items
     const [items, setItems] = useState<LineItem[]>([]);
@@ -86,10 +93,14 @@ export default function QuoteBuilder() {
         });
     }, []);
 
-    // M-Maps: Auto-calculate distance when client is selected
+    // M-Maps: Auto-calculate distance when client is selected + auto-fill address
     useEffect(() => {
         if (!clientId) { setTravelInfo(null); return; }
         const client = clients.find(c => c.id === clientId);
+        // Auto-fill address from CRM if available
+        if (client?.formatted_address && !clientAddress) {
+            setClientAddress(client.formatted_address);
+        }
         if (!client?.latitude || !client?.longitude) { setTravelInfo(null); return; }
         setCalculatingDistance(true);
         calculateDistance(NUCLEO_HQ, { lat: client.latitude, lng: client.longitude }).then(result => {
@@ -195,6 +206,13 @@ export default function QuoteBuilder() {
             maniobra_cost: parseFloat(maniobraCost) || 0,
             valid_until: validUntil || null,
             notes: notes || null,
+            // New Excel-format fields
+            client_address: clientAddress || null,
+            property_name: propertyName || null,
+            payment_terms: paymentTerms || '70% AL CONTRATAR 30% AL FINALIZAR',
+            delivery_days: deliveryDays || '10 DIAS HABILES',
+            exchange_rate: parseFloat(exchangeRate) || 20,
+            intro_text: introText || null,
         }).select().single();
 
         if (error || !quote) {
@@ -309,8 +327,20 @@ export default function QuoteBuilder() {
                                 <label className={labelClass}>Tipo de Trabajo</label>
                                 <input value={workType} onChange={e => setWorkType(e.target.value)} placeholder="Ej: Aforo, Equipamiento..." className={inputClass} />
                             </div>
+                            <div>
+                                <label className={labelClass}>Domicilio del Cliente</label>
+                                <input value={clientAddress} onChange={e => setClientAddress(e.target.value)} placeholder="Ej: Conocido, El Veladero, Mun. Sayula Jalisco" className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Nombre del Predio</label>
+                                <input value={propertyName} onChange={e => setPropertyName(e.target.value)} placeholder="Ej: POZO EL PELILLO" className={inputClass} />
+                            </div>
                             <div className="md:col-span-2">
-                                <label className={labelClass}>Descripción</label>
+                                <label className={labelClass}>Texto Introductorio</label>
+                                <textarea value={introText} onChange={e => setIntroText(e.target.value)} rows={2} placeholder="Atendiendo a su amable solicitud..." className={inputClass + ' resize-none'} />
+                            </div>
+                            <div className="md:col-span-2">
+                                <label className={labelClass}>Descripción (Notas internas)</label>
                                 <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Detalles adicionales..." className={inputClass + ' resize-none'} />
                             </div>
                         </div>
@@ -374,6 +404,28 @@ export default function QuoteBuilder() {
                             <div>
                                 <label className={labelClass}>Vigencia</label>
                                 <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} className={inputClass} />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Condiciones Comerciales */}
+                    <div className={sectionClass}>
+                        <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                            <span className="material-symbols-outlined text-primary text-[20px]">handshake</span>
+                            Condiciones Comerciales (Aparece en PDF al cliente)
+                        </h3>
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                            <div>
+                                <label className={labelClass}>Forma de Pago</label>
+                                <input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="70% AL CONTRATAR 30% AL FINALIZAR" className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Tiempo de Entrega</label>
+                                <input value={deliveryDays} onChange={e => setDeliveryDays(e.target.value)} placeholder="10 DIAS HABILES" className={inputClass} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Tipo de Cambio (T.C.)</label>
+                                <input type="number" step="0.01" value={exchangeRate} onChange={e => setExchangeRate(e.target.value)} placeholder="20.00" className={inputClass} />
                             </div>
                         </div>
                     </div>
