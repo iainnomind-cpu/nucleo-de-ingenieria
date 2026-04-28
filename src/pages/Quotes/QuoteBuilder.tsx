@@ -11,15 +11,25 @@ import {
 import { Client } from '../../types/crm';
 import { OperationalDefaults, DEFAULT_OPERATIONAL_VALUES } from '../../types/settings';
 import { calculateDistance, NUCLEO_HQ, DistanceResult } from '../../lib/maps';
+import {
+    InventoryProduct,
+    CATEGORY_LABELS,
+    UNIT_LABELS,
+    getStockStatus,
+    STOCK_STATUS_CONFIG,
+    formatCurrencyInv,
+} from '../../types/inventory';
 
 interface LineItem {
     tempId: string;
     service_id: string | null;
+    product_id: string | null;
     description: string;
     quantity: number;
     unit: string;
     unit_price: number;
     maxStock?: number | null;
+    source: 'catalog' | 'inventory' | 'manual';
 }
 
 export default function QuoteBuilder() {
@@ -36,9 +46,12 @@ export default function QuoteBuilder() {
 
     const [clients, setClients] = useState<Pick<Client, 'id' | 'company_name' | 'latitude' | 'longitude' | 'formatted_address'>[]>([]);
     const [services, setServices] = useState<ServiceCatalogItem[]>([]);
+    const [invProducts, setInvProducts] = useState<InventoryProduct[]>([]);
     const [saving, setSaving] = useState(false);
     const [travelInfo, setTravelInfo] = useState<DistanceResult | null>(null);
     const [calculatingDistance, setCalculatingDistance] = useState(false);
+    const [showInvPicker, setShowInvPicker] = useState(false);
+    const [invSearch, setInvSearch] = useState('');
 
     // Quote header
     const [clientId, setClientId] = useState(initialClientId);
@@ -75,6 +88,7 @@ export default function QuoteBuilder() {
     useEffect(() => {
         supabase.from('clients').select('id, company_name, latitude, longitude, formatted_address').order('company_name').then(({ data }) => setClients(data || []));
         supabase.from('service_catalog').select('*').eq('is_active', true).order('name').then(({ data }) => setServices(data || []));
+        supabase.from('inventory_products').select('*').eq('is_active', true).order('name').then(({ data }) => setInvProducts((data as InventoryProduct[]) || []));
 
         // Cargar parámetros operativos por defecto desde configuración del sistema
         supabase.from('system_settings').select('value').eq('key', 'operational_defaults').single().then(({ data }) => {
@@ -117,7 +131,6 @@ export default function QuoteBuilder() {
 
         // → M4: Verify Availability
         if (service) {
-            // Check if there is a matching product in inventory (M4)
             const { data: invProduct } = await supabase.from('inventory_products')
                 .select('current_stock, unit')
                 .eq('name', service.name)
@@ -134,12 +147,38 @@ export default function QuoteBuilder() {
         setItems([...items, {
             tempId: crypto.randomUUID(),
             service_id: service?.id || null,
+            product_id: null,
             description: service?.name || '',
             quantity: 1,
             unit: service?.unit || 'servicio',
             unit_price: service?.base_price || 0,
-            maxStock: maxStock ?? undefined // Store for UI validation
+            maxStock: maxStock ?? undefined,
+            source: service ? 'catalog' : 'manual',
         }]);
+    };
+
+    const addInventoryItem = (product: InventoryProduct) => {
+        // Check if already added
+        if (items.some(i => i.product_id === product.id)) {
+            alert(`El producto "${product.name}" ya está en la cotización.`);
+            return;
+        }
+        if (product.current_stock <= 0) {
+            if (!confirm(`⚠️ "${product.name}" está SIN STOCK (0 ${UNIT_LABELS[product.unit]}). ¿Agregar de todas formas?`)) return;
+        }
+        setItems([...items, {
+            tempId: crypto.randomUUID(),
+            service_id: null,
+            product_id: product.id,
+            description: product.name,
+            quantity: 1,
+            unit: product.unit,
+            unit_price: product.unit_cost,
+            maxStock: product.current_stock,
+            source: 'inventory',
+        }]);
+        setShowInvPicker(false);
+        setInvSearch('');
     };
 
     const updateItem = (tempId: string, field: keyof LineItem, value: string | number) => {
@@ -227,6 +266,7 @@ export default function QuoteBuilder() {
                 items.map((item, idx) => ({
                     quote_id: quote.id,
                     service_id: item.service_id || null,
+                    product_id: item.product_id || null,
                     description: item.description,
                     quantity: item.quantity,
                     unit: item.unit,
@@ -462,17 +502,22 @@ export default function QuoteBuilder() {
 
                     {/* Line Items */}
                     <div className={sectionClass}>
-                        <div className="mb-4 flex items-center justify-between">
+                        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
                                 <span className="material-symbols-outlined text-primary text-[20px]">list_alt</span>
-                                Conceptos / Servicios
+                                Conceptos / Servicios / Productos
                             </h3>
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-2">
                                 <select onChange={e => { const svc = services.find(s => s.id === e.target.value); if (svc) addItem(svc); e.target.value = ''; }}
                                     className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-                                    <option value="">+ Agregar del catálogo</option>
+                                    <option value="">+ Del catálogo</option>
                                     {services.map(s => <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.base_price)}</option>)}
                                 </select>
+                                <button onClick={() => setShowInvPicker(true)}
+                                    className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 transition-colors">
+                                    <span className="material-symbols-outlined text-[16px]">inventory_2</span>
+                                    Del Inventario
+                                </button>
                                 <button onClick={() => addItem()}
                                     className="flex items-center gap-1 rounded-lg border border-dashed border-primary px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/5">
                                     <span className="material-symbols-outlined text-[16px]">add</span>
@@ -481,36 +526,141 @@ export default function QuoteBuilder() {
                             </div>
                         </div>
 
+                        {/* Inventory Picker Modal */}
+                        {showInvPicker && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => { setShowInvPicker(false); setInvSearch(''); }}>
+                                <div className="w-full max-w-3xl max-h-[80vh] flex flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900" onClick={e => e.stopPropagation()}>
+                                    {/* Modal Header */}
+                                    <div className="flex items-center justify-between border-b border-slate-200 p-5 dark:border-slate-700">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg">
+                                                <span className="material-symbols-outlined text-white text-[22px]">inventory_2</span>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-base font-bold text-slate-900 dark:text-white">Agregar Producto del Inventario</h3>
+                                                <p className="text-xs text-slate-500">{invProducts.length} productos disponibles</p>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => { setShowInvPicker(false); setInvSearch(''); }} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+                                            <span className="material-symbols-outlined text-[20px]">close</span>
+                                        </button>
+                                    </div>
+                                    {/* Search */}
+                                    <div className="border-b border-slate-200 px-5 py-3 dark:border-slate-700">
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-[18px]">search</span>
+                                            <input type="text" placeholder="Buscar por código o nombre..." value={invSearch} onChange={e => setInvSearch(e.target.value)} autoFocus
+                                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                                        </div>
+                                    </div>
+                                    {/* Products List */}
+                                    <div className="flex-1 overflow-y-auto p-3">
+                                        {invProducts
+                                            .filter(p => {
+                                                if (!invSearch.trim()) return true;
+                                                const q = invSearch.toLowerCase();
+                                                return p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q) || (p.supplier || '').toLowerCase().includes(q);
+                                            })
+                                            .map(p => {
+                                                const status = getStockStatus(p);
+                                                const conf = STOCK_STATUS_CONFIG[status];
+                                                const alreadyAdded = items.some(i => i.product_id === p.id);
+                                                return (
+                                                    <button key={p.id} onClick={() => !alreadyAdded && addInventoryItem(p)} disabled={alreadyAdded}
+                                                        className={`flex w-full items-center gap-3 rounded-xl p-3 mb-1 text-left transition-all ${alreadyAdded ? 'opacity-40 cursor-not-allowed bg-slate-50 dark:bg-slate-800/30' : 'hover:bg-emerald-50/60 dark:hover:bg-emerald-900/10'}`}>
+                                                        <span className="text-lg" title={conf.label}>{conf.icon}</span>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">{p.code}</span>
+                                                                <span className="text-sm font-medium text-slate-900 dark:text-white truncate">{p.name}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 mt-0.5 text-xs text-slate-400">
+                                                                <span>{CATEGORY_LABELS[p.category]}</span>
+                                                                <span>•</span>
+                                                                <span className={conf.color}>{p.current_stock} {UNIT_LABELS[p.unit]}</span>
+                                                                <span>•</span>
+                                                                <span>{formatCurrencyInv(p.unit_cost)}/u</span>
+                                                            </div>
+                                                        </div>
+                                                        {alreadyAdded ? (
+                                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-400 dark:bg-slate-700">AGREGADO</span>
+                                                        ) : (
+                                                            <span className="material-symbols-outlined text-emerald-500 text-[20px]">add_circle</span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        {invProducts.filter(p => {
+                                            if (!invSearch.trim()) return true;
+                                            const q = invSearch.toLowerCase();
+                                            return p.name.toLowerCase().includes(q) || p.code.toLowerCase().includes(q);
+                                        }).length === 0 && (
+                                            <div className="py-8 text-center text-sm text-slate-400">
+                                                <span className="material-symbols-outlined text-[40px] text-slate-300 block mb-2">search_off</span>
+                                                No se encontraron productos con "{invSearch}"
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {items.length === 0 ? (
                             <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/50 py-8 text-center dark:border-slate-700 dark:bg-slate-800/30">
                                 <span className="material-symbols-outlined text-[40px] text-slate-300">playlist_add</span>
-                                <p className="mt-2 text-sm text-slate-500">Agrega conceptos del catálogo o líneas manuales.</p>
+                                <p className="mt-2 text-sm text-slate-500">Agrega conceptos del catálogo, productos del inventario o líneas manuales.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 {items.map((item, idx) => (
-                                    <div key={item.tempId} className="flex items-center gap-3 rounded-lg border border-slate-200/60 bg-white p-3 dark:border-slate-700/60 dark:bg-slate-800/50">
-                                        <span className="text-xs font-bold text-slate-400 w-6">{idx + 1}</span>
-                                        <input value={item.description} onChange={e => updateItem(item.tempId, 'description', e.target.value)}
-                                            placeholder="Descripción" className="flex-1 rounded border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
-                                        <div className="flex flex-col w-20">
-                                            <input type="number" value={item.quantity} onChange={e => updateItem(item.tempId, 'quantity', parseFloat(e.target.value) || 0)}
-                                                className={`w-full rounded border px-3 py-1.5 text-sm text-center dark:bg-slate-800 dark:text-white ${item.maxStock !== null && item.maxStock !== undefined && item.quantity > item.maxStock ? 'border-red-500 text-red-600 focus:ring-red-200' : 'border-slate-200 dark:border-slate-700'}`} placeholder="Cant" />
-                                            {item.maxStock !== null && item.maxStock !== undefined && (
-                                                <span className={`text-[10px] mt-0.5 text-center ${item.quantity > item.maxStock ? 'text-red-500 font-bold' : 'text-slate-400'}`}>Stock: {item.maxStock}</span>
-                                            )}
+                                    <div key={item.tempId} className={`rounded-lg border p-3 ${item.source === 'inventory' ? 'border-emerald-200/60 bg-emerald-50/30 dark:border-emerald-800/40 dark:bg-emerald-900/10' : 'border-slate-200/60 bg-white dark:border-slate-700/60 dark:bg-slate-800/50'}`}>
+                                        {/* Row 1: Number + Description + Delete */}
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <span className="text-xs font-bold text-slate-400 w-5 text-center">{idx + 1}</span>
+                                                {item.source === 'inventory' && <span className="material-symbols-outlined text-emerald-500 text-[14px]" title="Del Inventario">inventory_2</span>}
+                                                {item.source === 'catalog' && <span className="material-symbols-outlined text-sky-500 text-[14px]" title="Del Catálogo">menu_book</span>}
+                                            </div>
+                                            <input value={item.description} onChange={e => updateItem(item.tempId, 'description', e.target.value)}
+                                                placeholder="Descripción del concepto" className="flex-1 min-w-0 rounded border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                                            <button onClick={() => removeItem(item.tempId)} className="shrink-0 rounded p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar">
+                                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                            </button>
                                         </div>
-                                        <select value={item.unit} onChange={e => updateItem(item.tempId, 'unit', e.target.value)}
-                                            className="w-24 rounded border border-slate-200 px-2 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
-                                            <option value="servicio">Servicio</option><option value="hora">Hora</option><option value="metro">Metro</option>
-                                            <option value="km">Km</option><option value="pieza">Pieza</option><option value="dia">Día</option>
-                                        </select>
-                                        <input type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(item.tempId, 'unit_price', parseFloat(e.target.value) || 0)}
-                                            className="w-32 rounded border border-slate-200 px-3 py-1.5 text-sm text-right dark:border-slate-700 dark:bg-slate-800 dark:text-white" placeholder="Precio" />
-                                        <span className="w-28 text-right text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(item.quantity * item.unit_price)}</span>
-                                        <button onClick={() => removeItem(item.tempId)} className="rounded p-1 text-slate-400 hover:text-red-500">
-                                            <span className="material-symbols-outlined text-[18px]">close</span>
-                                        </button>
+                                        {/* Row 2: Quantity + Unit + Price + Subtotal */}
+                                        <div className="flex items-center gap-2 pl-7">
+                                            <div className="flex flex-col w-20 shrink-0">
+                                                <input type="number" value={item.quantity} onChange={e => updateItem(item.tempId, 'quantity', parseFloat(e.target.value) || 0)}
+                                                    className={`w-full rounded border px-2 py-1.5 text-sm text-center dark:bg-slate-800 dark:text-white ${item.maxStock !== null && item.maxStock !== undefined && item.quantity > item.maxStock ? 'border-red-500 text-red-600' : 'border-slate-200 dark:border-slate-700'}`} placeholder="Cant" />
+                                                {item.maxStock !== null && item.maxStock !== undefined && (
+                                                    <span className={`text-[10px] mt-0.5 text-center ${item.quantity > item.maxStock ? 'text-red-500 font-bold' : 'text-emerald-600'}`}>Stock: {item.maxStock}</span>
+                                                )}
+                                            </div>
+                                            <select value={item.unit} onChange={e => updateItem(item.tempId, 'unit', e.target.value)}
+                                                className="w-24 shrink-0 rounded border border-slate-200 px-1 py-1.5 text-xs dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                                                <option value="servicio">Servicio</option>
+                                                <option value="pieza">Pieza</option>
+                                                <option value="metro">Metro</option>
+                                                <option value="litro">Litro</option>
+                                                <option value="kg">Kilogramo</option>
+                                                <option value="rollo">Rollo</option>
+                                                <option value="tramo">Tramo</option>
+                                                <option value="caja">Caja</option>
+                                                <option value="hora">Hora</option>
+                                                <option value="km">Km</option>
+                                                <option value="dia">Día</option>
+                                                <option value="lote">Lote</option>
+                                                <option value="juego">Juego</option>
+                                            </select>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <span className="text-[10px] text-slate-400">$</span>
+                                                <input type="number" step="0.01" value={item.unit_price} onChange={e => updateItem(item.tempId, 'unit_price', parseFloat(e.target.value) || 0)}
+                                                    className="w-28 rounded border border-slate-200 px-2 py-1.5 text-sm text-right dark:border-slate-700 dark:bg-slate-800 dark:text-white" placeholder="P. Unit." />
+                                            </div>
+                                            <div className="flex-1 text-right">
+                                                <span className="text-sm font-bold text-slate-900 dark:text-white">{formatCurrency(item.quantity * item.unit_price)}</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                             </div>

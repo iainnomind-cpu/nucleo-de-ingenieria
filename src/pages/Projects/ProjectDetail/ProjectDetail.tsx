@@ -214,8 +214,18 @@ export default function ProjectDetail() {
                 if (quoteItems && quoteItems.length > 0) {
                     let itemsConsumed = 0;
                     for (const item of quoteItems) {
-                        const { data: invProduct } = await supabase.from('inventory_products')
-                            .select('id, current_stock, unit_cost').eq('name', item.description).single();
+                        // Try product_id first (direct inventory link), then fallback to name match
+                        let invProduct: { id: string; current_stock: number; unit_cost: number } | null = null;
+                        if (item.product_id) {
+                            const { data } = await supabase.from('inventory_products')
+                                .select('id, current_stock, unit_cost').eq('id', item.product_id).single();
+                            invProduct = data;
+                        }
+                        if (!invProduct) {
+                            const { data } = await supabase.from('inventory_products')
+                                .select('id, current_stock, unit_cost').eq('name', item.description).single();
+                            invProduct = data;
+                        }
 
                         if (invProduct) {
                             // Create movement

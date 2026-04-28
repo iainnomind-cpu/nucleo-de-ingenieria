@@ -70,6 +70,7 @@ export interface QuoteItem {
     id: string;
     quote_id: string;
     service_id: string | null;
+    product_id: string | null;
     description: string;
     quantity: number;
     unit: string;

@@ -220,6 +220,7 @@ export default function QuoteDetail() {
                 items.map(item => ({
                     quote_id: newQ.id,
                     service_id: item.service_id,
+                    product_id: item.product_id,
                     description: item.description,
                     quantity: item.quantity,
                     unit: item.unit,
@@ -920,7 +921,17 @@ export default function QuoteDetail() {
                                     {items.map((item, idx) => (
                                         <tr key={item.id}>
                                             <td className="px-4 py-3 text-slate-400">{idx + 1}</td>
-                                            <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{item.description}</td>
+                                            <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">
+                                                <div className="flex items-center gap-2">
+                                                    {item.description}
+                                                    {item.product_id && (
+                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" title="Producto del inventario">
+                                                            <span className="material-symbols-outlined text-[10px]">inventory_2</span>
+                                                            INV
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-4 py-3 text-center text-slate-600 dark:text-slate-300">{item.quantity}</td>
                                             <td className="px-4 py-3 text-center capitalize text-slate-600 dark:text-slate-300">{item.unit}</td>
                                             <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{formatCurrency(item.unit_price)}</td>
