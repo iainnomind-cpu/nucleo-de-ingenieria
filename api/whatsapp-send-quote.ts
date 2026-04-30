@@ -1,17 +1,16 @@
 // ═══════════════════════════════════════════════════════════════════
 // Vercel Serverless: Enviar Cotización por WhatsApp (Plantilla Meta)
 // ═══════════════════════════════════════════════════════════════════
-// Usa la plantilla aprobada "alerta_cotizacion_enviada" para enviar
-// un resumen de la cotización. El PDF se sube a Supabase Storage y
-// se almacena como documento pendiente para auto-enviar cuando el
-// cliente responda (abriendo la ventana de 24h de Meta).
+// Usa la plantilla "cotizacion_descarga_pdf" que incluye la URL de
+// descarga directa del PDF. El PDF se sube a Supabase Storage y
+// la URL pública se pasa como variable {{6}} de la plantilla.
 // ═══════════════════════════════════════════════════════════════════
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
 const GRAPH_API_VERSION = 'v21.0';
-const TEMPLATE_NAME = 'alerta_cotizacion_enviada';
+const TEMPLATE_NAME = 'cotizacion_descarga_pdf';
 const PDF_BUCKET = 'quote-pdfs';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -78,20 +77,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             if (uploadError) {
                 console.error('Error subiendo PDF a Storage:', uploadError);
-                // No falla completamente — aún envía la plantilla
-            } else {
-                const { data: urlData } = supabase.storage.from(PDF_BUCKET).getPublicUrl(storagePath);
-                pdfPublicUrl = urlData.publicUrl;
-                console.log('✅ PDF subido a Storage:', pdfPublicUrl);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: `Error al subir el PDF a Storage: ${uploadError.message}`,
+                    phase: 'upload' 
+                });
             }
+
+            const { data: urlData } = supabase.storage.from(PDF_BUCKET).getPublicUrl(storagePath);
+            pdfPublicUrl = urlData.publicUrl;
+            console.log('✅ PDF subido a Storage:', pdfPublicUrl);
+        } else {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'El PDF (base64Pdf) es obligatorio para generar la URL de descarga' 
+            });
         }
 
         // ══════════════════════════════════════════════════
-        // PASO 2: Enviar plantilla aprobada vía Meta API
+        // PASO 2: Enviar plantilla con URL de descarga
         // ══════════════════════════════════════════════════
-        // Plantilla: alerta_cotizacion_enviada (es_MX)
+        // Plantilla: cotizacion_descarga_pdf (es_MX)
         // Variables:  {{1}}=client_name  {{2}}=quote_number
-        //             {{3}}=total  {{4}}=description  {{5}}=estimated_days
+        //             {{3}}=total  {{4}}=description  
+        //             {{5}}=estimated_days  {{6}}=pdf_url
         const metaPayload = {
             messaging_product: 'whatsapp',
             recipient_type: 'individual',
@@ -109,6 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                             { type: 'text', text: total || '$0.00' },
                             { type: 'text', text: description || 'Servicio de ingeniería' },
                             { type: 'text', text: String(estimated_days || '10') },
+                            { type: 'text', text: pdfPublicUrl },
                         ],
                     },
                 ],
@@ -138,12 +148,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const waMessageId = sendResult?.messages?.[0]?.id;
 
         // ══════════════════════════════════════════════════
-        // PASO 3: Registrar conversación + documento pendiente
+        // PASO 3: Registrar conversación y mensaje
         // ══════════════════════════════════════════════════
-        // Si el cliente responde ("Aceptar" / "Tengo dudas"),
-        // el webhook detectará que hay un pending_document_url
-        // y le enviará el PDF automáticamente (ya dentro de 24h).
-
         let { data: conv } = await supabase
             .from('wa_conversations')
             .select('id')
@@ -159,22 +165,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     status: 'active',
                     last_message_at: new Date().toISOString(),
                     last_message_preview: `[Cotización ${quote_number}]`,
-                    pending_document_url: pdfPublicUrl || null,
-                    pending_document_filename: pdfFilename,
                 })
                 .select('id')
                 .single();
             conv = newConv;
         } else {
-            const updateData: Record<string, any> = {
+            await supabase.from('wa_conversations').update({
                 last_message_at: new Date().toISOString(),
                 last_message_preview: `[Cotización ${quote_number}]`,
-            };
-            if (pdfPublicUrl) {
-                updateData.pending_document_url = pdfPublicUrl;
-                updateData.pending_document_filename = pdfFilename;
-            }
-            await supabase.from('wa_conversations').update(updateData).eq('id', conv.id);
+            }).eq('id', conv.id);
         }
 
         // Guardar registro del mensaje
@@ -183,17 +182,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 conversation_id: conv.id,
                 direction: 'outbound',
                 message_type: 'template',
-                content: `[Plantilla: ${TEMPLATE_NAME}] Cotización ${quote_number} — ${total}`,
+                content: `[Plantilla: ${TEMPLATE_NAME}] Cotización ${quote_number} — ${total} — PDF: ${pdfPublicUrl}`,
                 wa_message_id: waMessageId,
                 status: 'sent',
-                template_variables: [client_name, quote_number, total, description, String(estimated_days)],
+                media_url: pdfPublicUrl,
+                media_type: 'document',
+                template_variables: [client_name, quote_number, total, description, String(estimated_days), pdfPublicUrl],
             });
         }
 
         return res.status(200).json({
             success: true,
             messageId: waMessageId,
-            pdfUrl: pdfPublicUrl || null,
+            pdfUrl: pdfPublicUrl,
             conversation_id: conv?.id,
         });
 
