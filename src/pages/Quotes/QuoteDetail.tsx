@@ -711,6 +711,10 @@ export default function QuoteDetail() {
             }
 
             if (sendChannels.whatsapp && quote.client?.phone) {
+                // Calcular total cliente (Suma items + IVA) para la plantilla
+                const itemsSuma = items.reduce((s, i) => s + i.subtotal, 0);
+                const clientTotal = itemsSuma * (1 + (quote.tax_percent || 16) / 100);
+
                 promises.push(
                     fetch('/api/whatsapp-send-quote', {
                         method: 'POST',
@@ -719,7 +723,12 @@ export default function QuoteDetail() {
                             to: quote.client.phone,
                             base64Pdf,
                             filename,
-                            caption: `Hola ${quote.client.contact_name || ''}, te adjuntamos la cotización de tu proyecto: ${quote.title}`
+                            // Variables de la plantilla "alerta_cotizacion_enviada"
+                            client_name: quote.client.contact_name || quote.client.company_name || 'Cliente',
+                            quote_number: quote.quote_number,
+                            total: formatCurrency(clientTotal),
+                            description: quote.title || 'Servicio de ingeniería',
+                            estimated_days: quote.estimated_days || 10,
                         })
                     }).then(res => res.json()).then(data => data.success ? '✅ WhatsApp enviado con éxito' : `❌ WhatsApp falló: ${data.message}`)
                 );
@@ -1060,6 +1069,7 @@ export default function QuoteDetail() {
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-bold text-slate-800 dark:text-slate-200">WhatsApp</span>
                                                 <span className="text-xs font-mono mt-0.5 text-slate-500">{quote.client?.phone || 'Sin número registrado'}</span>
+                                                <span className="text-[10px] mt-0.5 text-emerald-600 dark:text-emerald-400">Plantilla con resumen → PDF se envía cuando el cliente responda</span>
                                             </div>
                                         </div>
                                         <input type="checkbox" checked={sendChannels.whatsapp} 

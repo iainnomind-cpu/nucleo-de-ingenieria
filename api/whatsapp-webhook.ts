@@ -151,6 +151,80 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                                 location_lng: locationLng,
                                 location_label: locationLabel,
                             });
+
+                            // ─── Auto-envío de PDF pendiente (Cotización) ───
+                            // Cuando el cliente responde a la plantilla de cotización,
+                            // se abre la ventana de 24h y podemos enviar el PDF directamente.
+                            const { data: convData } = await supabase
+                                .from('wa_conversations')
+                                .select('pending_document_url, pending_document_filename')
+                                .eq('id', conversation.id)
+                                .single();
+
+                            if (convData?.pending_document_url) {
+                                const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+                                const phoneNumberId = process.env.WHATSAPP_PHONE_ID;
+
+                                if (accessToken && phoneNumberId) {
+                                    try {
+                                        const docPayload = {
+                                            messaging_product: 'whatsapp',
+                                            recipient_type: 'individual',
+                                            to: from,
+                                            type: 'document',
+                                            document: {
+                                                link: convData.pending_document_url,
+                                                caption: '📎 Aquí tienes tu cotización en PDF. ¡Gracias por tu interés!',
+                                                filename: convData.pending_document_filename || 'Cotizacion.pdf',
+                                            },
+                                        };
+
+                                        const GRAPH_API_VERSION = 'v21.0';
+                                        const docResponse = await fetch(
+                                            `https://graph.facebook.com/${GRAPH_API_VERSION}/${phoneNumberId}/messages`,
+                                            {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Authorization': `Bearer ${accessToken}`,
+                                                    'Content-Type': 'application/json',
+                                                },
+                                                body: JSON.stringify(docPayload),
+                                            }
+                                        );
+
+                                        const docResult = await docResponse.json();
+
+                                        if (docResponse.ok) {
+                                            console.log('✅ PDF auto-enviado al cliente:', from);
+
+                                            // Registrar el mensaje del PDF enviado
+                                            await supabase.from('wa_messages').insert({
+                                                conversation_id: conversation.id,
+                                                direction: 'outbound',
+                                                message_type: 'document',
+                                                content: `[PDF] ${convData.pending_document_filename || 'Cotizacion.pdf'}`,
+                                                wa_message_id: docResult?.messages?.[0]?.id || null,
+                                                status: 'sent',
+                                                media_url: convData.pending_document_url,
+                                                media_type: 'document',
+                                            });
+
+                                            // Limpiar el documento pendiente
+                                            await supabase
+                                                .from('wa_conversations')
+                                                .update({
+                                                    pending_document_url: null,
+                                                    pending_document_filename: null,
+                                                })
+                                                .eq('id', conversation.id);
+                                        } else {
+                                            console.error('Error auto-enviando PDF:', JSON.stringify(docResult));
+                                        }
+                                    } catch (docErr) {
+                                        console.error('Error en auto-envío de PDF:', docErr);
+                                    }
+                                }
+                            }
                         }
                     }
 
