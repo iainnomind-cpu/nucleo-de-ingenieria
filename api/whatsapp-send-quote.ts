@@ -64,7 +64,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const pdfFilename = filename || `${quote_number}.pdf`;
 
         if (base64Pdf) {
-            const base64Data = base64Pdf.replace(/^data:application\/pdf;base64,/, '');
+            // Extraer el base64 de manera segura, sin importar si incluye 'filename=...' en el data URI
+            const base64Data = base64Pdf.includes(',') ? base64Pdf.split(',')[1] : base64Pdf;
             const fileBuffer = Buffer.from(base64Data, 'base64');
             const storagePath = `${quote_number}/${pdfFilename}`;
 
