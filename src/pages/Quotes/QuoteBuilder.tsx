@@ -210,6 +210,7 @@ export default function QuoteBuilder() {
 
     const handleSave = async (status: 'draft' | 'sent' = 'draft') => {
         if (!title.trim()) return alert('El título es requerido');
+        if (!clientId) return alert('Por favor, selecciona un cliente de la lista.');
         setSaving(true);
 
         // Generate quote number
