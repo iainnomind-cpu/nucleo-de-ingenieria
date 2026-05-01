@@ -44,6 +44,19 @@ export default function QuoteDetail() {
             .single();
 
         if (error || !data) { navigate('/quotes'); return; }
+
+        // ── Fallback: si el JOIN no trajo datos completos del cliente, hacer fetch directo ──
+        if (data.client_id && (!data.client || !data.client.phone || !data.client.email)) {
+            const { data: clientData } = await supabase
+                .from('clients')
+                .select('id, company_name, contact_name, email, phone')
+                .eq('id', data.client_id)
+                .single();
+            if (clientData) {
+                data.client = clientData;
+            }
+        }
+
         setQuote(data as Quote);
 
         if (new URLSearchParams(location.search).get('send') === '1' && data.status === 'draft') {
@@ -1069,7 +1082,7 @@ export default function QuoteDetail() {
                                             <div className="flex flex-col">
                                                 <span className="text-sm font-bold text-slate-800 dark:text-slate-200">WhatsApp</span>
                                                 <span className="text-xs font-mono mt-0.5 text-slate-500">{quote.client?.phone || 'Sin número registrado'}</span>
-                                                <span className="text-[10px] mt-0.5 text-emerald-600 dark:text-emerald-400">Plantilla con resumen → PDF se envía cuando el cliente responda</span>
+                                                <span className="text-[10px] mt-0.5 text-emerald-600 dark:text-emerald-400">Plantilla aprobada → Resumen con enlace de descarga del PDF</span>
                                             </div>
                                         </div>
                                         <input type="checkbox" checked={sendChannels.whatsapp} 
