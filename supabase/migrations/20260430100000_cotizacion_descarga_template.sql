@@ -35,7 +35,7 @@ Si tiene alguna duda, responda este mensaje y con gusto le atendemos.',
     'Nucleo de Ingenieria',
     '["client_name", "quote_number", "total", "description", "estimated_days", "pdf_url"]',
     '["Juan Perez", "COT-2026-0001", "$18,500.00", "Instalacion de bomba sumergible", "10", "https://ejemplo.com/cotizacion.pdf"]',
-    'automation',
+    'marketing',
     'draft'
 )
 ON CONFLICT DO NOTHING;

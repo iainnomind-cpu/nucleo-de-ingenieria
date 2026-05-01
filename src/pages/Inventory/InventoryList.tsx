@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/AuthContext';
 import {
     InventoryProduct,
     ProductCategory,
@@ -36,6 +37,8 @@ export default function InventoryList() {
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<InventoryProduct | null>(null);
     const [showMovement, setShowMovement] = useState<InventoryProduct | null>(null);
+    const { hasPermission } = useAuth();
+    const canDelete = hasPermission('inventory', 'delete');
 
     // Form state
     const [form, setForm] = useState({
@@ -144,6 +147,18 @@ export default function InventoryList() {
         setShowMovement(null);
         setMovForm({ movement_type: 'entry', quantity: '', unit_cost: '', reason: 'purchase', reference_number: '', notes: '', performed_by: '' });
         fetchProducts();
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('¿Está seguro de que desea eliminar este producto? Esta acción no se puede deshacer.')) return;
+        
+        try {
+            await supabase.from('inventory_products').update({ is_active: false }).eq('id', id);
+            fetchProducts();
+        } catch (error) {
+            console.error('Error deleting product:', error);
+            alert('Hubo un error al intentar eliminar el producto.');
+        }
     };
 
     // KPIs
@@ -345,6 +360,11 @@ export default function InventoryList() {
                                                 <button onClick={e => { e.stopPropagation(); openEditForm(p); }} title="Editar" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
                                                     <span className="material-symbols-outlined text-[18px]">edit</span>
                                                 </button>
+                                                {canDelete && (
+                                                    <button onClick={e => { e.stopPropagation(); handleDelete(p.id); }} title="Eliminar" className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
+                                                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                                                    </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
