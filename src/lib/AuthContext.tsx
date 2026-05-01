@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from './supabase';
+import { supabase, getAuthedClient } from './supabase';
 import { AppUser, ModulePermissions } from '../types/auth';
 
 interface AuthContextType {
@@ -13,21 +12,22 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
 const STORAGE_KEY = 'nucleo_erp_user';
+const TOKEN_KEY   = 'nucleo_erp_token';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AppUser | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // Rehidratar desde localStorage al montar
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
             try {
-                const parsed = JSON.parse(stored) as AppUser;
-                setUser(parsed);
+                setUser(JSON.parse(stored) as AppUser);
             } catch {
                 localStorage.removeItem(STORAGE_KEY);
+                localStorage.removeItem(TOKEN_KEY);
             }
         }
         setLoading(false);
@@ -40,19 +40,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 p_password: password,
             });
 
-            if (error) {
-                return { success: false, message: 'Error de conexión al servidor' };
-            }
+            if (error) return { success: false, message: 'Error de conexión al servidor' };
 
-            const result = data as { success: boolean; message?: string; user?: AppUser };
+            const result = data as {
+                success: boolean;
+                message?: string;
+                user?: AppUser;
+                token?: string;
+            };
 
             if (!result.success) {
                 return { success: false, message: result.message || 'Credenciales inválidas' };
             }
 
-            const loggedUser = result.user!;
-            setUser(loggedUser);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(loggedUser));
+            setUser(result.user!);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(result.user!));
+            localStorage.setItem(TOKEN_KEY, result.token!);
+
             return { success: true };
         } catch {
             return { success: false, message: 'Error inesperado al autenticar' };
@@ -62,13 +66,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const logout = useCallback(() => {
         setUser(null);
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(TOKEN_KEY);
     }, []);
 
-    const hasPermission = useCallback((moduleKey: string, action: 'view' | 'create' | 'edit' | 'delete') => {
-        if (!user || !user.permissions) return false;
+    const hasPermission = useCallback((
+        moduleKey: string,
+        action: 'view' | 'create' | 'edit' | 'delete'
+    ) => {
+        if (!user?.permissions) return false;
         const perms = user.permissions as ModulePermissions;
         let mod = perms[moduleKey];
-        // Fallback: si el módulo 'tasks' no existe en permisos guardados, usar los de 'team'
         if (!mod && moduleKey === 'tasks') mod = perms['team'];
         if (!mod) return false;
         return mod[action] === true;
@@ -76,18 +83,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const refreshUser = useCallback(async () => {
         if (!user) return;
-        // Recargar datos del usuario desde la BD
-        const { data: userData } = await supabase
+        const token = localStorage.getItem(TOKEN_KEY);
+        const client = token ? getAuthedClient(token) : supabase;
+
+        const { data: userData } = await client
             .from('app_users')
             .select('*')
             .eq('id', user.id)
             .single();
 
         if (userData) {
-            const refreshed: AppUser = {
-                ...userData,
-                permissions: userData.permissions,
-            };
+            const refreshed: AppUser = { ...userData, permissions: userData.permissions };
             setUser(refreshed);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(refreshed));
         }
@@ -102,8 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 export function useAuth(): AuthContextType {
     const context = useContext(AuthContext);
-    if (!context) {
-        throw new Error('useAuth debe usarse dentro de un AuthProvider');
-    }
+    if (!context) throw new Error('useAuth debe usarse dentro de un AuthProvider');
     return context;
 }
