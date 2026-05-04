@@ -53,6 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: false, message: result.message || 'Credenciales inválidas' };
             }
 
+            await supabase.rpc('set_current_user', { user_id: result.user!.id });
+
             setUser(result.user!);
             localStorage.setItem(STORAGE_KEY, JSON.stringify(result.user!));
             localStorage.setItem(TOKEN_KEY, result.token!);
