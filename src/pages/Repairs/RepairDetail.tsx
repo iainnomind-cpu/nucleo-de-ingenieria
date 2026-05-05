@@ -178,7 +178,7 @@ export default function RepairDetail() {
                 {isActive && (
                     <div className="flex gap-2 flex-wrap">
                         {nextOptions.map(ns => (
-                            <button key={ns} onClick={() => changeStatus(ns)} className={`rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90`} style={{ background: `var(--color-primary)` }}>
+                            <button key={ns} onClick={() => changeStatus(ns)} className={`rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90`}>
                                 → {REPAIR_STATUS_LABELS[ns]}
                             </button>
                         ))}
