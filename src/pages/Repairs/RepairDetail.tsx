@@ -69,8 +69,8 @@ export default function RepairDetail() {
             event: 'status_change',
             condition: { new_status: newStatus },
             record: {
-                equipment_name: repair.equipment?.well_name || repair.equipment?.name || '',
-                client_name: repair.client?.company_name || '',
+                equipment_name: repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || '',
+                client_name: repair.external_client_name || repair.client?.company_name || '',
                 failure_description: repair.failure_description || '',
                 status_label: REPAIR_STATUS_LABELS[newStatus],
                 external_provider: repair.external_provider || '',
@@ -162,7 +162,7 @@ export default function RepairDetail() {
                     </div>
                     <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{repair.equipment?.well_name || repair.equipment?.name}</h2>
+                            <h2 className="text-xl font-bold text-slate-900 dark:text-white">{repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name}</h2>
                             <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${statusColor.bg} ${statusColor.text}`}>{REPAIR_STATUS_LABELS[repair.status]}</span>
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${urgencyColor.bg} ${urgencyColor.text}`}>
                                 <span className={`h-1.5 w-1.5 rounded-full ${urgencyColor.dot}`} />{URGENCY_LABELS[repair.urgency]}
@@ -170,7 +170,7 @@ export default function RepairDetail() {
                         </div>
                         <p className="text-sm text-slate-500 flex items-center gap-2 flex-wrap">
                             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">{FAILURE_TYPE_ICONS[repair.failure_type]}</span>{FAILURE_TYPE_LABELS[repair.failure_type]}</span>
-                            {repair.client?.company_name && <><span>·</span><span>{repair.client.company_name}</span></>}
+                            {(repair.external_client_name || repair.client?.company_name) && <><span>·</span><span>{repair.external_client_name || repair.client?.company_name}</span></>}
                             {repair.external_provider && <><span>·</span><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">warehouse</span>{repair.external_provider}</span></>}
                         </p>
                     </div>

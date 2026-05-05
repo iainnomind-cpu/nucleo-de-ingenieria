@@ -24,8 +24,10 @@ export type TimelineEventType = 'status_change' | 'note' | 'photo' | 'cost_updat
 
 export interface EquipmentRepair {
     id: string;
-    equipment_id: string;
+    equipment_id: string | null;
+    external_equipment_name: string | null;
     client_id: string | null;
+    external_client_name: string | null;
     // 1) Reporte
     report_date: string;
     reported_by: string | null;

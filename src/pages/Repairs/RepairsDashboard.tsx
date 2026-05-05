@@ -22,13 +22,14 @@ export default function RepairsDashboard() {
     const [equipment, setEquipment] = useState<any[]>([]);
     const [workshops, setWorkshops] = useState<ExternalWorkshop[]>([]);
     const [carriers, setCarriers] = useState<ShippingCarrier[]>([]);
+    const [clients, setClients] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [view, setView] = useState<ViewMode>('kanban');
     const [showForm, setShowForm] = useState(false);
     const [filterStatus, setFilterStatus] = useState<RepairStatus | 'all'>('all');
 
     const [form, setForm] = useState({
-        equipment_id: '', failure_description: '', failure_type: 'other' as FailureType,
+        is_external: false, equipment_id: '', external_equipment_name: '', client_name_input: '', failure_description: '', failure_type: 'other' as FailureType,
         urgency: 'normal' as RepairUrgency, reported_by: '',
         pickup_method: 'pickup' as PickupMethod, pickup_location: '', pickup_date: '',
         external_provider: '', shipping_carrier_to: '', assigned_to: '',
@@ -36,16 +37,18 @@ export default function RepairsDashboard() {
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
-        const [rRes, eRes, wRes, cRes] = await Promise.all([
+        const [rRes, eRes, wRes, cRes, cliRes] = await Promise.all([
             supabase.from('equipment_repairs').select('*, equipment:installed_equipment(id, name, well_name, equipment_type, brand, model, serial_number), client:clients(id, company_name)').order('report_date', { ascending: false }),
             supabase.from('installed_equipment').select('id, name, well_name, equipment_type, client_id, client:clients(id, company_name)'),
             supabase.from('external_workshops').select('*').order('name'),
             supabase.from('shipping_carriers').select('*').order('name'),
+            supabase.from('clients').select('id, company_name').order('company_name'),
         ]);
         setRepairs((rRes.data as EquipmentRepair[]) || []);
         setEquipment(eRes.data || []);
         setWorkshops((wRes.data as ExternalWorkshop[]) || []);
         setCarriers((cRes.data as ShippingCarrier[]) || []);
+        setClients(cliRes.data || []);
         setLoading(false);
     }, []);
 
@@ -55,10 +58,27 @@ export default function RepairsDashboard() {
         e.preventDefault();
         const eq = equipment.find((x: any) => x.id === form.equipment_id);
         
+        let resolvedClientId = eq?.client_id || null;
+        let resolvedExternalClientName = null;
+
+        if (form.is_external) {
+            const matchedClient = clients.find(c => c.company_name === form.client_name_input);
+            if (matchedClient) {
+                resolvedClientId = matchedClient.id;
+            } else if (form.client_name_input.trim()) {
+                resolvedClientId = null;
+                resolvedExternalClientName = form.client_name_input.trim();
+            } else {
+                resolvedClientId = null;
+            }
+        }
+
         try {
             const { data: newRepair, error } = await supabase.from('equipment_repairs').insert({
-                equipment_id: form.equipment_id,
-                client_id: eq?.client_id || null,
+                equipment_id: form.is_external ? null : form.equipment_id,
+                external_equipment_name: form.is_external ? form.external_equipment_name : null,
+                client_id: resolvedClientId,
+                external_client_name: resolvedExternalClientName,
                 failure_description: form.failure_description,
                 failure_type: form.failure_type,
                 urgency: form.urgency,
@@ -80,7 +100,7 @@ export default function RepairsDashboard() {
             }
 
             setShowForm(false);
-            setForm({ equipment_id: '', failure_description: '', failure_type: 'other', urgency: 'normal', reported_by: '', pickup_method: 'pickup', pickup_location: '', pickup_date: '', external_provider: '', shipping_carrier_to: '', assigned_to: '' });
+            setForm({ is_external: false, equipment_id: '', external_equipment_name: '', client_name_input: '', failure_description: '', failure_type: 'other', urgency: 'normal', reported_by: '', pickup_method: 'pickup', pickup_location: '', pickup_date: '', external_provider: '', shipping_carrier_to: '', assigned_to: '' });
 
             // → M9: WA automation
             if (newRepair) {
@@ -88,8 +108,8 @@ export default function RepairsDashboard() {
                     module: 'repairs',
                     event: 'created',
                     record: {
-                        equipment_name: eq?.well_name || eq?.name || '',
-                        client_name: eq?.client?.company_name || '',
+                        equipment_name: form.is_external ? form.external_equipment_name : (eq?.well_name || eq?.name || ''),
+                        client_name: form.is_external ? (resolvedExternalClientName || (clients.find(c => c.id === resolvedClientId)?.company_name) || '') : (eq?.client?.company_name || ''),
                         failure_description: form.failure_description,
                         status_label: 'Reportado',
                     },
@@ -118,8 +138,8 @@ export default function RepairsDashboard() {
             event: 'status_change',
             condition: { new_status: newStatus },
             record: {
-                equipment_name: r?.equipment?.well_name || r?.equipment?.name || '',
-                client_name: r?.client?.company_name || '',
+                equipment_name: r?.external_equipment_name || r?.equipment?.well_name || r?.equipment?.name || '',
+                client_name: r?.external_client_name || r?.client?.company_name || '',
                 failure_description: r?.failure_description || '',
                 status_label: REPAIR_STATUS_LABELS[newStatus],
                 external_provider: r?.external_provider || '',
@@ -253,14 +273,14 @@ export default function RepairsDashboard() {
                                         <tr key={r.id} onClick={() => navigate(`/repairs/${r.id}`)} className="cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-primary text-[16px]">{EQUIPMENT_TYPE_ICONS[r.equipment?.equipment_type as keyof typeof EQUIPMENT_TYPE_ICONS] || 'settings'}</span>
+                                                    <span className="material-symbols-outlined text-primary text-[16px]">{r.equipment ? (EQUIPMENT_TYPE_ICONS[r.equipment.equipment_type as keyof typeof EQUIPMENT_TYPE_ICONS] || 'settings') : 'handyman'}</span>
                                                     <div>
-                                                        <p className="font-semibold text-slate-900 dark:text-white">{r.equipment?.well_name || r.equipment?.name}</p>
-                                                        <p className="text-[11px] text-slate-400">{r.equipment?.brand} {r.equipment?.model}</p>
+                                                        <p className="font-semibold text-slate-900 dark:text-white">{r.external_equipment_name || r.equipment?.well_name || r.equipment?.name}</p>
+                                                        {r.equipment && <p className="text-[11px] text-slate-400">{r.equipment?.brand} {r.equipment?.model}</p>}
                                                     </div>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.client?.company_name || '—'}</td>
+                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.external_client_name || r.client?.company_name || '—'}</td>
                                             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.external_provider || '—'}</td>
                                             <td className="px-3 py-3 text-center">
                                                 <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${REPAIR_STATUS_COLORS[r.status].bg} ${REPAIR_STATUS_COLORS[r.status].text}`}>{REPAIR_STATUS_LABELS[r.status]}</span>
@@ -297,11 +317,30 @@ export default function RepairsDashboard() {
                         </div>
                         <form onSubmit={handleCreate}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="md:col-span-2"><label className={labelClass}>Equipo *</label>
-                                    <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} required className={inputClass}>
-                                        <option value="">Seleccionar equipo...</option>
-                                        {equipment.map((eq: any) => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}
-                                    </select>
+                                <div className="md:col-span-2">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <label className={labelClass + ' mb-0'}>Equipo *</label>
+                                        <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                            <input type="checkbox" checked={form.is_external} onChange={e => setForm({ ...form, is_external: e.target.checked })} className="rounded border-slate-300 text-primary focus:ring-primary" />
+                                            Equipo externo (del cliente)
+                                        </label>
+                                    </div>
+                                    {!form.is_external ? (
+                                        <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} required className={inputClass}>
+                                            <option value="">Seleccionar equipo...</option>
+                                            {equipment.map((eq: any) => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}
+                                        </select>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <input value={form.external_equipment_name} onChange={e => setForm({ ...form, external_equipment_name: e.target.value })} required placeholder="Nombre o descripción del equipo..." className={inputClass} />
+                                            <div>
+                                                <input list="clients-ext-list" value={form.client_name_input} onChange={e => setForm({ ...form, client_name_input: e.target.value })} placeholder="Seleccionar o escribir cliente (opcional)..." className={inputClass} />
+                                                <datalist id="clients-ext-list">
+                                                    {clients.map(c => <option key={c.id} value={c.company_name} />)}
+                                                </datalist>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div><label className={labelClass}>Tipo de Falla</label>
                                     <select value={form.failure_type} onChange={e => setForm({ ...form, failure_type: e.target.value as FailureType })} className={inputClass}>
@@ -383,8 +422,8 @@ function KanbanCard({ repair: r, onStatusChange, onClick }: { repair: EquipmentR
 
             {/* Equipment */}
             <div className="flex items-center gap-2 mb-1">
-                <span className="material-symbols-outlined text-primary text-[16px]">{EQUIPMENT_TYPE_ICONS[r.equipment?.equipment_type as keyof typeof EQUIPMENT_TYPE_ICONS] || 'settings'}</span>
-                <p className="font-bold text-sm text-slate-900 dark:text-white truncate">{r.equipment?.well_name || r.equipment?.name}</p>
+                <span className="material-symbols-outlined text-primary text-[16px]">{r.equipment ? (EQUIPMENT_TYPE_ICONS[r.equipment.equipment_type as keyof typeof EQUIPMENT_TYPE_ICONS] || 'settings') : 'handyman'}</span>
+                <p className="font-bold text-sm text-slate-900 dark:text-white truncate">{r.external_equipment_name || r.equipment?.well_name || r.equipment?.name}</p>
             </div>
 
             {/* Failure + urgency */}
@@ -395,7 +434,7 @@ function KanbanCard({ repair: r, onStatusChange, onClick }: { repair: EquipmentR
 
             {/* Client + provider */}
             <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                <span className="truncate">{r.client?.company_name || '—'}</span>
+                <span className="truncate">{r.external_client_name || r.client?.company_name || '—'}</span>
                 <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${urgencyColor.bg} ${urgencyColor.text} font-bold`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${urgencyColor.dot}`} />{URGENCY_LABELS[r.urgency]}
                 </span>
