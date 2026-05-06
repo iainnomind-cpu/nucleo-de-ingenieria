@@ -42,6 +42,17 @@ export default function UniformsInventory() {
         assigned_date: new Date().toISOString().split('T')[0],
         notes: ''
     });
+    
+    // Uniform Form
+    const [showUniformForm, setShowUniformForm] = useState(false);
+    const [editingUniform, setEditingUniform] = useState<Uniform | null>(null);
+    const [uniformForm, setUniformForm] = useState({
+        name: '',
+        category: 'uniforme' as 'uniforme' | 'epp',
+        size: '',
+        current_stock: '0',
+        unit_cost: '0'
+    });
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -86,6 +97,46 @@ export default function UniformsInventory() {
         
         setShowForm(false);
         setForm({ uniform_id: '', employee_id: '', quantity: '1', assigned_date: new Date().toISOString().split('T')[0], notes: '' });
+        fetchData();
+    };
+
+    const handleSaveUniform = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const payload = {
+            name: uniformForm.name,
+            category: uniformForm.category,
+            size: uniformForm.size || null,
+            current_stock: parseFloat(uniformForm.current_stock) || 0,
+            unit_cost: parseFloat(uniformForm.unit_cost) || 0
+        };
+
+        if (editingUniform) {
+            await supabase.from('inventory_uniforms').update(payload).eq('id', editingUniform.id);
+        } else {
+            await supabase.from('inventory_uniforms').insert(payload);
+        }
+
+        setShowUniformForm(false);
+        setEditingUniform(null);
+        setUniformForm({ name: '', category: 'uniforme', size: '', current_stock: '0', unit_cost: '0' });
+        fetchData();
+    };
+
+    const openEditUniform = (u: Uniform) => {
+        setEditingUniform(u);
+        setUniformForm({
+            name: u.name,
+            category: u.category,
+            size: u.size || '',
+            current_stock: u.current_stock.toString(),
+            unit_cost: u.unit_cost.toString()
+        });
+        setShowUniformForm(true);
+    };
+
+    const handleDeleteUniform = async (id: string) => {
+        if (!window.confirm('¿Eliminar este artículo? Esta acción no se puede deshacer.')) return;
+        await supabase.from('inventory_uniforms').update({ is_active: false }).eq('id', id);
         fetchData();
     };
 
@@ -134,7 +185,46 @@ export default function UniformsInventory() {
                                     <option value="uniforme">Uniformes</option>
                                     <option value="epp">EPP (Equipo de Protección)</option>
                                 </select>
+                                <button onClick={() => { setEditingUniform(null); setUniformForm({ name: '', category: 'uniforme', size: '', current_stock: '0', unit_cost: '0' }); setShowUniformForm(!showUniformForm); }} 
+                                    className="ml-auto flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-primary/20">
+                                    <span className="material-symbols-outlined text-[18px]">add</span> Nuevo Artículo
+                                </button>
                             </div>
+                            
+                            {showUniformForm && (
+                                <form onSubmit={handleSaveUniform} className="rounded-xl border border-primary/20 bg-primary/5 p-6 mb-6 shadow-inner">
+                                    <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">{editingUniform ? 'Editar Artículo' : 'Nuevo Artículo'}</h3>
+                                    <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
+                                        <div className="md:col-span-2">
+                                            <label className={labelClass}>Nombre / Descripción *</label>
+                                            <input required value={uniformForm.name} onChange={e => setUniformForm({ ...uniformForm, name: e.target.value })} className={inputClass} placeholder="Ej. Playera tipo Polo Negra" />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Categoría *</label>
+                                            <select required value={uniformForm.category} onChange={e => setUniformForm({ ...uniformForm, category: e.target.value as 'uniforme' | 'epp' })} className={inputClass}>
+                                                <option value="uniforme">Uniforme</option>
+                                                <option value="epp">EPP</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Talla</label>
+                                            <input value={uniformForm.size} onChange={e => setUniformForm({ ...uniformForm, size: e.target.value })} className={inputClass} placeholder="CH, M, G, 32..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Stock Actual</label>
+                                            <input type="number" required min="0" value={uniformForm.current_stock} onChange={e => setUniformForm({ ...uniformForm, current_stock: e.target.value })} className={inputClass} />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Costo Unitario ($)</label>
+                                            <input type="number" step="0.01" required min="0" value={uniformForm.unit_cost} onChange={e => setUniformForm({ ...uniformForm, unit_cost: e.target.value })} className={inputClass} />
+                                        </div>
+                                    </div>
+                                    <div className="mt-4 flex gap-2">
+                                        <button type="submit" className="rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-white">{editingUniform ? 'Actualizar' : 'Guardar'}</button>
+                                        <button type="button" onClick={() => setShowUniformForm(false)} className="rounded-lg border border-slate-200 px-5 py-2 text-sm text-slate-500">Cancelar</button>
+                                    </div>
+                                </form>
+                            )}
                             
                             <div className="rounded-xl border border-slate-200/60 bg-white shadow-sm dark:border-slate-800/60 dark:bg-slate-900 overflow-hidden">
                                 <table className="w-full text-sm">
@@ -145,6 +235,7 @@ export default function UniformsInventory() {
                                             <th className="px-5 py-3 text-center font-semibold text-slate-500">Talla</th>
                                             <th className="px-5 py-3 text-center font-semibold text-slate-500">Stock</th>
                                             <th className="px-5 py-3 text-right font-semibold text-slate-500">Valor Unitario</th>
+                                            <th className="px-5 py-3 text-center font-semibold text-slate-500">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -161,10 +252,16 @@ export default function UniformsInventory() {
                                                     <span className={u.current_stock <= 2 ? 'text-red-500' : ''}>{u.current_stock}</span>
                                                 </td>
                                                 <td className="px-5 py-3 text-right text-slate-500">{formatCurrency(u.unit_cost)}</td>
+                                                <td className="px-5 py-3 text-center">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button onClick={() => openEditUniform(u)} className="text-slate-400 hover:text-primary"><span className="material-symbols-outlined text-[18px]">edit</span></button>
+                                                        <button onClick={() => handleDeleteUniform(u.id)} className="text-slate-400 hover:text-red-500"><span className="material-symbols-outlined text-[18px]">delete</span></button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         ))}
                                         {filteredUniforms.length === 0 && (
-                                            <tr><td colSpan={5} className="py-8 text-center text-slate-400">No hay registros</td></tr>
+                                            <tr><td colSpan={6} className="py-8 text-center text-slate-400">No hay registros</td></tr>
                                         )}
                                     </tbody>
                                 </table>

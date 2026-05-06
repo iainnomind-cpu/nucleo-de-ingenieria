@@ -27,6 +27,14 @@ export default function VacationsPlanner() {
         notes: ''
     });
 
+    const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+    const [employeeForm, setEmployeeForm] = useState({
+        full_name: '',
+        department: '',
+        hire_date: new Date().toISOString().split('T')[0],
+        base_vacation_days: '12'
+    });
+
     const fetchAll = useCallback(async () => {
         setLoading(true);
         const [empRes, absRes] = await Promise.all([
@@ -66,6 +74,22 @@ export default function VacationsPlanner() {
         
         setShowForm(false);
         setForm({ employee_id: '', absence_type: 'VACACIONES', start_date: '', days_count: '1', is_compensated: false, notes: '' });
+        fetchAll();
+    };
+
+    const handleSaveEmployee = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        await supabase.from('hr_employees').insert({
+            full_name: employeeForm.full_name,
+            department: employeeForm.department || null,
+            hire_date: employeeForm.hire_date || null,
+            base_vacation_days: parseInt(employeeForm.base_vacation_days) || 12,
+            is_active: true
+        });
+        
+        setShowEmployeeForm(false);
+        setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], base_vacation_days: '12' });
         fetchAll();
     };
 
@@ -119,12 +143,45 @@ export default function VacationsPlanner() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={() => setShowForm(!showForm)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20">
+                    <button onClick={() => { setShowEmployeeForm(!showEmployeeForm); setShowForm(false); }} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="material-symbols-outlined text-[18px]">person_add</span>
+                        Nuevo Colaborador
+                    </button>
+                    <button onClick={() => { setShowForm(!showForm); setShowEmployeeForm(false); }} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20">
                         <span className="material-symbols-outlined text-[18px]">event_busy</span>
                         Registrar Ausencia
                     </button>
                 </div>
             </div>
+
+            {showEmployeeForm && (
+                <form onSubmit={handleSaveEmployee} className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-6 shadow-inner dark:border-indigo-900/30 dark:bg-indigo-900/10">
+                    <h3 className="mb-4 text-sm font-bold text-indigo-900 dark:text-indigo-300">Nuevo Colaborador</h3>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                        <div>
+                            <label className={labelClass}>Nombre Completo *</label>
+                            <input required value={employeeForm.full_name} onChange={e => setEmployeeForm({ ...employeeForm, full_name: e.target.value })} className={inputClass} placeholder="Nombre y Apellidos" />
+                        </div>
+                        <div>
+                            <label className={labelClass}>Departamento</label>
+                            <input value={employeeForm.department} onChange={e => setEmployeeForm({ ...employeeForm, department: e.target.value })} className={inputClass} placeholder="Ej. Operaciones, Limpieza..." />
+                        </div>
+                        <div>
+                            <label className={labelClass}>Fecha de Ingreso</label>
+                            <input type="date" required value={employeeForm.hire_date} onChange={e => setEmployeeForm({ ...employeeForm, hire_date: e.target.value })} className={inputClass} />
+                        </div>
+                        <div>
+                            <label className={labelClass}>Días Base Vacaciones</label>
+                            <input type="number" required min="6" value={employeeForm.base_vacation_days} onChange={e => setEmployeeForm({ ...employeeForm, base_vacation_days: e.target.value })} className={inputClass} />
+                            <p className="mt-1 text-[10px] text-slate-500">Por defecto: 12 días (LFT México)</p>
+                        </div>
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                        <button type="submit" className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white">Guardar Colaborador</button>
+                        <button type="button" onClick={() => setShowEmployeeForm(false)} className="rounded-lg border border-slate-200 px-5 py-2 text-sm text-slate-500">Cancelar</button>
+                    </div>
+                </form>
+            )}
 
             {showForm && (
                 <form onSubmit={handleSubmit} className="rounded-xl border border-primary/20 bg-primary/5 p-6 shadow-inner">
