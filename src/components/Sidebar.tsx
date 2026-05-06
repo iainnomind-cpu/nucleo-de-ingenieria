@@ -19,7 +19,8 @@ const navItems = [
   { label: 'Flotilla', icon: 'local_shipping', path: '/fleet', module: 'fleet' },
   { label: 'WhatsApp Mktg', icon: 'chat', path: '/whatsapp', module: 'whatsapp' },
   { label: 'Tablero de Tareas', icon: 'task', path: '/tasks', module: 'tasks' },
-  { label: 'Equipo', icon: 'forum', path: '/team', module: 'team' },
+  { label: 'Chat de Equipo', icon: 'forum', path: '/team', module: 'team' },
+  { label: 'Vacaciones y RH', icon: 'event_available', path: '/team/board', module: 'team' },
 ];
 
 function Sidebar() {

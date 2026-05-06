@@ -27,7 +27,7 @@ import FieldExpenses from './pages/Finance/FieldExpenses';
 import VehiclesList from './pages/Fleet/VehiclesList';
 import VehicleDetail from './pages/Fleet/VehicleDetail/VehicleDetail';
 import SpaceChat from './pages/Team/SpaceChat';
-import TeamBoard from './pages/Team/TeamBoard';
+import VacationsPlanner from './pages/Team/VacationsPlanner';
 import Inbox from './pages/Team/Inbox';
 import TasksDashboard from './pages/Tasks/TasksDashboard';
 import WhatsAppDashboard from './pages/WhatsApp/WhatsAppDashboard';
@@ -142,7 +142,7 @@ function ProtectedApp() {
             <>
               <Route path="/team" element={<SpaceChat />} />
               <Route path="/team/space/:spaceId" element={<SpaceChat />} />
-              <Route path="/team/board" element={<TeamBoard />} />
+              <Route path="/team/board" element={<VacationsPlanner />} />
               <Route path="/team/inbox" element={<Inbox />} />
             </>
           )}
