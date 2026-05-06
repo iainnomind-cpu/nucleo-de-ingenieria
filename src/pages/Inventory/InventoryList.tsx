@@ -322,7 +322,14 @@ export default function InventoryList() {
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                             {products.map(p => {
                                 const status = getStockStatus(p);
-                                const conf = STOCK_STATUS_CONFIG[status];
+                                const conf = STOCK_STATUS_CONFIG[status] || STOCK_STATUS_CONFIG.ok;
+                                const areaConf = AREA_COLORS[p.area as InventoryArea] || AREA_COLORS.oficina;
+                                const areaIcon = AREA_ICONS[p.area as InventoryArea] || AREA_ICONS.oficina;
+                                const areaLabel = AREA_LABELS[p.area as InventoryArea] || AREA_LABELS.oficina;
+                                const catIcon = CATEGORY_ICONS[p.category] || CATEGORY_ICONS.otro;
+                                const catLabel = CATEGORY_LABELS[p.category] || CATEGORY_LABELS.otro;
+                                const critConf = CRITICALITY_COLORS[p.criticality] || CRITICALITY_COLORS.normal;
+                                const critLabel = CRITICALITY_LABELS[p.criticality] || CRITICALITY_LABELS.normal;
                                 return (
                                     <tr key={p.id} className="group transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/50">
                                         <td className="px-4 py-3">
@@ -333,16 +340,16 @@ export default function InventoryList() {
                                             <p className="font-medium text-slate-900 dark:text-white">{p.name}</p>
                                             <div className="flex items-center gap-2 mt-0.5">
                                                 {p.location && <span className="text-xs text-slate-400">📍 {p.location}</span>}
-                                                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${AREA_COLORS[p.area || 'oficina'].bg} ${AREA_COLORS[p.area || 'oficina'].text}`}>
-                                                    <span className="material-symbols-outlined text-[11px]">{AREA_ICONS[p.area || 'oficina']}</span>
-                                                    {AREA_LABELS[p.area || 'oficina']}
+                                                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${areaConf.bg} ${areaConf.text}`}>
+                                                    <span className="material-symbols-outlined text-[11px]">{areaIcon}</span>
+                                                    {areaLabel}
                                                 </span>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <span className="inline-flex items-center gap-1 text-xs text-slate-500">
-                                                <span className="material-symbols-outlined text-[14px]">{CATEGORY_ICONS[p.category]}</span>
-                                                {CATEGORY_LABELS[p.category]}
+                                                <span className="material-symbols-outlined text-[14px]">{catIcon}</span>
+                                                {catLabel}
                                             </span>
                                         </td>
                                         <td className={`px-4 py-3 text-right font-bold ${conf.color}`}>{p.current_stock} <span className="text-xs font-normal text-slate-400">{UNIT_LABELS[p.unit]}</span></td>
@@ -350,7 +357,7 @@ export default function InventoryList() {
                                         <td className="px-4 py-3 text-right text-slate-600 dark:text-slate-300">{formatCurrencyInv(p.unit_cost)}</td>
                                         <td className="px-4 py-3 text-right font-semibold text-slate-900 dark:text-white">{formatCurrencyInv(p.current_stock * p.unit_cost)}</td>
                                         <td className="px-4 py-3 text-center">
-                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${CRITICALITY_COLORS[p.criticality].bg} ${CRITICALITY_COLORS[p.criticality].text}`}>{CRITICALITY_LABELS[p.criticality]}</span>
+                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${critConf.bg} ${critConf.text}`}>{critLabel}</span>
                                         </td>
                                         <td className="px-4 py-3 text-right">
                                             <div className="flex justify-end gap-1">
