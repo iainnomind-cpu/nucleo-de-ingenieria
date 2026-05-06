@@ -4,7 +4,7 @@ export type Criticality = 'normal' | 'high_rotation' | 'critical_path';
 export type MovementType = 'entry' | 'exit' | 'adjustment';
 export type MovementReason = 'purchase' | 'project_consumption' | 'return' | 'adjustment' | 'damaged' | 'initial';
 export type PurchaseStatus = 'pending' | 'ordered' | 'received' | 'cancelled';
-export type InventoryArea = 'oficina' | 'bodega';
+export type InventoryArea = 'oficina' | 'bodega' | 'limpieza_pozos' | 'equipos_aforo';
 
 export interface InventoryProduct {
     id: string;
@@ -147,20 +147,25 @@ export function formatCurrencyInv(value: number): string {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
 }
 
-// ── Área (Bodega / Oficina) ──────────────────────────────────────
 export const AREA_LABELS: Record<InventoryArea, string> = {
     oficina: 'Oficina',
     bodega: 'Bodega',
+    limpieza_pozos: 'Mat. Limpieza de Pozos',
+    equipos_aforo: 'Equipos de Aforo',
 };
 
 export const AREA_ICONS: Record<InventoryArea, string> = {
     oficina: 'apartment',
     bodega: 'warehouse',
+    limpieza_pozos: 'water_drop',
+    equipos_aforo: 'speed',
 };
 
 export const AREA_COLORS: Record<InventoryArea, { bg: string; text: string; border: string }> = {
     oficina: { bg: 'bg-sky-100 dark:bg-sky-900/30', text: 'text-sky-700 dark:text-sky-400', border: 'border-sky-200 dark:border-sky-800' },
     bodega: { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-800' },
+    limpieza_pozos: { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-400', border: 'border-cyan-200 dark:border-cyan-800' },
+    equipos_aforo: { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-400', border: 'border-indigo-200 dark:border-indigo-800' },
 };
 
 /** Determina el área de un producto basándose en el prefijo de su código */

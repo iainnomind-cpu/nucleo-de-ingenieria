@@ -228,7 +228,7 @@ export default function InventoryList() {
                         {(Object.keys(CATEGORY_LABELS) as ProductCategory[]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                     </select>
                     <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 self-center" />
-                    {(['all', 'oficina', 'bodega'] as const).map(a => (
+                    {(['all', 'oficina', 'bodega', 'limpieza_pozos', 'equipos_aforo'] as const).map(a => (
                         <button key={a} onClick={() => setFilterArea(a as InventoryArea | 'all')}
                             className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all ${filterArea === a ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
                             <span className="material-symbols-outlined text-[14px]">{a === 'all' ? 'apps' : AREA_ICONS[a]}</span>
