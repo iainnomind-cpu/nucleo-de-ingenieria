@@ -17,6 +17,7 @@ import ProjectDetail from './pages/Projects/ProjectDetail/ProjectDetail';
 import InventoryList from './pages/Inventory/InventoryList';
 import PurchaseList from './pages/Inventory/PurchaseList';
 import ConsumptionReport from './pages/Inventory/ConsumptionReport';
+import UniformsInventory from './pages/Inventory/UniformsInventory';
 import MaintenanceDashboard from './pages/Maintenance/MaintenanceDashboard';
 import EquipmentDetail from './pages/Maintenance/EquipmentDetail/EquipmentDetail';
 import ContractsList from './pages/Maintenance/ContractsList';
@@ -100,6 +101,7 @@ function ProtectedApp() {
               <Route path="/inventory" element={<InventoryList />} />
               <Route path="/inventory/purchases" element={<PurchaseList />} />
               <Route path="/inventory/consumption" element={<ConsumptionReport />} />
+              <Route path="/inventory/uniforms" element={<UniformsInventory />} />
             </>
           )}
           {/* M5: Mantenimiento */}
