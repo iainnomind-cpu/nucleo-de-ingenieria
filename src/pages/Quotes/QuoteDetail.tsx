@@ -801,6 +801,11 @@ export default function QuoteDetail() {
                         <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
                         Descargar PDF
                     </button>
+                    <button onClick={() => navigate(`/quotes/${quote.id}/edit`)}
+                        className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                        Editar
+                    </button>
                     <button onClick={handleNewVersion}
                         className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <span className="material-symbols-outlined text-[18px]">content_copy</span>

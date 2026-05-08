@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import {
     ServiceCatalogItem,
@@ -35,6 +35,8 @@ interface LineItem {
 export default function QuoteBuilder() {
     const navigate = useNavigate();
     const location = useLocation();
+    const { id: editId } = useParams<{ id: string }>();
+    const isEditMode = Boolean(editId);
 
     // Parse query params for M1 prefill
     const queryParams = new URLSearchParams(location.search);
@@ -43,6 +45,8 @@ export default function QuoteBuilder() {
     const initialWorkType = queryParams.get('work_type') || '';
     const initialMotorHp = queryParams.get('hp') || '';
     const initialWellDepth = queryParams.get('depth') || '';
+
+    const [editQuoteNumber, setEditQuoteNumber] = useState('');
 
     const [clients, setClients] = useState<Pick<Client, 'id' | 'company_name' | 'latitude' | 'longitude' | 'formatted_address'>[]>([]);
     const [services, setServices] = useState<ServiceCatalogItem[]>([]);
@@ -90,22 +94,76 @@ export default function QuoteBuilder() {
         supabase.from('service_catalog').select('*').eq('is_active', true).order('name').then(({ data }) => setServices(data || []));
         supabase.from('inventory_products').select('*').eq('is_active', true).order('name').then(({ data }) => setInvProducts((data as InventoryProduct[]) || []));
 
-        // Cargar parámetros operativos por defecto desde configuración del sistema
-        supabase.from('system_settings').select('value').eq('key', 'operational_defaults').single().then(({ data }) => {
-            const d: OperationalDefaults = data?.value
-                ? { ...DEFAULT_OPERATIONAL_VALUES, ...(data.value as Partial<OperationalDefaults>) }
-                : DEFAULT_OPERATIONAL_VALUES;
-            setCostPerKm(d.cost_per_km.toString());
-            setViaticosPerPerson(d.viaticos_per_person.toString());
-            setInsuranceCost(d.insurance_cost.toString());
-            setVehicleWear(d.vehicle_wear.toString());
-            setManiobraCost(d.maniobra_cost.toString());
-            setMarginPercent(d.margin_percent.toString());
-            setTaxPercent(d.tax_percent.toString());
-            setCrewSize(d.crew_size.toString());
-            setEstimatedDays(d.estimated_days.toString());
-        });
-    }, []);
+        if (!isEditMode) {
+            // Only load defaults for NEW quotes
+            supabase.from('system_settings').select('value').eq('key', 'operational_defaults').single().then(({ data }) => {
+                const d: OperationalDefaults = data?.value
+                    ? { ...DEFAULT_OPERATIONAL_VALUES, ...(data.value as Partial<OperationalDefaults>) }
+                    : DEFAULT_OPERATIONAL_VALUES;
+                setCostPerKm(d.cost_per_km.toString());
+                setViaticosPerPerson(d.viaticos_per_person.toString());
+                setInsuranceCost(d.insurance_cost.toString());
+                setVehicleWear(d.vehicle_wear.toString());
+                setManiobraCost(d.maniobra_cost.toString());
+                setMarginPercent(d.margin_percent.toString());
+                setTaxPercent(d.tax_percent.toString());
+                setCrewSize(d.crew_size.toString());
+                setEstimatedDays(d.estimated_days.toString());
+            });
+        }
+    }, [isEditMode]);
+
+    // Load existing quote data when editing
+    useEffect(() => {
+        if (!editId) return;
+        const loadQuote = async () => {
+            const { data: q } = await supabase.from('quotes').select('*').eq('id', editId).single();
+            if (!q) { navigate('/quotes'); return; }
+            setEditQuoteNumber(q.quote_number || '');
+            setClientId(q.client_id || '');
+            setTitle(q.title || '');
+            setDescription(q.description || '');
+            setWorkType(q.work_type || '');
+            setWellDepth(q.well_depth?.toString() || '');
+            setMotorHp(q.motor_hp?.toString() || '');
+            setDistanceKm(q.distance_km?.toString() || '');
+            setCrewSize(q.crew_size?.toString() || '2');
+            setEstimatedDays(q.estimated_days?.toString() || '1');
+            setRiskLevel(q.risk_level || 'normal');
+            setMarginPercent(q.margin_percent?.toString() || '20');
+            setDiscountPercent(q.discount_percent?.toString() || '0');
+            setTaxPercent(q.tax_percent?.toString() || '16');
+            setCostPerKm(q.cost_per_km?.toString() || '5.50');
+            setViaticosPerPerson(q.viaticos_per_person?.toString() || '850');
+            setInsuranceCost(q.insurance_cost?.toString() || '0');
+            setVehicleWear(q.vehicle_wear?.toString() || '0');
+            setManiobraCost(q.maniobra_cost?.toString() || '0');
+            setValidUntil(q.valid_until || '');
+            setNotes(q.notes || '');
+            setClientAddress(q.client_address || '');
+            setPropertyName(q.property_name || '');
+            setPaymentTerms(q.payment_terms || '70% AL CONTRATAR 30% AL FINALIZAR');
+            setDeliveryDays(q.delivery_days || '10 DIAS HABILES');
+            setExchangeRate(q.exchange_rate?.toString() || '20.00');
+            setIntroText(q.intro_text || '');
+
+            // Load items
+            const { data: existingItems } = await supabase.from('quote_items').select('*').eq('quote_id', editId).order('sort_order');
+            if (existingItems) {
+                setItems(existingItems.map(it => ({
+                    tempId: crypto.randomUUID(),
+                    service_id: it.service_id || null,
+                    product_id: it.product_id || null,
+                    description: it.description,
+                    quantity: it.quantity,
+                    unit: it.unit,
+                    unit_price: it.unit_price,
+                    source: it.product_id ? 'inventory' : it.service_id ? 'catalog' : 'manual',
+                })));
+            }
+        };
+        loadQuote();
+    }, [editId, navigate]);
 
     // M-Maps: Auto-calculate distance when client is selected + auto-fill address
     useEffect(() => {
@@ -213,15 +271,8 @@ export default function QuoteBuilder() {
         if (!clientId) return alert('Por favor, selecciona un cliente de la lista.');
         setSaving(true);
 
-        // Generate quote number
-        const year = new Date().getFullYear();
-        const { count } = await supabase.from('quotes').select('*', { count: 'exact', head: true });
-        const quoteNumber = `COT-${year}-${String((count || 0) + 1).padStart(4, '0')}`;
-
-        const { data: quote, error } = await supabase.from('quotes').insert({
-            quote_number: quoteNumber,
+        const payload = {
             client_id: clientId || null,
-            status: 'draft', // Always initially save as draft so the Send Modal correctly tracks the transition
             title,
             description: description || null,
             work_type: workType || null,
@@ -246,26 +297,45 @@ export default function QuoteBuilder() {
             maniobra_cost: parseFloat(maniobraCost) || 0,
             valid_until: validUntil || null,
             notes: notes || null,
-            // New Excel-format fields
             client_address: clientAddress || null,
             property_name: propertyName || null,
             payment_terms: paymentTerms || '70% AL CONTRATAR 30% AL FINALIZAR',
             delivery_days: deliveryDays || '10 DIAS HABILES',
             exchange_rate: parseFloat(exchangeRate) || 20,
             intro_text: introText || null,
-        }).select().single();
+        };
 
-        if (error || !quote) {
-            alert('Error al guardar: ' + (error?.message || 'unknown'));
-            setSaving(false);
-            return;
+        let quoteId: string;
+
+        if (isEditMode && editId) {
+            // ── UPDATE existing quote ──
+            const { error } = await supabase.from('quotes').update(payload).eq('id', editId);
+            if (error) { alert('Error al guardar: ' + error.message); setSaving(false); return; }
+            quoteId = editId;
+
+            // Replace items: delete old then insert new
+            await supabase.from('quote_items').delete().eq('quote_id', editId);
+        } else {
+            // ── INSERT new quote ──
+            const year = new Date().getFullYear();
+            const { count } = await supabase.from('quotes').select('*', { count: 'exact', head: true });
+            const quoteNumber = `COT-${year}-${String((count || 0) + 1).padStart(4, '0')}`;
+
+            const { data: quote, error } = await supabase.from('quotes').insert({
+                ...payload,
+                quote_number: quoteNumber,
+                status: 'draft',
+            }).select().single();
+
+            if (error || !quote) { alert('Error al guardar: ' + (error?.message || 'unknown')); setSaving(false); return; }
+            quoteId = quote.id;
         }
 
         // Save items
         if (items.length > 0) {
             await supabase.from('quote_items').insert(
                 items.map((item, idx) => ({
-                    quote_id: quote.id,
+                    quote_id: quoteId,
                     service_id: item.service_id || null,
                     product_id: item.product_id || null,
                     description: item.description,
@@ -278,8 +348,8 @@ export default function QuoteBuilder() {
             );
         }
 
-        // → Pipeline Sync: Al enviar cotización, mover oportunidad a "Cotización Enviada"
-        if (status === 'sent' && clientId) {
+        // → Pipeline Sync (only for new quotes being sent)
+        if (!isEditMode && status === 'sent' && clientId) {
             const { data: existingOpp } = await supabase.from('sales_opportunities')
                 .select('id').eq('client_id', clientId)
                 .in('stage', ['prospecting', 'quoting'])
@@ -292,7 +362,7 @@ export default function QuoteBuilder() {
                     probability: 40,
                     title: title,
                 }).eq('id', existingOpp.id);
-                await supabase.from('quotes').update({ opportunity_id: existingOpp.id }).eq('id', quote.id);
+                await supabase.from('quotes').update({ opportunity_id: existingOpp.id }).eq('id', quoteId);
             } else {
                 const { data: newOpp } = await supabase.from('sales_opportunities').insert({
                     client_id: clientId,
@@ -302,13 +372,13 @@ export default function QuoteBuilder() {
                     stage: 'quoting',
                 }).select().single();
                 if (newOpp) {
-                    await supabase.from('quotes').update({ opportunity_id: newOpp.id }).eq('id', quote.id);
+                    await supabase.from('quotes').update({ opportunity_id: newOpp.id }).eq('id', quoteId);
                 }
             }
         }
 
         setSaving(false);
-        navigate(`/quotes/${quote.id}${status === 'sent' ? '?send=1' : ''}`);
+        navigate(`/quotes/${quoteId}${status === 'sent' ? '?send=1' : ''}`);
     };
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
@@ -326,20 +396,22 @@ export default function QuoteBuilder() {
                         Volver
                     </button>
                     <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">
-                        Nueva Cotización
+                        {isEditMode ? `Editar ${editQuoteNumber}` : 'Nueva Cotización'}
                     </h2>
                 </div>
                 <div className="flex gap-2">
                     <button onClick={() => handleSave('draft')} disabled={saving}
                         className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 disabled:opacity-50">
                         <span className="material-symbols-outlined text-[18px]">save</span>
-                        Guardar Borrador
+                        {isEditMode ? 'Guardar Cambios' : 'Guardar Borrador'}
                     </button>
-                    <button onClick={() => handleSave('sent')} disabled={saving}
-                        className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20 disabled:opacity-50">
-                        <span className="material-symbols-outlined text-[18px]">send</span>
-                        Guardar y Enviar
-                    </button>
+                    {!isEditMode && (
+                        <button onClick={() => handleSave('sent')} disabled={saving}
+                            className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20 disabled:opacity-50">
+                            <span className="material-symbols-outlined text-[18px]">send</span>
+                            Guardar y Enviar
+                        </button>
+                    )}
                 </div>
             </div>
 

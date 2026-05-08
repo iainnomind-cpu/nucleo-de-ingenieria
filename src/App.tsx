@@ -84,6 +84,7 @@ function ProtectedApp() {
             <>
               <Route path="/quotes" element={<QuotesList />} />
               <Route path="/quotes/new" element={<QuoteBuilder />} />
+              <Route path="/quotes/:id/edit" element={<QuoteBuilder />} />
               <Route path="/quotes/catalog" element={<ServiceCatalog />} />
               <Route path="/quotes/:id" element={<QuoteDetail />} />
             </>
