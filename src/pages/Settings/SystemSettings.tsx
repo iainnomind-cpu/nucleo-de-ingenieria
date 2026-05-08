@@ -536,8 +536,8 @@ function UsuariosTab() {
                     {/* Permissions Matrix */}
                     <div className="col-span-full mt-4">
                         <h5 className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-500">Matriz de Permisos Individuales</h5>
-                        <div className="rounded-xl border border-slate-200/60 bg-white/50 overflow-hidden dark:border-slate-800/60 dark:bg-slate-900/50">
-                            <table className="w-full text-sm">
+                        <div className="rounded-xl border border-slate-200/60 bg-white/50 overflow-x-auto dark:border-slate-800/60 dark:bg-slate-900/50">
+                            <table className="w-full text-sm min-w-[500px]">
                                 <thead className="border-b border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-800/50">
                                     <tr>
                                         <th className="px-4 py-3 text-left font-semibold text-slate-500">Módulo</th>
