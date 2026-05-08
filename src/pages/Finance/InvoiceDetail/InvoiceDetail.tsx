@@ -23,6 +23,7 @@ export default function InvoiceDetail() {
 
     const [payForm, setPayForm] = useState({ amount: '', payment_method: 'transfer' as PaymentMethod, reference: '', notes: '', received_by: '' });
     const [expForm, setExpForm] = useState({ category: 'materials' as ExpenseCategory, description: '', amount: '', supplier: '', receipt_number: '', recorded_by: '' });
+    const [uploadingSAT, setUploadingSAT] = useState(false);
 
     const fetchAll = useCallback(async () => {
         if (!id) return;
@@ -283,6 +284,56 @@ export default function InvoiceDetail() {
         fetchAll();
     };
 
+    const handleSATUpload = async (e: React.ChangeEvent<HTMLInputElement>, fileType: 'pdf' | 'xml') => {
+        if (!invoice || !e.target.files?.[0]) return;
+        setUploadingSAT(true);
+        const file = e.target.files[0];
+        const ext = file.name.split('.').pop()?.toLowerCase() || fileType;
+        const path = `invoices/sat/${invoice.invoice_number.replace(/[^a-zA-Z0-9-]/g, '_')}_${fileType}.${ext}`;
+        const { error } = await supabase.storage.from('documents').upload(path, file, { upsert: true });
+        if (error) { alert('Error al subir: ' + error.message); setUploadingSAT(false); return; }
+        const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path);
+        const field = fileType === 'pdf' ? 'sat_pdf_url' : 'sat_xml_url';
+        await supabase.from('invoices').update({ [field]: urlData.publicUrl }).eq('id', invoice.id);
+        setUploadingSAT(false);
+        fetchAll();
+    };
+
+    const downloadPaymentReceipt = (payment: Payment) => {
+        if (!invoice) return;
+        const content = `
+===================================================
+       NOTA DE PAGO — ${invoice.invoice_number}
+===================================================
+
+Fecha: ${new Date(payment.payment_date).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' })}
+Cliente: ${invoice.client?.company_name || '—'}
+Factura: ${invoice.invoice_number}
+
+---------------------------------------------------
+Monto:          ${formatCurrencyFin(payment.amount)}
+Método:         ${PAYMENT_METHOD_LABELS[payment.payment_method]}
+Referencia:     ${payment.reference || 'N/A'}
+Recibido por:   ${payment.received_by || 'N/A'}
+Notas:          ${payment.notes || '—'}
+---------------------------------------------------
+
+Total Factura:  ${formatCurrencyFin(invoice.total)}
+Saldo:          ${formatCurrencyFin(invoice.balance)}
+
+===================================================
+           Núcleo de Ingeniería S.A. de C.V.
+===================================================
+        `.trim();
+        const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Nota_Pago_${invoice.invoice_number}_${new Date(payment.payment_date).toISOString().split('T')[0]}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5';
     const sectionClass = 'rounded-xl border border-slate-200/60 bg-white/50 p-6 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50';
@@ -368,6 +419,9 @@ export default function InvoiceDetail() {
                                             <p className="text-xs text-slate-400">{PAYMENT_METHOD_LABELS[p.payment_method]}{p.reference ? ` · Ref: ${p.reference}` : ''}{p.received_by ? ` · ${p.received_by}` : ''}</p>
                                         </div>
                                         <span className="text-xs text-slate-400">{new Date(p.payment_date).toLocaleDateString('es-MX')}</span>
+                                        <button onClick={() => downloadPaymentReceipt(p)} className="rounded p-1 text-slate-400 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-sky-900/20 transition-colors" title="Descargar nota de pago">
+                                            <span className="material-symbols-outlined text-[16px]">download</span>
+                                        </button>
                                     </div>
                                 ))}
                             </div>
@@ -436,6 +490,55 @@ export default function InvoiceDetail() {
                         <div className="space-y-3 text-sm">
                             <div><span className="text-xs text-slate-400 block">RFC</span><span className="font-mono font-medium text-slate-900 dark:text-white">{invoice.client_rfc || '—'}</span></div>
                             <div><span className="text-xs text-slate-400 block">Razón Social</span><span className="font-medium text-slate-900 dark:text-white">{invoice.client_fiscal_name || '—'}</span></div>
+                        </div>
+                    </div>
+
+                    {/* SAT Documents */}
+                    <div className={sectionClass}>
+                        <h3 className="mb-3 text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2"><span className="material-symbols-outlined text-sky-500 text-[18px]">description</span>Documentos SAT</h3>
+                        <div className="space-y-3">
+                            {/* PDF */}
+                            <div>
+                                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Factura PDF</p>
+                                {(invoice as any).sat_pdf_url ? (
+                                    <div className="flex items-center gap-2">
+                                        <a href={(invoice as any).sat_pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-sky-500 hover:text-sky-600 font-medium">
+                                            <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>Ver PDF
+                                        </a>
+                                        <label className="cursor-pointer text-xs text-slate-400 hover:text-orange-500">
+                                            <span className="material-symbols-outlined text-[14px]">upload</span>
+                                            <input type="file" accept=".pdf" className="hidden" onChange={e => handleSATUpload(e, 'pdf')} />
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <label className={`flex items-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-400 hover:border-sky-400 hover:text-sky-500 transition-colors ${uploadingSAT ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                                        <span>{uploadingSAT ? 'Subiendo...' : 'Subir PDF del SAT'}</span>
+                                        <input type="file" accept=".pdf" className="hidden" onChange={e => handleSATUpload(e, 'pdf')} />
+                                    </label>
+                                )}
+                            </div>
+                            {/* XML */}
+                            <div>
+                                <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">CFDI XML</p>
+                                {(invoice as any).sat_xml_url ? (
+                                    <div className="flex items-center gap-2">
+                                        <a href={(invoice as any).sat_xml_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-emerald-500 hover:text-emerald-600 font-medium">
+                                            <span className="material-symbols-outlined text-[16px]">code</span>Ver XML
+                                        </a>
+                                        <label className="cursor-pointer text-xs text-slate-400 hover:text-orange-500">
+                                            <span className="material-symbols-outlined text-[14px]">upload</span>
+                                            <input type="file" accept=".xml" className="hidden" onChange={e => handleSATUpload(e, 'xml')} />
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <label className={`flex items-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-400 hover:border-emerald-400 hover:text-emerald-500 transition-colors ${uploadingSAT ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                                        <span>{uploadingSAT ? 'Subiendo...' : 'Subir XML del SAT'}</span>
+                                        <input type="file" accept=".xml" className="hidden" onChange={e => handleSATUpload(e, 'xml')} />
+                                    </label>
+                                )}
+                            </div>
                         </div>
                     </div>
 
