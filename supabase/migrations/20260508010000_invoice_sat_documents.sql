@@ -17,3 +17,7 @@ CREATE POLICY "Authenticated upload on documents" ON storage.objects
 -- Allow authenticated updates (upsert) on documents bucket
 CREATE POLICY "Authenticated update on documents" ON storage.objects
   FOR UPDATE USING (bucket_id = 'documents');
+
+-- Allow authenticated deletes on documents bucket
+CREATE POLICY "Authenticated delete on documents" ON storage.objects
+  FOR DELETE USING (bucket_id = 'documents');

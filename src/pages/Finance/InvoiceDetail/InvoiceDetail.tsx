@@ -299,6 +299,25 @@ export default function InvoiceDetail() {
         fetchAll();
     };
 
+    const handleSATDelete = async (fileType: 'pdf' | 'xml') => {
+        if (!invoice) return;
+        if (!window.confirm(`¿Eliminar el archivo ${fileType.toUpperCase()} de esta factura?`)) return;
+        const url = fileType === 'pdf' ? (invoice as any).sat_pdf_url : (invoice as any).sat_xml_url;
+        if (url) {
+            // Extract path from URL to delete from storage
+            try {
+                const urlObj = new URL(url);
+                const pathMatch = urlObj.pathname.match(/\/object\/public\/documents\/(.+)/);
+                if (pathMatch) {
+                    await supabase.storage.from('documents').remove([decodeURIComponent(pathMatch[1])]);
+                }
+            } catch { /* ignore URL parse errors */ }
+        }
+        const field = fileType === 'pdf' ? 'sat_pdf_url' : 'sat_xml_url';
+        await supabase.from('invoices').update({ [field]: null }).eq('id', invoice.id);
+        fetchAll();
+    };
+
     const downloadPaymentReceipt = (payment: Payment) => {
         if (!invoice) return;
         const content = `
@@ -505,10 +524,13 @@ Saldo:          ${formatCurrencyFin(invoice.balance)}
                                         <a href={(invoice as any).sat_pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-sky-500 hover:text-sky-600 font-medium">
                                             <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>Ver PDF
                                         </a>
-                                        <label className="cursor-pointer text-xs text-slate-400 hover:text-orange-500">
+                                        <label className="cursor-pointer text-xs text-slate-400 hover:text-orange-500" title="Reemplazar">
                                             <span className="material-symbols-outlined text-[14px]">upload</span>
                                             <input type="file" accept=".pdf" className="hidden" onChange={e => handleSATUpload(e, 'pdf')} />
                                         </label>
+                                        <button onClick={() => handleSATDelete('pdf')} className="text-xs text-slate-400 hover:text-red-500 transition-colors" title="Eliminar PDF">
+                                            <span className="material-symbols-outlined text-[14px]">delete</span>
+                                        </button>
                                     </div>
                                 ) : (
                                     <label className={`flex items-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-400 hover:border-sky-400 hover:text-sky-500 transition-colors ${uploadingSAT ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -526,10 +548,13 @@ Saldo:          ${formatCurrencyFin(invoice.balance)}
                                         <a href={(invoice as any).sat_xml_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-sm text-emerald-500 hover:text-emerald-600 font-medium">
                                             <span className="material-symbols-outlined text-[16px]">code</span>Ver XML
                                         </a>
-                                        <label className="cursor-pointer text-xs text-slate-400 hover:text-orange-500">
+                                        <label className="cursor-pointer text-xs text-slate-400 hover:text-orange-500" title="Reemplazar">
                                             <span className="material-symbols-outlined text-[14px]">upload</span>
                                             <input type="file" accept=".xml" className="hidden" onChange={e => handleSATUpload(e, 'xml')} />
                                         </label>
+                                        <button onClick={() => handleSATDelete('xml')} className="text-xs text-slate-400 hover:text-red-500 transition-colors" title="Eliminar XML">
+                                            <span className="material-symbols-outlined text-[14px]">delete</span>
+                                        </button>
                                     </div>
                                 ) : (
                                     <label className={`flex items-center gap-2 cursor-pointer rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 p-3 text-sm text-slate-400 hover:border-emerald-400 hover:text-emerald-500 transition-colors ${uploadingSAT ? 'opacity-50 pointer-events-none' : ''}`}>
