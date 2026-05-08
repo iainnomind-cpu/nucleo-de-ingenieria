@@ -507,19 +507,19 @@ function UsuariosTab() {
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <div>
                             <label className={labelClass}>Nombre completo *</label>
-                            <input value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} className={inputClass} placeholder="Ej: Joel García" />
+                            <input autoComplete="off" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} className={inputClass} placeholder="Ej: Joel García" />
                         </div>
                         <div>
                             <label className={labelClass}>Email *</label>
-                            <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inputClass} placeholder="joel@nucleo.com" />
+                            <input type="email" autoComplete="off" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className={inputClass} placeholder="joel@nucleo.com" />
                         </div>
                         <div>
                             <label className={labelClass}>Celular (WhatsApp)</label>
-                            <input type="tel" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={inputClass} placeholder="521..." title="Incluir código de país sin el '+'" />
+                            <input type="tel" autoComplete="off" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className={inputClass} placeholder="521..." title="Incluir código de país sin el '+'" />
                         </div>
                         <div>
                             <label className={labelClass}>{editingUser ? 'Nueva contraseña (dejar vacío para mantener)' : 'Contraseña *'}</label>
-                            <input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={inputClass} placeholder="••••••••" />
+                            <input type="password" autoComplete="new-password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} className={inputClass} placeholder="••••••••" />
                         </div>
                         
                         <div>
