@@ -85,7 +85,9 @@ export default function RepairDetail() {
     const saveSection = async (section: string) => {
         if (!repair) return;
         await supabase.from('equipment_repairs').update(editData).eq('id', repair.id);
-        const desc = section === 'shipping_to' ? 'Datos de envío actualizados' :
+        const desc = section === 'report' ? 'Datos del reporte actualizados' :
+            section === 'pickup' ? 'Datos de recolección actualizados' :
+            section === 'shipping_to' ? 'Datos de envío actualizados' :
             section === 'diagnosis' ? 'Diagnóstico actualizado' :
             section === 'quote' ? 'Cotización actualizada' :
             section === 'authorization' ? 'Autorización / OC actualizada' :
@@ -229,13 +231,33 @@ export default function RepairDetail() {
                                 Reporte de Falla
                                 {isDone('reported') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
-                            <span className="text-xs text-slate-400">{new Date(repair.report_date).toLocaleDateString('es-MX')}</span>
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs text-slate-400">{new Date(repair.report_date).toLocaleDateString('es-MX')}</span>
+                                {editSection !== 'report' && <button onClick={() => startEdit('report', { external_equipment_name: repair.external_equipment_name || '', failure_description: repair.failure_description || '', failure_type: repair.failure_type || 'other', urgency: repair.urgency || 'normal', reported_by: repair.reported_by || '', assigned_to: repair.assigned_to || '', report_date: repair.report_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
+                            </div>
                         </div>
-                        <p className="text-sm text-slate-600 dark:text-slate-300">{repair.failure_description}</p>
-                        <div className="mt-2 flex gap-4 text-xs text-slate-500">
-                            {repair.reported_by && <span>Reportó: <strong>{repair.reported_by}</strong></span>}
-                            {repair.assigned_to && <span>Asignado: <strong>{repair.assigned_to}</strong></span>}
-                        </div>
+                        {editSection === 'report' ? (
+                            <div className="space-y-3">
+                                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <div className="md:col-span-2"><label className={labelClass}>Nombre del Equipo (Motor/Bomba)</label><input value={editData.external_equipment_name} onChange={e => setEditData({...editData, external_equipment_name: e.target.value})} className={inputClass} placeholder="Ej: Motor 50HP Pozo #3" /></div>
+                                    <div className="md:col-span-2"><label className={labelClass}>Descripción de la Falla</label><textarea value={editData.failure_description} onChange={e => setEditData({...editData, failure_description: e.target.value})} rows={3} className={inputClass + ' resize-none'} /></div>
+                                    <div><label className={labelClass}>Tipo de Falla</label><select value={editData.failure_type} onChange={e => setEditData({...editData, failure_type: e.target.value})} className={inputClass}>{Object.entries(FAILURE_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+                                    <div><label className={labelClass}>Urgencia</label><select value={editData.urgency} onChange={e => setEditData({...editData, urgency: e.target.value})} className={inputClass}>{Object.entries(URGENCY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+                                    <div><label className={labelClass}>Reportó</label><input value={editData.reported_by} onChange={e => setEditData({...editData, reported_by: e.target.value})} className={inputClass} /></div>
+                                    <div><label className={labelClass}>Asignado a</label><input value={editData.assigned_to} onChange={e => setEditData({...editData, assigned_to: e.target.value})} className={inputClass} /></div>
+                                    <div><label className={labelClass}>Fecha Reporte</label><input type="date" value={editData.report_date} onChange={e => setEditData({...editData, report_date: e.target.value})} className={inputClass} /></div>
+                                </div>
+                                <div className="flex gap-2"><button onClick={() => saveSection('report')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
+                            </div>
+                        ) : (
+                            <>
+                                <p className="text-sm text-slate-600 dark:text-slate-300">{repair.failure_description}</p>
+                                <div className="mt-2 flex gap-4 text-xs text-slate-500">
+                                    {repair.reported_by && <span>Reportó: <strong>{repair.reported_by}</strong></span>}
+                                    {repair.assigned_to && <span>Asignado: <strong>{repair.assigned_to}</strong></span>}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Step 2: Recolección */}
@@ -246,12 +268,22 @@ export default function RepairDetail() {
                                 Recolección del Equipo
                                 {isDone('picked_up') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
+                            {editSection !== 'pickup' && <button onClick={() => startEdit('pickup', { pickup_method: repair.pickup_method || 'pickup', pickup_location: repair.pickup_location || '', pickup_date: repair.pickup_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
                         </div>
-                        <div className="grid grid-cols-3 gap-3 text-sm">
-                            <InfoField label="Método" value={PICKUP_METHOD_LABELS[repair.pickup_method] || '—'} />
-                            <InfoField label="Lugar" value={repair.pickup_location} />
-                            <InfoField label="Fecha" value={repair.pickup_date ? new Date(repair.pickup_date).toLocaleDateString('es-MX') : null} />
-                        </div>
+                        {editSection === 'pickup' ? (
+                            <div className="grid grid-cols-3 gap-3">
+                                <div><label className={labelClass}>Método</label><select value={editData.pickup_method} onChange={e => setEditData({...editData, pickup_method: e.target.value})} className={inputClass}>{Object.entries(PICKUP_METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+                                <div><label className={labelClass}>Lugar</label><input value={editData.pickup_location} onChange={e => setEditData({...editData, pickup_location: e.target.value})} className={inputClass} placeholder="Ubicación del equipo..." /></div>
+                                <div><label className={labelClass}>Fecha</label><input type="date" value={editData.pickup_date} onChange={e => setEditData({...editData, pickup_date: e.target.value})} className={inputClass} /></div>
+                                <div className="flex items-end gap-2"><button onClick={() => saveSection('pickup')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-3 gap-3 text-sm">
+                                <InfoField label="Método" value={PICKUP_METHOD_LABELS[repair.pickup_method] || '—'} />
+                                <InfoField label="Lugar" value={repair.pickup_location} />
+                                <InfoField label="Fecha" value={repair.pickup_date ? new Date(repair.pickup_date).toLocaleDateString('es-MX') : null} />
+                            </div>
+                        )}
                     </div>
 
                     {/* Step 3: Envío al Proveedor */}
