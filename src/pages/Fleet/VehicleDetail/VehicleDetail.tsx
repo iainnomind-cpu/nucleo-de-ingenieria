@@ -35,6 +35,7 @@ export default function VehicleDetail() {
 
     // Form states
     const [insForm, setInsForm] = useState<Partial<VehicleInsurance>>({});
+    const [editingInsId, setEditingInsId] = useState<string | null>(null);
     const [milForm, setMilForm] = useState<Partial<VehicleMileage & { fuel_liters: number }>>({ 
         date: new Date().toISOString().split('T')[0], odometer_start: 0, odometer_end: 0, fuel_liters: 0 
     });
@@ -82,9 +83,34 @@ export default function VehicleDetail() {
     
     const handleAddIns = async (e: React.FormEvent) => {
         e.preventDefault();
-        await supabase.from('vehicle_insurances').insert({ ...insForm, vehicle_id: id });
+        if (editingInsId) {
+            const { vehicle_id, id: _id, created_at, ...updateData } = insForm as any;
+            await supabase.from('vehicle_insurances').update(updateData).eq('id', editingInsId);
+        } else {
+            await supabase.from('vehicle_insurances').insert({ ...insForm, vehicle_id: id });
+        }
         setShowInsForm(false);
         setInsForm({});
+        setEditingInsId(null);
+        fetchAll();
+    };
+
+    const handleEditIns = (ins: VehicleInsurance) => {
+        setInsForm({
+            provider: ins.provider,
+            policy_number: ins.policy_number,
+            start_date: ins.start_date,
+            end_date: ins.end_date,
+            cost: ins.cost,
+            coverage_details: ins.coverage_details || '',
+        });
+        setEditingInsId(ins.id);
+        setShowInsForm(true);
+    };
+
+    const handleDeleteIns = async (insId: string) => {
+        if (!window.confirm('¿Eliminar esta póliza de seguro? Esta acción no se puede deshacer.')) return;
+        await supabase.from('vehicle_insurances').delete().eq('id', insId);
         fetchAll();
     };
 
@@ -306,7 +332,7 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-indigo-500">verified_user</span>Pólizas de Seguro</h3>
-                        <button onClick={() => setShowInsForm(true)} className="flex items-center gap-2 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 text-sm font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
+                        <button onClick={() => { setEditingInsId(null); setInsForm({}); setShowInsForm(true); }} className="flex items-center gap-2 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 text-sm font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Nueva Póliza
                         </button>
                     </div>
@@ -321,11 +347,19 @@ export default function VehicleDetail() {
                                             <p className="text-xs text-slate-500 mt-1">Vigencia: {new Date(ins.start_date).toLocaleDateString('es-MX')} al {new Date(ins.end_date).toLocaleDateString('es-MX')}</p>
                                             {ins.coverage_details && <p className="text-xs text-slate-400 mt-1 line-clamp-1">{ins.coverage_details}</p>}
                                         </div>
-                                        <div className="mt-3 sm:mt-0 text-right flex flex-col sm:items-end gap-1">
+                                        <div className="mt-3 sm:mt-0 text-right flex flex-col sm:items-end gap-2">
                                             <p className="font-bold text-slate-700 dark:text-slate-300">{formatCurrency(ins.cost)}</p>
                                             {exp.status === 'expired' && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Vencida hace {Math.abs(exp.days)} días</span>}
                                             {exp.status === 'warning' && <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Vence en {exp.days} días</span>}
                                             {exp.status === 'ok' && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Vigente ({exp.days} días más)</span>}
+                                            <div className="flex items-center gap-1">
+                                                <button onClick={() => handleEditIns(ins)} className="rounded p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="Editar">
+                                                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                                                </button>
+                                                <button onClick={() => handleDeleteIns(ins.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar">
+                                                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 )
@@ -446,8 +480,8 @@ export default function VehicleDetail() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
                         <div className="mb-6 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Registrar Póliza</h3>
-                            <button onClick={() => setShowInsForm(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{editingInsId ? 'Editar Póliza' : 'Registrar Póliza'}</h3>
+                            <button onClick={() => { setShowInsForm(false); setEditingInsId(null); setInsForm({}); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
                         </div>
                         <form onSubmit={handleAddIns} className="space-y-4">
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Aseguradora</label><input required type="text" value={insForm.provider || ''} onChange={e => setInsForm({...insForm, provider: e.target.value})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
@@ -458,7 +492,7 @@ export default function VehicleDetail() {
                             </div>
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Costo Póliza</label><input required type="number" step="0.01" value={insForm.cost || 0} onChange={e => setInsForm({...insForm, cost: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Detalles de Cobertura</label><textarea value={insForm.coverage_details || ''} onChange={e => setInsForm({...insForm, coverage_details: e.target.value})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900"></textarea></div>
-                            <button type="submit" className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700">Guardar Póliza</button>
+                            <button type="submit" className="w-full rounded-lg bg-indigo-600 py-3 text-sm font-semibold text-white hover:bg-indigo-700">{editingInsId ? 'Actualizar Póliza' : 'Guardar Póliza'}</button>
                         </form>
                     </div>
                 </div>
