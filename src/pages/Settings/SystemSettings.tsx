@@ -532,6 +532,7 @@ function UsuariosTab() {
                                     />
                                 ))}
                             </div>
+                        </div>
                         
                     {/* Permissions Matrix */}
                     <div className="col-span-full mt-4">
@@ -614,8 +615,6 @@ function UsuariosTab() {
                             </table>
                         </div>
                     </div>
- 
- </div>
                     </div>
 
                     {/* Password strength indicator */}
