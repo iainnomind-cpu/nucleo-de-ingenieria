@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['logo.png'],
+      workbox: {
+        maximumFileSizeToCacheInBytes: 3000000,
+      },
       manifest: {
         name: 'Núcleo de Ingeniería ERP',
         short_name: 'Núcleo ERP',
