@@ -180,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [user]);
 
     /**
-     * Refrescar usuario
+     * Refresca usuario
      */
     const refreshUser = useCallback(async () => {
 
