@@ -739,7 +739,7 @@ function ProactiveRecipientsConfig() {
             key: 'proactive_maint_recipients',
             value: selected as unknown as Record<string, unknown>,
             description: 'Lista de nombres de usuario que recibirán notificaciones de mantenimiento proactivo.',
-        });
+        }, { onConflict: 'key' });
         setSaved([...selected]);
         setSaveOk(true);
         setTimeout(() => setSaveOk(false), 3000);

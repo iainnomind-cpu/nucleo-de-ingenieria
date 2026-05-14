@@ -25,6 +25,7 @@ SECURITY DEFINER
 AS $$
 DECLARE
     v_user app_users%ROWTYPE;
+    v_role_name TEXT;
 BEGIN
     -- Buscar usuario activo por email
     SELECT * INTO v_user FROM app_users
@@ -42,13 +43,18 @@ BEGIN
     -- Actualizar last_login
     UPDATE app_users SET last_login = NOW() WHERE id = v_user.id;
 
+    -- Obtener nombre de rol (si existe)
+    SELECT name INTO v_role_name FROM app_roles WHERE id = v_user.role_id;
+
     RETURN json_build_object(
         'success', true,
+        'token', uuid_generate_v4(),
         'user', json_build_object(
             'id', v_user.id,
             'full_name', v_user.full_name,
             'email', v_user.email,
             'permissions', COALESCE(v_user.permissions, '{}'::jsonb),
+            'role_name', COALESCE(v_role_name, 'Usuario'),
             'avatar_color', v_user.avatar_color,
             'is_active', v_user.is_active,
             'last_login', NOW()

@@ -89,7 +89,7 @@ export default function Dashboard() {
         if (lastRun === today) return;
 
         // Actualizar para bloquear ejecuciones concurrentes
-        await supabase.from('system_settings').upsert({ key: 'last_payment_reminders', value: today });
+        await supabase.from('system_settings').upsert({ key: 'last_payment_reminders', value: today }, { onConflict: 'key' });
 
         // 1. A 3 días de vencer ('upcoming')
         const targetDate = new Date();
@@ -202,7 +202,7 @@ export default function Dashboard() {
         const { data: proactiveSetting } = await supabase.from('system_settings').select('value').eq('key', 'last_proactive_maint_check').single();
         const lastProactiveRun = typeof proactiveSetting?.value === 'string' ? proactiveSetting.value.replace(/"/g, '') : null;
         if (lastProactiveRun !== today) {
-          await supabase.from('system_settings').upsert({ key: 'last_proactive_maint_check', value: today });
+          await supabase.from('system_settings').upsert({ key: 'last_proactive_maint_check', value: today }, { onConflict: 'key' });
           await checkProactiveMaintenance();
         }
 

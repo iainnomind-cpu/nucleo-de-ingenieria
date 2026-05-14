@@ -16,6 +16,7 @@ export interface AppUser {
     full_name: string;
     email: string;
     phone?: string;
+    role_name?: string;
     permissions?: ModulePermissions;
     avatar_color: string;
     is_active: boolean;

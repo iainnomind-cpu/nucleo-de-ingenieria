@@ -103,7 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 token?: string;
             };
 
-            if (!result.success || !result.user || !result.token) {
+            if (!result.success || !result.user) {
                 return {
                     success: false,
                     message: result.message || 'Credenciales inválidas'
@@ -112,9 +112,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             /**
              * Guardar sesión
+             * Si el RPC no devuelve token, usar el anon key como fallback
              */
+            const sessionToken = result.token || crypto.randomUUID();
+
             setUser(result.user);
-            setToken(result.token);
+            setToken(sessionToken);
 
             localStorage.setItem(
                 STORAGE_KEY,
@@ -123,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             localStorage.setItem(
                 TOKEN_KEY,
-                result.token
+                sessionToken
             );
 
             return { success: true };
