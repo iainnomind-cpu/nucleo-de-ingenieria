@@ -749,81 +749,152 @@ export default function QuoteBuilder() {
 
                 {/* RIGHT: Live Summary */}
                 <div className="xl:col-span-1">
-                    <div className="sticky top-8 rounded-xl border border-slate-200/60 bg-white/50 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
-                        <div className="border-b border-slate-200 p-5 dark:border-slate-800">
-                            <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                                <span className="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
-                                Resumen de Cotización
-                            </h3>
-                        </div>
-                        <div className="p-5 space-y-3 text-sm">
-                            <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                                <span>Servicios ({items.length} conceptos)</span>
-                                <span className="font-medium">{formatCurrency(items.reduce((s, i) => s + i.quantity * i.unit_price, 0))}</span>
+                    <div className="sticky top-8 space-y-4">
+                        {/* ── SECTION 1: COSTO REAL ── */}
+                        <div className="rounded-xl border border-slate-200/60 bg-white/50 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
+                            <div className="border-b border-slate-200 p-4 dark:border-slate-800">
+                                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                                    <span className="material-symbols-outlined text-amber-500 text-[20px]">calculate</span>
+                                    Costo Real
+                                    <span className="ml-auto text-[10px] font-medium text-slate-400 normal-case">Lo que nos cuesta</span>
+                                </h3>
                             </div>
-                            <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                                <span>Costos Operativos</span>
-                                <span className="font-medium">{formatCurrency(totals.operational_costs)}</span>
-                            </div>
-                            <div className="pl-4 space-y-1 text-xs text-slate-400">
-                                <div className="flex justify-between"><span>Traslado ({distanceKm || '0'} km × 2)</span><span>{formatCurrency(totals.travel_cost)}</span></div>
-                                <div className="flex justify-between"><span>Viáticos ({crewSize} pers × {estimatedDays} días)</span><span>{formatCurrency(totals.viaticos_cost)}</span></div>
-                                {parseFloat(insuranceCost) > 0 && <div className="flex justify-between"><span>Seguros</span><span>{formatCurrency(parseFloat(insuranceCost))}</span></div>}
-                                {parseFloat(vehicleWear) > 0 && <div className="flex justify-between"><span>Desgaste vehículo</span><span>{formatCurrency(parseFloat(vehicleWear))}</span></div>}
-                                {parseFloat(maniobraCost) > 0 && <div className="flex justify-between"><span>Maniobras</span><span>{formatCurrency(parseFloat(maniobraCost))}</span></div>}
-                            </div>
-
-                            {totals.complexity_factor > 1 && (
-                                <div className="flex justify-between text-xs text-amber-600 dark:text-amber-400">
-                                    <span>Factor complejidad</span>
-                                    <span>×{totals.complexity_factor.toFixed(3)}</span>
-                                </div>
-                            )}
-
-                            <div className="border-t border-slate-200 pt-2 dark:border-slate-700">
-                                <div className="flex justify-between font-medium text-slate-700 dark:text-slate-300">
-                                    <span>Subtotal</span><span>{formatCurrency(totals.subtotal)}</span>
-                                </div>
-                            </div>
-
-                            <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                                <span>Margen ({totals.effective_margin.toFixed(1)}%)</span>
-                                <span className="text-emerald-600">+{formatCurrency(totals.margin_amount)}</span>
-                            </div>
-
-                            {totals.discount_amount > 0 && (
+                            <div className="p-4 space-y-2 text-sm">
                                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                                    <span>Descuento ({discountPercent}%)</span>
-                                    <span className="text-red-500">-{formatCurrency(totals.discount_amount)}</span>
+                                    <span>Materiales / Servicios ({items.length})</span>
+                                    <span className="font-medium">{formatCurrency(totals.items_subtotal)}</span>
                                 </div>
-                            )}
-
-                            <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                                <span>IVA ({taxPercent}%)</span>
-                                <span>{formatCurrency(totals.tax_amount)}</span>
-                            </div>
-
-                            <div className="border-t-2 border-primary/30 pt-3">
-                                <div className="flex justify-between">
-                                    <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
-                                    <span className="text-2xl font-bold text-primary">{formatCurrency(totals.total)}</span>
+                                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                    <span>Costos Operativos</span>
+                                    <span className="font-medium">{formatCurrency(totals.operational_costs)}</span>
+                                </div>
+                                <div className="pl-4 space-y-1 text-xs text-slate-400">
+                                    <div className="flex justify-between"><span>Traslado ({distanceKm || '0'} km × 2)</span><span>{formatCurrency(totals.travel_cost)}</span></div>
+                                    <div className="flex justify-between"><span>Viáticos ({crewSize} pers × {estimatedDays} días)</span><span>{formatCurrency(totals.viaticos_cost)}</span></div>
+                                    {parseFloat(insuranceCost) > 0 && <div className="flex justify-between"><span>Seguros</span><span>{formatCurrency(parseFloat(insuranceCost))}</span></div>}
+                                    {parseFloat(vehicleWear) > 0 && <div className="flex justify-between"><span>Desgaste vehículo</span><span>{formatCurrency(parseFloat(vehicleWear))}</span></div>}
+                                    {parseFloat(maniobraCost) > 0 && <div className="flex justify-between"><span>Maniobras</span><span>{formatCurrency(parseFloat(maniobraCost))}</span></div>}
+                                </div>
+                                <div className="border-t border-slate-200 pt-2 dark:border-slate-700">
+                                    <div className="flex justify-between">
+                                        <span className="font-bold text-slate-700 dark:text-slate-300">Costo Total</span>
+                                        <span className="font-bold text-amber-600 dark:text-amber-400 text-base">{formatCurrency(totals.cost_total)}</span>
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* Margin sliders */}
-                            <div className="mt-4 space-y-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+                        {/* ── SECTION 2: PRECIO DE VENTA ── */}
+                        <div className="rounded-xl border border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 shadow-sm backdrop-blur-xl dark:from-primary/5 dark:to-primary/10 dark:border-primary/20">
+                            <div className="border-b border-primary/20 p-4">
+                                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+                                    <span className="material-symbols-outlined text-primary text-[20px]">receipt_long</span>
+                                    Precio de Venta
+                                    <span className="ml-auto text-[10px] font-medium text-slate-400 normal-case">Lo que cobra el cliente</span>
+                                </h3>
+                            </div>
+                            <div className="p-4 space-y-2 text-sm">
+                                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                    <span>Costo base</span>
+                                    <span className="font-medium">{formatCurrency(totals.cost_total)}</span>
+                                </div>
+                                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                    <span>+ Margen de utilidad ({marginPercent}%)</span>
+                                    <span className="font-semibold text-emerald-600">+{formatCurrency(totals.margin_amount)}</span>
+                                </div>
+
+                                <div className="border-t border-primary/20 pt-2">
+                                    <div className="flex justify-between font-medium text-slate-700 dark:text-slate-300">
+                                        <span>Subtotal</span><span>{formatCurrency(totals.subtotal)}</span>
+                                    </div>
+                                </div>
+
+                                {totals.discount_amount > 0 && (
+                                    <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                        <span>Descuento ({discountPercent}%)</span>
+                                        <span className="text-red-500">-{formatCurrency(totals.discount_amount)}</span>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between text-slate-600 dark:text-slate-400">
+                                    <span>IVA ({taxPercent}%)</span>
+                                    <span>{formatCurrency(totals.tax_amount)}</span>
+                                </div>
+
+                                <div className="border-t-2 border-primary/30 pt-3">
+                                    <div className="flex justify-between">
+                                        <span className="text-lg font-bold text-slate-900 dark:text-white">Total al Cliente</span>
+                                        <span className="text-2xl font-bold text-primary">{formatCurrency(totals.total)}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── SECTION 3: ANÁLISIS DE UTILIDAD ── */}
+                        <div className={`rounded-xl border p-4 shadow-sm backdrop-blur-xl ${totals.net_profit_percent >= totals.suggested_min_margin ? 'border-emerald-200/60 bg-emerald-50/50 dark:border-emerald-800/40 dark:bg-emerald-900/10' : totals.net_profit_percent > 0 ? 'border-amber-200/60 bg-amber-50/50 dark:border-amber-800/40 dark:bg-amber-900/10' : 'border-red-200/60 bg-red-50/50 dark:border-red-800/40 dark:bg-red-900/10'}`}>
+                            <h4 className="text-xs font-bold uppercase text-slate-500 mb-2 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">analytics</span>
+                                Análisis de Utilidad
+                            </h4>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm text-slate-600 dark:text-slate-300">Utilidad Neta</span>
+                                <span className={`text-lg font-bold ${totals.net_profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                    {formatCurrency(totals.net_profit)}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between mb-3">
+                                <span className="text-xs text-slate-500">% sobre costo</span>
+                                <span className={`text-sm font-bold ${totals.net_profit_percent >= totals.suggested_min_margin ? 'text-emerald-600' : totals.net_profit_percent > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                                    {totals.net_profit_percent}%
+                                </span>
+                            </div>
+                            {/* Barra visual del margen */}
+                            <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden mb-2">
+                                <div className={`h-full rounded-full transition-all ${totals.net_profit_percent >= totals.suggested_min_margin ? 'bg-emerald-500' : totals.net_profit_percent > 0 ? 'bg-amber-500' : 'bg-red-500'}`}
+                                    style={{ width: `${Math.min(Math.max(totals.net_profit_percent, 0), 60) / 60 * 100}%` }} />
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px]">
+                                <span className={`material-symbols-outlined text-[14px] ${totals.net_profit_percent >= totals.suggested_min_margin ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {totals.net_profit_percent >= totals.suggested_min_margin ? 'check_circle' : 'info'}
+                                </span>
+                                <span className="text-slate-500">
+                                    Mín. sugerido para riesgo <strong>{RISK_LABELS[riskLevel]}</strong>: <strong>{totals.suggested_min_margin}%</strong>
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* ── SECTION 4: CONTROLES DE MARGEN ── */}
+                        <div className="rounded-xl border border-slate-200/60 bg-white/50 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
+                            <h4 className="text-xs font-bold uppercase text-slate-500 mb-3 flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">tune</span>
+                                Ajustar Precios
+                            </h4>
+                            <div className="space-y-4">
                                 <div>
                                     <div className="flex justify-between mb-1">
                                         <label className="text-xs font-semibold text-slate-500">Margen de Utilidad</label>
-                                        <span className="text-xs font-bold text-primary">{marginPercent}%</span>
+                                        <div className="flex items-center gap-2">
+                                            <input type="number" min="0" max="100" step="1" value={marginPercent}
+                                                onChange={e => setMarginPercent(e.target.value)}
+                                                className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs text-right font-bold text-primary dark:border-slate-700 dark:bg-slate-800 dark:text-primary-light" />
+                                            <span className="text-xs font-bold text-primary">%</span>
+                                        </div>
                                     </div>
-                                    <input type="range" min="0" max="50" step="1" value={marginPercent}
+                                    <input type="range" min="0" max="60" step="1" value={marginPercent}
                                         onChange={e => setMarginPercent(e.target.value)} className="w-full accent-primary" />
+                                    <div className="flex justify-between text-[10px] text-slate-400 mt-0.5">
+                                        <span>0%</span><span>20%</span><span>40%</span><span>60%</span>
+                                    </div>
                                 </div>
                                 <div>
                                     <div className="flex justify-between mb-1">
                                         <label className="text-xs font-semibold text-slate-500">Descuento</label>
-                                        <span className="text-xs font-bold text-red-500">{discountPercent}%</span>
+                                        <div className="flex items-center gap-2">
+                                            <input type="number" min="0" max="50" step="1" value={discountPercent}
+                                                onChange={e => setDiscountPercent(e.target.value)}
+                                                className="w-16 rounded border border-slate-200 px-2 py-0.5 text-xs text-right font-bold text-red-500 dark:border-slate-700 dark:bg-slate-800" />
+                                            <span className="text-xs font-bold text-red-500">%</span>
+                                        </div>
                                     </div>
                                     <input type="range" min="0" max="30" step="1" value={discountPercent}
                                         onChange={e => setDiscountPercent(e.target.value)} className="w-full accent-red-500" />

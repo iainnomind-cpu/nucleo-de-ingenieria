@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../../lib/supabase';
+import { useAuth } from '../../../lib/AuthContext';
 import { 
     Vehicle, VehicleInsurance, VehicleMileage, VehicleMaintenance, VehicleServiceSchedule,
     SchedulePriority, ScheduleStatus,
@@ -16,6 +17,10 @@ type Tab = 'overview' | 'insurances' | 'mileage' | 'maintenance' | 'services' | 
 export default function VehicleDetail() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { hasPermission } = useAuth();
+    const canEdit = hasPermission('fleet', 'edit');
+    const canCreate = hasPermission('fleet', 'create');
+    const canDelete = hasPermission('fleet', 'delete');
     
     const [vehicle, setVehicle] = useState<Vehicle | null>(null);
     const [insurances, setInsurances] = useState<VehicleInsurance[]>([]);
@@ -332,9 +337,9 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-indigo-500">verified_user</span>Pólizas de Seguro</h3>
-                        <button onClick={() => { setEditingInsId(null); setInsForm({}); setShowInsForm(true); }} className="flex items-center gap-2 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 text-sm font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
+                        {canCreate && <button onClick={() => { setEditingInsId(null); setInsForm({}); setShowInsForm(true); }} className="flex items-center gap-2 rounded bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400 px-3 py-1.5 text-sm font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Nueva Póliza
-                        </button>
+                        </button>}
                     </div>
                     {insurances.length === 0 ? <p className="text-sm text-slate-500">No hay seguros registrados.</p> : (
                         <div className="space-y-3">
@@ -352,14 +357,14 @@ export default function VehicleDetail() {
                                             {exp.status === 'expired' && <span className="text-[10px] font-bold text-red-600 bg-red-100 px-2 py-0.5 rounded-full">Vencida hace {Math.abs(exp.days)} días</span>}
                                             {exp.status === 'warning' && <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">Vence en {exp.days} días</span>}
                                             {exp.status === 'ok' && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Vigente ({exp.days} días más)</span>}
-                                            <div className="flex items-center gap-1">
-                                                <button onClick={() => handleEditIns(ins)} className="rounded p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="Editar">
+                                            {(canEdit || canDelete) && <div className="flex items-center gap-1">
+                                                {canEdit && <button onClick={() => handleEditIns(ins)} className="rounded p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors" title="Editar">
                                                     <span className="material-symbols-outlined text-[16px]">edit</span>
-                                                </button>
-                                                <button onClick={() => handleDeleteIns(ins.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar">
+                                                </button>}
+                                                {canDelete && <button onClick={() => handleDeleteIns(ins.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar">
                                                     <span className="material-symbols-outlined text-[16px]">delete</span>
-                                                </button>
-                                            </div>
+                                                </button>}
+                                            </div>}
                                         </div>
                                     </div>
                                 )
@@ -373,9 +378,9 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-emerald-500">speed</span>Bitácora de Kilometraje / Viajes</h3>
-                        <button onClick={() => setShowMilForm(true)} className="flex items-center gap-2 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-3 py-1.5 text-sm font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
+                        {canCreate && <button onClick={() => setShowMilForm(true)} className="flex items-center gap-2 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-3 py-1.5 text-sm font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Registrar Viaje
-                        </button>
+                        </button>}
                     </div>
                     {mileage.length === 0 ? <p className="text-sm text-slate-500">No hay registros de kilometraje.</p> : (
                         <div className="overflow-x-auto">
@@ -438,9 +443,9 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                      <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-amber-500">build</span>Historial de Mantenimientos</h3>
-                        <button onClick={() => setShowMntForm(true)} className="flex items-center gap-2 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 px-3 py-1.5 text-sm font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors">
+                        {canCreate && <button onClick={() => setShowMntForm(true)} className="flex items-center gap-2 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 px-3 py-1.5 text-sm font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Registrar Servicio
-                        </button>
+                        </button>}
                     </div>
                     {maintenance.length === 0 ? <p className="text-sm text-slate-500">No hay mantenimientos registrados.</p> : (
                         <div className="overflow-x-auto">
@@ -594,9 +599,9 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-violet-500">event</span>Agenda de Servicios</h3>
-                        <button onClick={() => setShowSchedForm(true)} className="flex items-center gap-2 rounded bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 px-3 py-1.5 text-sm font-semibold hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors">
+                        {canCreate && <button onClick={() => setShowSchedForm(true)} className="flex items-center gap-2 rounded bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 px-3 py-1.5 text-sm font-semibold hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Agendar Servicio
-                        </button>
+                        </button>}
                     </div>
                     <p className="text-xs text-slate-400 mb-4">Agenda servicios recurrentes por kilometraje o por tiempo. El sistema te alertará cuando estén próximos o vencidos.</p>
                     {schedules.length === 0 ? <p className="text-sm text-slate-500">No hay servicios agendados.</p> : (

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../lib/AuthContext';
 import { 
     Vehicle, VehicleType, VehicleStatus, VehicleInsurance, VehicleServiceSchedule,
     VEHICLE_TYPE_LABELS, VEHICLE_TYPE_ICONS,
@@ -11,6 +12,9 @@ import {
 
 export default function VehiclesList() {
     const navigate = useNavigate();
+    const { hasPermission } = useAuth();
+    const canCreate = hasPermission('fleet', 'create');
+    const canEdit = hasPermission('fleet', 'edit');
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -120,9 +124,9 @@ export default function VehiclesList() {
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Flotilla & Vehículos</h2>
                     <p className="text-sm text-slate-500">Gestión de unidades, mantenimientos y traslados.</p>
                 </div>
-                <button onClick={openCreate} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-primary-dark">
+                {canCreate && <button onClick={openCreate} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-md transition-all hover:bg-primary-dark">
                     <span className="material-symbols-outlined text-[18px]">add</span>Nuevo Vehículo
-                </button>
+                </button>}
             </div>
 
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between rounded-xl border border-slate-200/60 bg-white/50 p-4 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
@@ -203,9 +207,9 @@ export default function VehiclesList() {
                                             <span className="text-[10px] text-slate-400">{v.year}</span>
                                         </div>
                                     </div>
-                                    <button onClick={(e) => { e.stopPropagation(); openEdit(v); }} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-primary dark:hover:bg-slate-700">
+                                    {canEdit && <button onClick={(e) => { e.stopPropagation(); openEdit(v); }} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-primary dark:hover:bg-slate-700">
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
-                                    </button>
+                                    </button>}
                                 </div>
                                 <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
                                     <div className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">speed</span>{v.current_mileage.toLocaleString()} km</div>

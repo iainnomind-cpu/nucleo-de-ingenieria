@@ -300,7 +300,17 @@ export default function TasksDashboard() {
                         {editingTask ? 'Editar Tarea' : 'Nueva Tarea'}
                     </h3>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                        <div className="md:col-span-2"><label className={labelClass}>Tarea *</label><input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="Verificar bomba pozo Limonera..." className={inputClass} /></div>
+                        <div className="md:col-span-2">
+                            <label className={labelClass}>Tarea *</label>
+                            <input list="common-tasks" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} required placeholder="Verificar bomba pozo Limonera..." className={inputClass} />
+                            <datalist id="common-tasks">
+                                <option value="Recarga o servicio de extintores" />
+                                <option value="Mantenimiento preventivo" />
+                                <option value="Revisión de equipos" />
+                                <option value="Visita de inspección" />
+                                <option value="Resolución de falla" />
+                            </datalist>
+                        </div>
                         <div><label className={labelClass}>Responsable *</label>
                             {canAssignOthers ? (
                                 <select value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} required className={inputClass}>

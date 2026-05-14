@@ -115,7 +115,7 @@ export const RISK_MARGIN_MULTIPLIERS: Record<RiskLevel, number> = {
     critical: 1.5,
 };
 
-// Pricing engine
+// Pricing engine — separates COST (what it costs us) from SALE PRICE (what the client pays)
 export function calculateQuoteTotals(params: {
     items: { quantity: number; unit_price: number }[];
     distance_km: number;
@@ -133,7 +133,9 @@ export function calculateQuoteTotals(params: {
     well_depth?: number;
     motor_hp?: number;
 }) {
-    // Sum of line items
+    // ── 1. COSTO REAL (lo que nos cuesta a nosotros) ──
+
+    // Sum of line items (materiales / servicios)
     const itemsSubtotal = params.items.reduce((s, i) => s + i.quantity * i.unit_price, 0);
 
     // Operational costs
@@ -141,45 +143,56 @@ export function calculateQuoteTotals(params: {
     const viaticosCost = (params.viaticos_per_person || 0) * params.crew_size * params.estimated_days;
     const operationalCosts = travelCost + viaticosCost + params.insurance_cost + params.vehicle_wear + params.maniobra_cost;
 
-    // Depth & HP complexity factor
-    let complexityFactor = 1.0;
-    if (params.well_depth && params.well_depth > 100) {
-        complexityFactor += (params.well_depth - 100) * 0.001; // +0.1% per meter above 100m
-    }
-    if (params.motor_hp && params.motor_hp > 50) {
-        complexityFactor += (params.motor_hp - 50) * 0.002; // +0.2% per HP above 50
-    }
+    // Costo total real (sin factor de complejidad, sin margen — lo que de verdad nos cuesta)
+    const costTotal = itemsSubtotal + operationalCosts;
 
-    // Risk multiplier
-    const riskMultiplier = RISK_MARGIN_MULTIPLIERS[params.risk_level];
+    // ── 2. PRECIO DE VENTA ──
 
-    // Subtotal
-    const subtotal = (itemsSubtotal + operationalCosts) * complexityFactor;
+    // Margen de utilidad — se aplica directamente al costo, sin multiplicadores automáticos
+    // El usuario decide libremente el % viendo el costo de referencia
+    const marginAmount = costTotal * (params.margin_percent / 100);
 
-    // Margin adjusted by risk
-    const effectiveMargin = params.margin_percent * riskMultiplier;
-    const marginAmount = subtotal * (effectiveMargin / 100);
+    // Subtotal de venta = costo + margen
+    const subtotal = costTotal + marginAmount;
 
-    // Discount
-    const discountAmount = (subtotal + marginAmount) * (params.discount_percent / 100);
+    // Descuento sobre el precio de venta
+    const discountAmount = subtotal * (params.discount_percent / 100);
 
-    // Tax
-    const beforeTax = subtotal + marginAmount - discountAmount;
+    // Antes de IVA
+    const beforeTax = subtotal - discountAmount;
+
+    // IVA
     const taxAmount = beforeTax * (params.tax_percent / 100);
 
+    // Total final al cliente
     const total = beforeTax + taxAmount;
 
+    // Utilidad neta (lo que ganamos después de descuento, antes de IVA)
+    const netProfit = beforeTax - costTotal;
+    const netProfitPercent = costTotal > 0 ? (netProfit / costTotal) * 100 : 0;
+
+    // Risk — informativo para la referencia del usuario, no altera el cálculo
+    const riskMultiplier = RISK_MARGIN_MULTIPLIERS[params.risk_level];
+    const suggestedMinMargin = Math.round(15 * riskMultiplier); // sugerencia mínima según riesgo
+
     return {
+        // Costo real
+        items_subtotal: Math.round(itemsSubtotal * 100) / 100,
+        operational_costs: Math.round(operationalCosts * 100) / 100,
+        travel_cost: Math.round(travelCost * 100) / 100,
+        viaticos_cost: Math.round(viaticosCost * 100) / 100,
+        cost_total: Math.round(costTotal * 100) / 100,
+        // Venta
         subtotal: Math.round(subtotal * 100) / 100,
         margin_amount: Math.round(marginAmount * 100) / 100,
         discount_amount: Math.round(discountAmount * 100) / 100,
         tax_amount: Math.round(taxAmount * 100) / 100,
         total: Math.round(total * 100) / 100,
-        complexity_factor: complexityFactor,
-        effective_margin: effectiveMargin,
-        operational_costs: operationalCosts,
-        travel_cost: travelCost,
-        viaticos_cost: viaticosCost,
+        // Análisis
+        net_profit: Math.round(netProfit * 100) / 100,
+        net_profit_percent: Math.round(netProfitPercent * 10) / 10,
+        suggested_min_margin: suggestedMinMargin,
+        effective_margin: params.margin_percent,
     };
 }
 

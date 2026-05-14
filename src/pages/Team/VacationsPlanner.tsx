@@ -99,20 +99,28 @@ export default function VacationsPlanner() {
         fetchAll();
     };
 
-    // Calculate vacation balances
+    // Calculate vacation balances — only VACACIONES affects vacation days
     const balances = useMemo(() => {
-        const map = new Map<string, { total: number, used: number, remaining: number }>();
+        const map = new Map<string, { total: number, used: number, remaining: number, unpaidLeave: number, otherAbsences: number }>();
         employees.forEach(emp => {
             const total = calculateVacationDays(emp.hire_date, emp.base_vacation_days);
-            // Count used vacations up to current filterYear
-            const empAbsences = absences.filter(a => 
-                a.employee_id === emp.id && 
-                a.absence_type === 'VACACIONES' && 
-                !a.is_compensated &&
+            const yearAbsences = absences.filter(a =>
+                a.employee_id === emp.id &&
                 new Date(a.start_date).getFullYear() <= filterYear
             );
-            const used = empAbsences.reduce((sum, a) => sum + Number(a.days_count), 0);
-            map.set(emp.id, { total, used, remaining: total - used });
+            // Only VACACIONES type counts against vacation balance
+            const usedVacation = yearAbsences
+                .filter(a => a.absence_type === 'VACACIONES')
+                .reduce((sum, a) => sum + Number(a.days_count), 0);
+            // Track unpaid leave separately
+            const unpaidLeave = yearAbsences
+                .filter(a => a.absence_type === 'PERMISO NO REMUNERADO')
+                .reduce((sum, a) => sum + Number(a.days_count), 0);
+            // Other absences (incapacidad, capacitación, etc.) — informational only
+            const otherAbsences = yearAbsences
+                .filter(a => a.absence_type !== 'VACACIONES' && a.absence_type !== 'PERMISO NO REMUNERADO')
+                .reduce((sum, a) => sum + Number(a.days_count), 0);
+            map.set(emp.id, { total, used: usedVacation, remaining: total - usedVacation, unpaidLeave, otherAbsences });
         });
         return map;
     }, [employees, absences, filterYear]);
@@ -270,6 +278,8 @@ export default function VacationsPlanner() {
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Días {filterYear}</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Usados</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Restantes</th>
+                                        <th className="px-5 py-3 text-center font-semibold text-slate-500">Permisos S/G</th>
+                                        <th className="px-5 py-3 text-center font-semibold text-slate-500">Otros</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -287,6 +297,16 @@ export default function VacationsPlanner() {
                                                 <td className="px-5 py-3 text-center">
                                                     <span className={`inline-flex min-w-[30px] items-center justify-center rounded-full px-2 py-1 text-xs font-bold ${(bal?.remaining || 0) <= 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>
                                                         {bal?.remaining || 0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-3 text-center">
+                                                    <span className={`inline-flex min-w-[30px] items-center justify-center rounded-full px-2 py-1 text-xs font-bold ${(bal?.unpaidLeave || 0) > 0 ? 'bg-amber-100 text-amber-700' : 'text-slate-400'}`}>
+                                                        {bal?.unpaidLeave || 0}
+                                                    </span>
+                                                </td>
+                                                <td className="px-5 py-3 text-center">
+                                                    <span className={`inline-flex min-w-[30px] items-center justify-center rounded-full px-2 py-1 text-xs font-bold ${(bal?.otherAbsences || 0) > 0 ? 'bg-sky-100 text-sky-700' : 'text-slate-400'}`}>
+                                                        {bal?.otherAbsences || 0}
                                                     </span>
                                                 </td>
                                             </tr>
@@ -355,14 +375,28 @@ export default function VacationsPlanner() {
                                                     
                                                     if (activeAbs) {
                                                         const colors = ABSENCE_TYPE_COLORS[activeAbs.absence_type] || ABSENCE_TYPE_COLORS['OTRO'];
+                                                        const isStart = currentDateStr === activeAbs.start_date;
+                                                        const isEnd = currentDateStr === (activeAbs.end_date || activeAbs.start_date);
+                                                        const isSingle = isStart && isEnd;
+                                                        const borderRadius = isSingle
+                                                            ? 'rounded-md'
+                                                            : isStart
+                                                                ? 'rounded-l-md rounded-r-none'
+                                                                : isEnd
+                                                                    ? 'rounded-r-md rounded-l-none'
+                                                                    : 'rounded-none';
                                                         return (
-                                                            <td key={day} className={`p-0.5 text-center ${isWeekend ? 'bg-slate-50 dark:bg-slate-800' : ''}`}>
+                                                            <td key={day} className={`py-0.5 px-0 text-center ${isWeekend ? 'bg-slate-50 dark:bg-slate-800' : ''}`}>
                                                                 <div 
-                                                                    title={`${activeAbs.absence_type} (${activeAbs.days_count} días)\n${activeAbs.notes || ''}`}
+                                                                    title={`${activeAbs.absence_type} (${activeAbs.days_count} días)${activeAbs.notes ? '\n' + activeAbs.notes : ''}`}
                                                                     onClick={() => deleteAbsence(activeAbs.id)}
-                                                                    className={`flex h-6 w-full cursor-pointer items-center justify-center rounded-sm ${colors.bg} ${colors.text} hover:opacity-80`}
+                                                                    className={`flex h-6 w-full cursor-pointer items-center justify-center ${borderRadius} ${colors.bg} ${colors.text} hover:opacity-80`}
                                                                 >
-                                                                    <span className="material-symbols-outlined text-[12px]">{colors.icon}</span>
+                                                                    {isStart ? (
+                                                                        <span className="material-symbols-outlined text-[12px]">{colors.icon}</span>
+                                                                    ) : (
+                                                                        <span className="block h-0.5 w-3" style={{ backgroundColor: 'currentColor', opacity: 0.5 }} />
+                                                                    )}
                                                                 </div>
                                                             </td>
                                                         );

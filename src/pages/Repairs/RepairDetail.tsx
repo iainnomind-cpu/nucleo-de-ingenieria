@@ -24,6 +24,8 @@ export default function RepairDetail() {
     const [timeline, setTimeline] = useState<RepairTimelineEvent[]>([]);
     const [carriers, setCarriers] = useState<ShippingCarrier[]>([]);
     const [workshops, setWorkshops] = useState<ExternalWorkshop[]>([]);
+    const [equipment, setEquipment] = useState<any[]>([]);
+    const [clients, setClients] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<Tab>('workflow');
 
@@ -38,12 +40,14 @@ export default function RepairDetail() {
     const fetchAll = useCallback(async () => {
         if (!id) return;
         setLoading(true);
-        const [rRes, pRes, tRes, cRes, wRes] = await Promise.all([
+        const [rRes, pRes, tRes, cRes, wRes, eqRes, cliRes] = await Promise.all([
             supabase.from('equipment_repairs').select('*, equipment:installed_equipment(id, name, well_name, equipment_type, brand, model, serial_number), client:clients(id, company_name)').eq('id', id).single(),
             supabase.from('repair_parts').select('*').eq('repair_id', id).order('created_at'),
             supabase.from('repair_timeline').select('*').eq('repair_id', id).order('created_at', { ascending: false }),
             supabase.from('shipping_carriers').select('*').order('name'),
             supabase.from('external_workshops').select('*').order('name'),
+            supabase.from('installed_equipment').select('id, name, well_name, equipment_type, client_id, client:clients(id, company_name)'),
+            supabase.from('clients').select('id, company_name').order('company_name'),
         ]);
         if (!rRes.data) { navigate('/repairs'); return; }
         setRepair(rRes.data as EquipmentRepair);
@@ -51,6 +55,8 @@ export default function RepairDetail() {
         setTimeline((tRes.data as RepairTimelineEvent[]) || []);
         setCarriers((cRes.data as ShippingCarrier[]) || []);
         setWorkshops((wRes.data as ExternalWorkshop[]) || []);
+        setEquipment(eqRes.data || []);
+        setClients(cliRes.data || []);
         setLoading(false);
     }, [id, navigate]);
 
@@ -84,7 +90,33 @@ export default function RepairDetail() {
 
     const saveSection = async (section: string) => {
         if (!repair) return;
-        await supabase.from('equipment_repairs').update(editData).eq('id', repair.id);
+        
+        let finalData = { ...editData };
+        if (section === 'report') {
+            if (finalData.is_external) {
+                finalData.equipment_id = null;
+                const matchedClient = clients.find(c => c.company_name === finalData.client_name_input);
+                if (matchedClient) {
+                    finalData.client_id = matchedClient.id;
+                    finalData.external_client_name = null;
+                } else if (finalData.client_name_input?.trim()) {
+                    finalData.client_id = null;
+                    finalData.external_client_name = finalData.client_name_input.trim();
+                } else {
+                    finalData.client_id = null;
+                    finalData.external_client_name = null;
+                }
+            } else {
+                finalData.external_equipment_name = null;
+                finalData.external_client_name = null;
+                const eq = equipment.find(e => e.id === finalData.equipment_id);
+                finalData.client_id = eq?.client_id || null;
+            }
+            delete finalData.is_external;
+            delete finalData.client_name_input;
+        }
+
+        await supabase.from('equipment_repairs').update(finalData).eq('id', repair.id);
         const desc = section === 'report' ? 'Datos del reporte actualizados' :
             section === 'pickup' ? 'Datos de recolección actualizados' :
             section === 'shipping_to' ? 'Datos de envío actualizados' :
@@ -233,13 +265,37 @@ export default function RepairDetail() {
                             </h4>
                             <div className="flex items-center gap-3">
                                 <span className="text-xs text-slate-400">{new Date(repair.report_date).toLocaleDateString('es-MX')}</span>
-                                {editSection !== 'report' && <button onClick={() => startEdit('report', { external_equipment_name: repair.external_equipment_name || '', failure_description: repair.failure_description || '', failure_type: repair.failure_type || 'other', urgency: repair.urgency || 'normal', reported_by: repair.reported_by || '', assigned_to: repair.assigned_to || '', report_date: repair.report_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
+                                {editSection !== 'report' && <button onClick={() => startEdit('report', { is_external: !repair.equipment_id, equipment_id: repair.equipment_id || '', external_equipment_name: repair.external_equipment_name || '', client_name_input: repair.external_client_name || repair.client?.company_name || '', failure_description: repair.failure_description || '', failure_type: repair.failure_type || 'other', urgency: repair.urgency || 'normal', reported_by: repair.reported_by || '', assigned_to: repair.assigned_to || '', report_date: repair.report_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
                             </div>
                         </div>
                         {editSection === 'report' ? (
                             <div className="space-y-3">
                                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    <div className="md:col-span-2"><label className={labelClass}>Nombre del Equipo (Motor/Bomba)</label><input value={editData.external_equipment_name} onChange={e => setEditData({...editData, external_equipment_name: e.target.value})} className={inputClass} placeholder="Ej: Motor 50HP Pozo #3" /></div>
+                                    <div className="md:col-span-2">
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <label className={labelClass + ' mb-0'}>Equipo *</label>
+                                            <label className="flex items-center gap-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                                                <input type="checkbox" checked={editData.is_external} onChange={e => setEditData({ ...editData, is_external: e.target.checked })} className="rounded border-slate-300 text-primary focus:ring-primary" />
+                                                Equipo externo (del cliente)
+                                            </label>
+                                        </div>
+                                        {!editData.is_external ? (
+                                            <select value={editData.equipment_id} onChange={e => setEditData({ ...editData, equipment_id: e.target.value })} required className={inputClass}>
+                                                <option value="">Seleccionar equipo...</option>
+                                                {equipment.map((eq: any) => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}
+                                            </select>
+                                        ) : (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <input value={editData.external_equipment_name} onChange={e => setEditData({ ...editData, external_equipment_name: e.target.value })} required placeholder="Nombre o descripción del equipo..." className={inputClass} />
+                                                <div>
+                                                    <input list="clients-ext-list-edit" value={editData.client_name_input} onChange={e => setEditData({ ...editData, client_name_input: e.target.value })} placeholder="Seleccionar o escribir cliente (opcional)..." className={inputClass} />
+                                                    <datalist id="clients-ext-list-edit">
+                                                        {clients.map(c => <option key={c.id} value={c.company_name} />)}
+                                                    </datalist>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                     <div className="md:col-span-2"><label className={labelClass}>Descripción de la Falla</label><textarea value={editData.failure_description} onChange={e => setEditData({...editData, failure_description: e.target.value})} rows={3} className={inputClass + ' resize-none'} /></div>
                                     <div><label className={labelClass}>Tipo de Falla</label><select value={editData.failure_type} onChange={e => setEditData({...editData, failure_type: e.target.value})} className={inputClass}>{Object.entries(FAILURE_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
                                     <div><label className={labelClass}>Urgencia</label><select value={editData.urgency} onChange={e => setEditData({...editData, urgency: e.target.value})} className={inputClass}>{Object.entries(URGENCY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
