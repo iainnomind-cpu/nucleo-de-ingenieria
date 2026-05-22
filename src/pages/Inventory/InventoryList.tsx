@@ -184,6 +184,11 @@ export default function InventoryList() {
                         <span className="material-symbols-outlined text-[18px]">analytics</span>
                         Consumo x Proyecto
                     </button>
+                    <button onClick={() => navigate('/inventory/monthly-exits')}
+                        className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-600 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400">
+                        <span className="material-symbols-outlined text-[18px]">bar_chart</span>
+                        Salidas del Mes
+                    </button>
                     <button onClick={() => navigate('/inventory/uniforms')}
                         className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <span className="material-symbols-outlined text-[18px]">checkroom</span>
