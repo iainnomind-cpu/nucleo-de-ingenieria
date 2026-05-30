@@ -16,13 +16,13 @@ function generateUniqueFilename(originalName: string): string {
 /**
  * Valida un archivo antes de subir.
  */
-function validateFile(file: File): string | null {
+function validateFile(file: File, acceptedTypesStr: string = ACCEPTED_FILE_TYPES): string | null {
     if (file.size > MAX_FILE_SIZE) {
         return `"${file.name}" excede el límite de 20MB (${(file.size / 1024 / 1024).toFixed(1)}MB)`;
     }
-    const allowedTypes = ACCEPTED_FILE_TYPES.split(',');
-    if (!allowedTypes.includes(file.type)) {
-        return `"${file.name}" no es un tipo permitido. Usa JPG, PNG, WEBP o MP4.`;
+    const allowedTypes = acceptedTypesStr.split(',');
+    if (!allowedTypes.includes(file.type) && !allowedTypes.includes(file.name.split('.').pop()?.toLowerCase() || '')) {
+        return `"${file.name}" no es un tipo permitido.`;
     }
     return null;
 }
@@ -37,10 +37,11 @@ function validateFile(file: File): string | null {
 export async function uploadPhoto(
     file: File,
     folder: string,
-    uploaderName: string
+    uploaderName: string,
+    acceptedTypesStr?: string
 ): Promise<{ data: PhotoAttachment | null; error: string | null }> {
     // Validar
-    const validationError = validateFile(file);
+    const validationError = validateFile(file, acceptedTypesStr);
     if (validationError) return { data: null, error: validationError };
 
     const filename = generateUniqueFilename(file.name);
@@ -80,13 +81,14 @@ export async function uploadMultiplePhotos(
     files: File[],
     folder: string,
     uploaderName: string,
-    onProgress?: (completed: number, total: number) => void
+    onProgress?: (completed: number, total: number) => void,
+    acceptedTypesStr?: string
 ): Promise<{ photos: PhotoAttachment[]; errors: string[] }> {
     const photos: PhotoAttachment[] = [];
     const errors: string[] = [];
 
     for (let i = 0; i < files.length; i++) {
-        const result = await uploadPhoto(files[i], folder, uploaderName);
+        const result = await uploadPhoto(files[i], folder, uploaderName, acceptedTypesStr);
         if (result.data) {
             photos.push(result.data);
         }

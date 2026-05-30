@@ -5,6 +5,7 @@ import {
     Client,
     ClientAsset,
     ClientActivity,
+    ClientDocument,
     SalesOpportunity,
     STATUS_LABELS,
     STATUS_COLORS,
@@ -20,7 +21,10 @@ import {
     PipelineStage,
 } from '../../../types/crm';
 
-type Tab = 'info' | 'assets' | 'history' | 'opportunities' | 'finance' | 'equipment';
+import { PhotoAttachment } from '../../../types/photos';
+import DocumentUploader from '../../../components/DocumentUploader';
+
+type Tab = 'info' | 'assets' | 'history' | 'opportunities' | 'finance' | 'equipment' | 'documents';
 
 // Finance helpers
 interface ClientInvoice { id: string; invoice_number: string; total: number; amount_paid: number; balance: number; status: string; due_date: string; issue_date: string; }
@@ -37,6 +41,7 @@ export default function ClientDetail() {
     const [assets, setAssets] = useState<ClientAsset[]>([]);
     const [activities, setActivities] = useState<ClientActivity[]>([]);
     const [opportunities, setOpportunities] = useState<SalesOpportunity[]>([]);
+    const [clientDocuments, setClientDocuments] = useState<ClientDocument[]>([]);
     const [activeTab, setActiveTab] = useState<Tab>('info');
     const [loading, setLoading] = useState(true);
 
@@ -93,6 +98,12 @@ export default function ClientDetail() {
         setOpportunities(data || []);
     }, [id]);
 
+    const fetchDocuments = useCallback(async () => {
+        if (!id) return;
+        const { data } = await supabase.from('client_documents').select('*').eq('client_id', id).order('created_at', { ascending: false });
+        setClientDocuments(data || []);
+    }, [id]);
+
     // M6: Fetch invoices & payments for this client
     const fetchFinance = useCallback(async () => {
         if (!id) return;
@@ -118,11 +129,11 @@ export default function ClientDetail() {
     useEffect(() => {
         const load = async () => {
             setLoading(true);
-            await Promise.all([fetchClient(), fetchAssets(), fetchActivities(), fetchOpportunities(), fetchFinance(), fetchMaintenance()]);
+            await Promise.all([fetchClient(), fetchAssets(), fetchActivities(), fetchOpportunities(), fetchFinance(), fetchMaintenance(), fetchDocuments()]);
             setLoading(false);
         };
         load();
-    }, [fetchClient, fetchAssets, fetchActivities, fetchOpportunities, fetchFinance, fetchMaintenance]);
+    }, [fetchClient, fetchAssets, fetchActivities, fetchOpportunities, fetchFinance, fetchMaintenance, fetchDocuments]);
 
     // M5: When adding asset, also register in installed_equipment + create maintenance schedule
     const handleAddAsset = async (e: React.FormEvent) => {
@@ -290,6 +301,7 @@ export default function ClientDetail() {
 
     const tabs: { key: Tab; label: string; icon: string; count?: number }[] = [
         { key: 'info', label: 'Informacion', icon: 'info' },
+        { key: 'documents', label: 'Documentos', icon: 'folder', count: clientDocuments.length },
         { key: 'assets', label: 'Activos', icon: 'precision_manufacturing', count: assets.length },
         { key: 'equipment', label: 'Equipos (M5)', icon: 'engineering', count: clientEquipment.length },
         { key: 'history', label: 'Historial', icon: 'history', count: activities.length },
@@ -438,6 +450,61 @@ export default function ClientDetail() {
                                 </div>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {/* DOCUMENTS TAB */}
+                {activeTab === 'documents' && (
+                    <div className="p-6">
+                        <div className="mb-4">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Documentación del Cliente</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                                Sube archivos PDF, Word, Excel o imágenes relevantes.
+                            </p>
+                        </div>
+                        <DocumentUploader
+                            documents={clientDocuments.map(d => ({
+                                url: d.file_url,
+                                filename: d.filename,
+                                size_bytes: d.size_bytes || 0,
+                                uploaded_by: d.uploaded_by || 'Sistema',
+                                uploaded_at: d.created_at
+                            }))}
+                            onDocumentsChange={async (newDocs: PhotoAttachment[]) => {
+                                if (!id) return;
+                                // Synchronize UI state temporarily
+                                const tempDocs = newDocs.map((doc, idx) => ({
+                                    id: idx.toString(),
+                                    client_id: id,
+                                    file_url: doc.url,
+                                    filename: doc.filename,
+                                    file_type: doc.filename.split('.').pop() || null,
+                                    size_bytes: doc.size_bytes,
+                                    uploaded_by: doc.uploaded_by,
+                                    created_at: doc.uploaded_at || new Date().toISOString()
+                                }));
+                                setClientDocuments(tempDocs);
+
+                                // Perform DB sync
+                                await supabase.from('client_documents').delete().eq('client_id', id);
+                                if (newDocs.length > 0) {
+                                    const inserts = newDocs.map(doc => ({
+                                        client_id: id,
+                                        file_url: doc.url,
+                                        filename: doc.filename,
+                                        file_type: doc.filename.split('.').pop() || null,
+                                        size_bytes: doc.size_bytes,
+                                        uploaded_by: doc.uploaded_by || 'Sistema',
+                                        created_at: doc.uploaded_at || new Date().toISOString()
+                                    }));
+                                    await supabase.from('client_documents').insert(inserts);
+                                }
+                                fetchDocuments();
+                            }}
+                            folder={`client-documents/${id}`}
+                            uploaderName="Sistema"
+                            maxFiles={20}
+                        />
                     </div>
                 )}
 

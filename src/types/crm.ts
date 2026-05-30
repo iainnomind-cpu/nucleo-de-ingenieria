@@ -72,6 +72,17 @@ export interface ClientActivity {
     created_at: string;
 }
 
+export interface ClientDocument {
+    id: string;
+    client_id: string;
+    file_url: string;
+    filename: string;
+    file_type: string | null;
+    size_bytes: number | null;
+    uploaded_by: string | null;
+    created_at: string;
+}
+
 // Helpers for UI labels
 export const STATUS_LABELS: Record<ClientStatus, string> = {
     prospect: 'Prospecto',

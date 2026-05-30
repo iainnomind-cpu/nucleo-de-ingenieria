@@ -28,5 +28,6 @@ export function normalizePhotos(raw: unknown): PhotoAttachment[] {
 }
 
 export const ACCEPTED_FILE_TYPES = 'image/jpeg,image/png,image/webp,video/mp4';
+export const ACCEPTED_DOCUMENT_TYPES = 'image/jpeg,image/png,image/webp,video/mp4,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,application/zip,application/x-rar-compressed';
 export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 export const MAX_FILES_DEFAULT = 10;
