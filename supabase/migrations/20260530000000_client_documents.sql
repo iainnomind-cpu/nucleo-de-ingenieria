@@ -14,14 +14,17 @@ CREATE TABLE IF NOT EXISTS public.client_documents (
 -- RLS
 ALTER TABLE public.client_documents ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Enable read access for all authenticated users" ON public.client_documents;
 CREATE POLICY "Enable read access for all authenticated users" 
 ON public.client_documents FOR SELECT 
 TO authenticated USING (true);
 
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.client_documents;
 CREATE POLICY "Enable insert for authenticated users" 
 ON public.client_documents FOR INSERT 
 TO authenticated WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.client_documents;
 CREATE POLICY "Enable delete for authenticated users" 
 ON public.client_documents FOR DELETE 
 TO authenticated USING (true);

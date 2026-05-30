@@ -10,6 +10,7 @@ interface DocumentUploaderProps {
     maxFiles?: number;
     disabled?: boolean;
     compact?: boolean;
+    bucket?: string;
 }
 
 export function getDocumentIcon(filename: string) {
@@ -41,6 +42,7 @@ export default function DocumentUploader({
     maxFiles = MAX_FILES_DEFAULT,
     disabled = false,
     compact = false,
+    bucket = 'client-documents',
 }: DocumentUploaderProps) {
     const documents = normalizePhotos(rawDocuments);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +69,8 @@ export default function DocumentUploader({
         const { photos: newDocs, errors: uploadErrors } = await uploadMultiplePhotos(
             toUpload, folder, uploaderName,
             (completed, total) => setProgress({ completed, total }),
-            ACCEPTED_DOCUMENT_TYPES
+            ACCEPTED_DOCUMENT_TYPES,
+            bucket
         );
 
         if (uploadErrors.length > 0) setErrors(uploadErrors);

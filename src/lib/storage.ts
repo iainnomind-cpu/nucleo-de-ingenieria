@@ -38,18 +38,20 @@ export async function uploadPhoto(
     file: File,
     folder: string,
     uploaderName: string,
-    acceptedTypesStr?: string
+    acceptedTypesStr?: string,
+    bucket?: string
 ): Promise<{ data: PhotoAttachment | null; error: string | null }> {
     // Validar
     const validationError = validateFile(file, acceptedTypesStr);
     if (validationError) return { data: null, error: validationError };
 
+    const useBucket = bucket || BUCKET;
     const filename = generateUniqueFilename(file.name);
     const path = `${folder}/${filename}`;
 
     // Subir
     const { error: uploadError } = await supabase.storage
-        .from(BUCKET)
+        .from(useBucket)
         .upload(path, file, {
             cacheControl: '3600',
             upsert: false,
@@ -60,7 +62,7 @@ export async function uploadPhoto(
     }
 
     // Obtener URL pública
-    const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    const { data: urlData } = supabase.storage.from(useBucket).getPublicUrl(path);
 
     return {
         data: {
@@ -82,13 +84,14 @@ export async function uploadMultiplePhotos(
     folder: string,
     uploaderName: string,
     onProgress?: (completed: number, total: number) => void,
-    acceptedTypesStr?: string
+    acceptedTypesStr?: string,
+    bucket?: string
 ): Promise<{ photos: PhotoAttachment[]; errors: string[] }> {
     const photos: PhotoAttachment[] = [];
     const errors: string[] = [];
 
     for (let i = 0; i < files.length; i++) {
-        const result = await uploadPhoto(files[i], folder, uploaderName, acceptedTypesStr);
+        const result = await uploadPhoto(files[i], folder, uploaderName, acceptedTypesStr, bucket);
         if (result.data) {
             photos.push(result.data);
         }
@@ -105,13 +108,17 @@ export async function uploadMultiplePhotos(
  * Elimina una foto del bucket.
  */
 export async function deletePhoto(url: string): Promise<boolean> {
-    // Extraer path del URL: https://xxx.supabase.co/storage/v1/object/public/evidence-photos/folder/file.jpg
-    const marker = `/storage/v1/object/public/${BUCKET}/`;
+    // Try to detect the bucket from the URL dynamically
+    const bucketPattern = /\/storage\/v1\/object\/public\/([^/]+)\//;
+    const match = url.match(bucketPattern);
+    const detectedBucket = match ? match[1] : BUCKET;
+
+    const marker = `/storage/v1/object/public/${detectedBucket}/`;
     const idx = url.indexOf(marker);
     if (idx === -1) return false;
 
     const path = url.substring(idx + marker.length);
-    const { error } = await supabase.storage.from(BUCKET).remove([path]);
+    const { error } = await supabase.storage.from(detectedBucket).remove([path]);
     return !error;
 }
 
