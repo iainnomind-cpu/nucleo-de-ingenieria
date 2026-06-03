@@ -4,6 +4,7 @@ export interface HREmployee {
     full_name: string;
     department: string;
     hire_date: string | null;
+    vacation_start_date: string | null;
     base_vacation_days: number;
     is_active: boolean;
     notes: string | null;
@@ -42,13 +43,15 @@ export const ABSENCE_TYPE_COLORS: Record<AbsenceType, { bg: string; text: string
 };
 
 // Helper: Calculate accumulated vacation days based on years worked.
-export function calculateVacationDays(hireDateStr: string | null, baseDays: number = 12): number {
-    if (!hireDateStr) return baseDays;
-    const hireDate = new Date(hireDateStr);
+// Uses vacation_start_date as the reference if provided, otherwise falls back to hire_date.
+export function calculateVacationDays(hireDateStr: string | null, baseDays: number = 12, vacationStartDateStr?: string | null): number {
+    const refDateStr = vacationStartDateStr || hireDateStr;
+    if (!refDateStr) return baseDays;
+    const refDate = new Date(refDateStr);
     const now = new Date();
     
-    let years = now.getFullYear() - hireDate.getFullYear();
-    if (now.getMonth() < hireDate.getMonth() || (now.getMonth() === hireDate.getMonth() && now.getDate() < hireDate.getDate())) {
+    let years = now.getFullYear() - refDate.getFullYear();
+    if (now.getMonth() < refDate.getMonth() || (now.getMonth() === refDate.getMonth() && now.getDate() < refDate.getDate())) {
         years--;
     }
     

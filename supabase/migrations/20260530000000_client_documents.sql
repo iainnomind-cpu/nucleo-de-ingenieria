@@ -16,18 +16,15 @@ ALTER TABLE public.client_documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Enable read access for all authenticated users" ON public.client_documents;
 CREATE POLICY "Enable read access for all authenticated users" 
-ON public.client_documents FOR SELECT 
-TO authenticated USING (true);
+ON public.client_documents FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS "Enable insert for authenticated users" ON public.client_documents;
 CREATE POLICY "Enable insert for authenticated users" 
-ON public.client_documents FOR INSERT 
-TO authenticated WITH CHECK (true);
+ON public.client_documents FOR INSERT WITH CHECK (true);
 
 DROP POLICY IF EXISTS "Enable delete for authenticated users" ON public.client_documents;
 CREATE POLICY "Enable delete for authenticated users" 
-ON public.client_documents FOR DELETE 
-TO authenticated USING (true);
+ON public.client_documents FOR DELETE USING (true);
 
 -- Index for faster queries
 CREATE INDEX IF NOT EXISTS idx_client_documents_client_id ON public.client_documents(client_id);

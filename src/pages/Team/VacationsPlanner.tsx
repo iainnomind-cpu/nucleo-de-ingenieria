@@ -16,6 +16,7 @@ export default function VacationsPlanner() {
     const [filterYear, setFilterYear] = useState<number>(currentYear);
     const [filterMonth, setFilterMonth] = useState<number>(new Date().getMonth() + 1); // 1-12
     const [filterDept, setFilterDept] = useState<string>('all');
+    const [filterActive, setFilterActive] = useState<'active' | 'inactive' | 'all'>('active');
     
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState({
@@ -28,10 +29,12 @@ export default function VacationsPlanner() {
     });
 
     const [showEmployeeForm, setShowEmployeeForm] = useState(false);
+    const [editingEmployee, setEditingEmployee] = useState<HREmployee | null>(null);
     const [employeeForm, setEmployeeForm] = useState({
         full_name: '',
         department: '',
         hire_date: new Date().toISOString().split('T')[0],
+        vacation_start_date: '',
         base_vacation_days: '12'
     });
 
@@ -79,17 +82,43 @@ export default function VacationsPlanner() {
 
     const handleSaveEmployee = async (e: React.FormEvent) => {
         e.preventDefault();
-        
-        await supabase.from('hr_employees').insert({
+        const payload = {
             full_name: employeeForm.full_name,
             department: employeeForm.department || null,
             hire_date: employeeForm.hire_date || null,
+            vacation_start_date: employeeForm.vacation_start_date || null,
             base_vacation_days: parseInt(employeeForm.base_vacation_days) || 12,
             is_active: true
-        });
-        
+        };
+        if (editingEmployee) {
+            await supabase.from('hr_employees').update(payload).eq('id', editingEmployee.id);
+        } else {
+            await supabase.from('hr_employees').insert(payload);
+        }
         setShowEmployeeForm(false);
-        setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], base_vacation_days: '12' });
+        setEditingEmployee(null);
+        setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], vacation_start_date: '', base_vacation_days: '12' });
+        fetchAll();
+    };
+
+    const openEditEmployee = (emp: HREmployee) => {
+        setEditingEmployee(emp);
+        setEmployeeForm({
+            full_name: emp.full_name,
+            department: emp.department || '',
+            hire_date: emp.hire_date || '',
+            vacation_start_date: emp.vacation_start_date || '',
+            base_vacation_days: emp.base_vacation_days.toString(),
+        });
+        setShowEmployeeForm(true);
+        setShowForm(false);
+    };
+
+    const toggleActive = async (emp: HREmployee) => {
+        const newStatus = !emp.is_active;
+        const action = newStatus ? 'reactivar' : 'dar de baja';
+        if (!window.confirm(`¿Desea ${action} a ${emp.full_name}?`)) return;
+        await supabase.from('hr_employees').update({ is_active: newStatus }).eq('id', emp.id);
         fetchAll();
     };
 
@@ -103,7 +132,7 @@ export default function VacationsPlanner() {
     const balances = useMemo(() => {
         const map = new Map<string, { total: number, used: number, remaining: number, unpaidLeave: number, otherAbsences: number }>();
         employees.forEach(emp => {
-            const total = calculateVacationDays(emp.hire_date, emp.base_vacation_days);
+            const total = calculateVacationDays(emp.hire_date, emp.base_vacation_days, emp.vacation_start_date);
             const yearAbsences = absences.filter(a =>
                 a.employee_id === emp.id &&
                 new Date(a.start_date).getFullYear() <= filterYear
@@ -131,7 +160,14 @@ export default function VacationsPlanner() {
     const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
     const departments = Array.from(new Set(employees.map(e => e.department).filter(Boolean)));
-    const filteredEmployees = employees.filter(e => filterDept === 'all' || e.department === filterDept);
+    const filteredEmployees = employees.filter(e => {
+        if (filterActive === 'active' && !e.is_active) return false;
+        if (filterActive === 'inactive' && e.is_active) return false;
+        if (filterDept !== 'all' && e.department !== filterDept) return false;
+        return true;
+    });
+    const activeEmployees = employees.filter(e => e.is_active);
+    const inactiveCount = employees.filter(e => !e.is_active).length;
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-primary dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1';
@@ -151,7 +187,7 @@ export default function VacationsPlanner() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={() => { setShowEmployeeForm(!showEmployeeForm); setShowForm(false); }} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <button onClick={() => { setEditingEmployee(null); setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], vacation_start_date: '', base_vacation_days: '12' }); setShowEmployeeForm(!showEmployeeForm); setShowForm(false); }} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <span className="material-symbols-outlined text-[18px]">person_add</span>
                         Nuevo Colaborador
                     </button>
@@ -164,8 +200,8 @@ export default function VacationsPlanner() {
 
             {showEmployeeForm && (
                 <form onSubmit={handleSaveEmployee} className="rounded-xl border border-indigo-200 bg-indigo-50/50 p-6 shadow-inner dark:border-indigo-900/30 dark:bg-indigo-900/10">
-                    <h3 className="mb-4 text-sm font-bold text-indigo-900 dark:text-indigo-300">Nuevo Colaborador</h3>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <h3 className="mb-4 text-sm font-bold text-indigo-900 dark:text-indigo-300">{editingEmployee ? `Editar: ${editingEmployee.full_name}` : 'Nuevo Colaborador'}</h3>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-5">
                         <div>
                             <label className={labelClass}>Nombre Completo *</label>
                             <input required value={employeeForm.full_name} onChange={e => setEmployeeForm({ ...employeeForm, full_name: e.target.value })} className={inputClass} placeholder="Nombre y Apellidos" />
@@ -179,14 +215,19 @@ export default function VacationsPlanner() {
                             <input type="date" required value={employeeForm.hire_date} onChange={e => setEmployeeForm({ ...employeeForm, hire_date: e.target.value })} className={inputClass} />
                         </div>
                         <div>
+                            <label className={labelClass}>Inicio Periodo Vacacional</label>
+                            <input type="date" value={employeeForm.vacation_start_date} onChange={e => setEmployeeForm({ ...employeeForm, vacation_start_date: e.target.value })} className={inputClass} />
+                            <p className="mt-1 text-[10px] text-slate-500">Desde qué fecha se cuentan sus vacaciones. Si se deja vacío usa la fecha de ingreso.</p>
+                        </div>
+                        <div>
                             <label className={labelClass}>Días Base Vacaciones</label>
                             <input type="number" required min="6" value={employeeForm.base_vacation_days} onChange={e => setEmployeeForm({ ...employeeForm, base_vacation_days: e.target.value })} className={inputClass} />
                             <p className="mt-1 text-[10px] text-slate-500">Por defecto: 12 días (LFT México)</p>
                         </div>
                     </div>
                     <div className="mt-4 flex gap-2">
-                        <button type="submit" className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white">Guardar Colaborador</button>
-                        <button type="button" onClick={() => setShowEmployeeForm(false)} className="rounded-lg border border-slate-200 px-5 py-2 text-sm text-slate-500">Cancelar</button>
+                        <button type="submit" className="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-semibold text-white">{editingEmployee ? 'Guardar Cambios' : 'Guardar Colaborador'}</button>
+                        <button type="button" onClick={() => { setShowEmployeeForm(false); setEditingEmployee(null); }} className="rounded-lg border border-slate-200 px-5 py-2 text-sm text-slate-500">Cancelar</button>
                     </div>
                 </form>
             )}
@@ -199,7 +240,7 @@ export default function VacationsPlanner() {
                             <label className={labelClass}>Colaborador</label>
                             <select required value={form.employee_id} onChange={e => setForm({ ...form, employee_id: e.target.value })} className={inputClass}>
                                 <option value="">Seleccionar...</option>
-                                {employees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
+                                {activeEmployees.map(e => <option key={e.id} value={e.id}>{e.full_name}</option>)}
                             </select>
                         </div>
                         <div>
@@ -261,6 +302,18 @@ export default function VacationsPlanner() {
                                 {departments.map(d => <option key={d} value={d}>{d}</option>)}
                             </select>
                         </div>
+                        <div className="w-px bg-slate-200 dark:bg-slate-700" />
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase">Estatus</label>
+                            <div className="mt-1 flex gap-1">
+                                {([['active', 'Activos'], ['inactive', `Bajas (${inactiveCount})`], ['all', 'Todos']] as const).map(([val, label]) => (
+                                    <button key={val} onClick={() => setFilterActive(val)}
+                                        className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all ${filterActive === val ? 'bg-primary text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Resumen Anual */}
@@ -275,11 +328,13 @@ export default function VacationsPlanner() {
                                         <th className="px-5 py-3 text-left font-semibold text-slate-500">Colaborador</th>
                                         <th className="px-5 py-3 text-left font-semibold text-slate-500">Departamento</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Antigüedad</th>
+                                        <th className="px-5 py-3 text-center font-semibold text-slate-500">Inicio Vac.</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Días {filterYear}</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Usados</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Restantes</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Permisos S/G</th>
                                         <th className="px-5 py-3 text-center font-semibold text-slate-500">Otros</th>
+                                        <th className="px-5 py-3 text-center font-semibold text-slate-500">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -287,11 +342,21 @@ export default function VacationsPlanner() {
                                         const bal = balances.get(emp.id);
                                         const hireYear = emp.hire_date ? new Date(emp.hire_date).getFullYear() : currentYear;
                                         const years = filterYear - hireYear;
+                                        const vacRef = emp.vacation_start_date || emp.hire_date;
                                         return (
-                                            <tr key={emp.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                                                <td className="px-5 py-3 font-medium text-slate-900 dark:text-white">{emp.full_name}</td>
+                                            <tr key={emp.id} className={`transition-colors ${emp.is_active ? 'hover:bg-slate-50/50 dark:hover:bg-slate-800/30' : 'opacity-50 bg-slate-50/30 dark:bg-slate-800/10'}`}>
+                                                <td className="px-5 py-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium text-slate-900 dark:text-white">{emp.full_name}</span>
+                                                        {!emp.is_active && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600 dark:bg-red-900/30 dark:text-red-400">BAJA</span>}
+                                                    </div>
+                                                </td>
                                                 <td className="px-5 py-3 text-slate-500">{emp.department || '—'}</td>
                                                 <td className="px-5 py-3 text-center text-slate-500">{years >= 0 ? `${years} años` : '—'}</td>
+                                                <td className="px-5 py-3 text-center text-xs text-slate-400">
+                                                    {vacRef ? new Date(vacRef + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                                                    {emp.vacation_start_date && <span className="ml-1 text-[9px] text-indigo-500" title="Fecha personalizada">✎</span>}
+                                                </td>
                                                 <td className="px-5 py-3 text-center font-bold text-slate-900 dark:text-white">{bal?.total || 0}</td>
                                                 <td className="px-5 py-3 text-center font-bold text-amber-500">{bal?.used || 0}</td>
                                                 <td className="px-5 py-3 text-center">
@@ -308,6 +373,17 @@ export default function VacationsPlanner() {
                                                     <span className={`inline-flex min-w-[30px] items-center justify-center rounded-full px-2 py-1 text-xs font-bold ${(bal?.otherAbsences || 0) > 0 ? 'bg-sky-100 text-sky-700' : 'text-slate-400'}`}>
                                                         {bal?.otherAbsences || 0}
                                                     </span>
+                                                </td>
+                                                <td className="px-5 py-3 text-center">
+                                                    <div className="flex justify-center gap-1">
+                                                        <button onClick={() => openEditEmployee(emp)} title="Editar" className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+                                                            <span className="material-symbols-outlined text-[16px]">edit</span>
+                                                        </button>
+                                                        <button onClick={() => toggleActive(emp)} title={emp.is_active ? 'Dar de baja' : 'Reactivar'}
+                                                            className={`rounded p-1 ${emp.is_active ? 'text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20' : 'text-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20'}`}>
+                                                            <span className="material-symbols-outlined text-[16px]">{emp.is_active ? 'person_off' : 'person'}</span>
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         );
