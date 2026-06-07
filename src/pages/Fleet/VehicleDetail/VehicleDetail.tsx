@@ -4,7 +4,7 @@ import { supabase } from '../../../lib/supabase';
 import { useAuth } from '../../../lib/AuthContext';
 import { 
     Vehicle, VehicleInsurance, VehicleMileage, VehicleMaintenance, VehicleServiceSchedule,
-    SchedulePriority, ScheduleStatus,
+    SchedulePriority, ScheduleStatus, VehicleFuelLog,
     VEHICLE_STATUS_LABELS, VEHICLE_STATUS_COLORS, VEHICLE_TYPE_ICONS, VEHICLE_TYPE_LABELS,
     VERIFICATION_STATUS_LABELS, VERIFICATION_STATUS_COLORS,
     SCHEDULE_PRIORITY_LABELS, SCHEDULE_PRIORITY_COLORS,
@@ -12,7 +12,7 @@ import {
 } from '../../../types/fleet';
 import { Project } from '../../../types/projects';
 
-type Tab = 'overview' | 'insurances' | 'mileage' | 'maintenance' | 'services' | 'performance';
+type Tab = 'overview' | 'insurances' | 'mileage' | 'fuel' | 'maintenance' | 'services' | 'performance';
 
 export default function VehicleDetail() {
     const { id } = useParams<{ id: string }>();
@@ -26,6 +26,7 @@ export default function VehicleDetail() {
     const [insurances, setInsurances] = useState<VehicleInsurance[]>([]);
     const [mileage, setMileage] = useState<VehicleMileage[]>([]);
     const [maintenance, setMaintenance] = useState<VehicleMaintenance[]>([]);
+    const [fuelLogs, setFuelLogs] = useState<VehicleFuelLog[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [tab, setTab] = useState<Tab>('overview');
@@ -35,14 +36,20 @@ export default function VehicleDetail() {
     // Modals
     const [showInsForm, setShowInsForm] = useState(false);
     const [showMilForm, setShowMilForm] = useState(false);
+    const [showFuelForm, setShowFuelForm] = useState(false);
     const [showMntForm, setShowMntForm] = useState(false);
     const [showSchedForm, setShowSchedForm] = useState(false);
 
     // Form states
     const [insForm, setInsForm] = useState<Partial<VehicleInsurance>>({});
     const [editingInsId, setEditingInsId] = useState<string | null>(null);
-    const [milForm, setMilForm] = useState<Partial<VehicleMileage & { fuel_liters: number }>>({ 
-        date: new Date().toISOString().split('T')[0], odometer_start: 0, odometer_end: 0, fuel_liters: 0 
+    const [editingMilId, setEditingMilId] = useState<string | null>(null);
+    const [editingFuelId, setEditingFuelId] = useState<string | null>(null);
+    const [milForm, setMilForm] = useState<Partial<VehicleMileage>>({ 
+        date: new Date().toISOString().split('T')[0], odometer_start: 0, odometer_end: 0 
+    });
+    const [fuelForm, setFuelForm] = useState<Partial<VehicleFuelLog>>({
+        date: new Date().toISOString().split('T')[0], odometer: 0, fuel_liters: 0, cost: 0
     });
     const [mntForm, setMntForm] = useState<Partial<VehicleMaintenance>>({ 
         service_date: new Date().toISOString().split('T')[0], cost: 0 
@@ -57,10 +64,11 @@ export default function VehicleDetail() {
         if (!id) return;
         setLoading(true);
 
-        const [vRes, iRes, mRes, mtRes, pRes, sRes] = await Promise.all([
+        const [vRes, iRes, mRes, fRes, mtRes, pRes, sRes] = await Promise.all([
             supabase.from('vehicles').select('*').eq('id', id).single(),
             supabase.from('vehicle_insurances').select('*').eq('vehicle_id', id).order('start_date', { ascending: false }),
             supabase.from('vehicle_mileage').select('*, project:projects(project_number, title)').eq('vehicle_id', id).order('date', { ascending: false }),
+            supabase.from('vehicle_fuel_logs').select('*').eq('vehicle_id', id).order('date', { ascending: false }).order('odometer', { ascending: false }),
             supabase.from('vehicle_maintenance').select('*, project:projects(project_number, title)').eq('vehicle_id', id).order('service_date', { ascending: false }),
             supabase.from('projects').select('id, project_number, title, location'),
             supabase.from('vehicle_service_schedules').select('*').eq('vehicle_id', id).order('created_at', { ascending: false })
@@ -69,12 +77,14 @@ export default function VehicleDetail() {
         setVehicle(vRes.data as Vehicle);
         setInsurances(iRes.data as VehicleInsurance[] || []);
         setMileage(mRes.data as VehicleMileage[] || []);
+        setFuelLogs(fRes.data as VehicleFuelLog[] || []);
         setMaintenance(mtRes.data as VehicleMaintenance[] || []);
         setProjects(pRes.data as unknown as Project[] || []);
         setSchedules(sRes.data as VehicleServiceSchedule[] || []);
         
         if (vRes.data) {
             setMilForm(prev => ({ ...prev, odometer_start: vRes.data.current_mileage, odometer_end: vRes.data.current_mileage }));
+            setFuelForm(prev => ({ ...prev, odometer: vRes.data.current_mileage }));
             setMntForm(prev => ({ ...prev, odometer_reading: vRes.data.current_mileage }));
         }
 
@@ -124,13 +134,82 @@ export default function VehicleDetail() {
         const dist = (milForm.odometer_end || 0) - (milForm.odometer_start || 0);
         const tripCost = dist * (vehicle?.cost_per_km || 0);
 
-        await supabase.from('vehicle_mileage').insert({ 
-            ...milForm, 
-            vehicle_id: id, 
-            calculated_trip_cost: tripCost,
-        });
+        if (editingMilId) {
+            const { vehicle_id, id: _id, created_at, project, ...updateData } = milForm as any;
+            await supabase.from('vehicle_mileage').update({
+                ...updateData,
+                distance: dist,
+                calculated_trip_cost: tripCost
+            }).eq('id', editingMilId);
+        } else {
+            await supabase.from('vehicle_mileage').insert({ 
+                ...milForm, 
+                distance: dist,
+                vehicle_id: id, 
+                calculated_trip_cost: tripCost,
+            });
+        }
         setShowMilForm(false);
-        setMilForm({ date: new Date().toISOString().split('T')[0], fuel_liters: 0 });
+        setMilForm({ date: new Date().toISOString().split('T')[0] });
+        setEditingMilId(null);
+        fetchAll();
+    };
+
+    const handleEditMil = (mil: VehicleMileage) => {
+        setMilForm({
+            date: mil.date,
+            driver_name: mil.driver_name,
+            project_id: mil.project_id,
+            destination: mil.destination,
+            departure_date: mil.departure_date,
+            return_date: mil.return_date,
+            odometer_start: mil.odometer_start,
+            odometer_end: mil.odometer_end,
+            distance: mil.distance,
+            fuel_level_start: mil.fuel_level_start,
+            fuel_level_end: mil.fuel_level_end,
+            notes: mil.notes,
+        });
+        setEditingMilId(mil.id);
+        setShowMilForm(true);
+    };
+
+    const handleDeleteMil = async (milId: string) => {
+        if (!window.confirm('¿Eliminar este registro de kilometraje? Esta acción no se puede deshacer.')) return;
+        await supabase.from('vehicle_mileage').delete().eq('id', milId);
+        fetchAll();
+    };
+
+    const handleAddFuel = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editingFuelId) {
+            const { vehicle_id, id: _id, created_at, ...updateData } = fuelForm as any;
+            await supabase.from('vehicle_fuel_logs').update(updateData).eq('id', editingFuelId);
+        } else {
+            await supabase.from('vehicle_fuel_logs').insert({ ...fuelForm, vehicle_id: id });
+        }
+        setShowFuelForm(false);
+        setFuelForm({ date: new Date().toISOString().split('T')[0], odometer: vehicle?.current_mileage || 0, fuel_liters: 0, cost: 0 });
+        setEditingFuelId(null);
+        fetchAll();
+    };
+
+    const handleEditFuel = (fuel: VehicleFuelLog) => {
+        setFuelForm({
+            date: fuel.date,
+            odometer: fuel.odometer,
+            fuel_liters: fuel.fuel_liters,
+            cost: fuel.cost,
+            provider: fuel.provider,
+            notes: fuel.notes,
+        });
+        setEditingFuelId(fuel.id);
+        setShowFuelForm(true);
+    };
+
+    const handleDeleteFuel = async (fuelId: string) => {
+        if (!window.confirm('¿Eliminar este registro de combustible? Esta acción no se puede deshacer.')) return;
+        await supabase.from('vehicle_fuel_logs').delete().eq('id', fuelId);
         fetchAll();
     };
 
@@ -158,7 +237,7 @@ export default function VehicleDetail() {
         fetchAll();
     };
 
-    const efficiency = useMemo(() => calculateEfficiency(mileage), [mileage]);
+    const efficiency = useMemo(() => calculateEfficiency(fuelLogs), [fuelLogs]);
 
     if (loading) return <div className="flex flex-1 justify-center items-center"><div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
     if (!vehicle) return <div className="p-8">Vehículo no encontrado</div>;
@@ -198,6 +277,7 @@ export default function VehicleDetail() {
                     { key: 'overview', icon: 'dashboard', label: 'General' },
                     { key: 'insurances', icon: 'verified_user', label: `Seguros (${insurances.length})` },
                     { key: 'mileage', icon: 'speed', label: `Kilometraje (${mileage.length})` },
+                    { key: 'fuel', icon: 'local_gas_station', label: `Combustible (${fuelLogs.length})` },
                     { key: 'maintenance', icon: 'build', label: `Mantenimiento (${maintenance.length})` },
                     { key: 'services', icon: 'event', label: `Agenda (${schedules.length})` },
                     { key: 'performance', icon: 'analytics', label: 'Rendimiento' },
@@ -378,7 +458,7 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-emerald-500">speed</span>Bitácora de Kilometraje / Viajes</h3>
-                        {canCreate && <button onClick={() => setShowMilForm(true)} className="flex items-center gap-2 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-3 py-1.5 text-sm font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
+                        {canCreate && <button onClick={() => { setEditingMilId(null); setMilForm({ date: new Date().toISOString().split('T')[0], odometer_start: vehicle.current_mileage, odometer_end: vehicle.current_mileage }); setShowMilForm(true); }} className="flex items-center gap-2 rounded bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400 px-3 py-1.5 text-sm font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Registrar Viaje
                         </button>}
                     </div>
@@ -392,17 +472,15 @@ export default function VehicleDetail() {
                                         <th className="px-4 py-3 font-semibold text-slate-500">Destino</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Proyecto</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Recorrido</th>
-                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Litros</th>
-                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Rendimiento</th>
-                                        <th className="px-4 py-3 font-semibold text-slate-500 text-right">Costo Combustible</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Nivel Inicial</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Nivel Final</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-right">Costo Operativo</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-right"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {mileage.map(m => {
-                                        const rendimiento = m.fuel_liters > 0 && m.distance > 0 ? (m.distance / m.fuel_liters) : null;
-                                        return (
-                                        <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                    {mileage.map(m => (
+                                        <tr key={m.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                                             <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.date).toLocaleDateString('es-MX')}</td>
                                             <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{m.driver_name}</td>
                                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
@@ -417,18 +495,83 @@ export default function VehicleDetail() {
                                                 <div className="font-bold text-emerald-500 mt-0.5">+{m.distance} km</div>
                                             </td>
                                             <td className="px-4 py-3 text-center text-xs font-mono text-slate-600 dark:text-slate-400">
-                                                {m.fuel_liters > 0 ? `${m.fuel_liters.toFixed(1)} L` : '—'}
+                                                {m.fuel_level_start !== null ? `${m.fuel_level_start}%` : '—'}
                                             </td>
-                                            <td className="px-4 py-3 text-center">
-                                                {rendimiento ? (
-                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${rendimiento >= 10 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : rendimiento >= 5 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
-                                                        <span className="material-symbols-outlined text-[12px]">local_gas_station</span>
-                                                        {rendimiento.toFixed(1)} km/l
-                                                    </span>
-                                                ) : <span className="text-xs text-slate-400">—</span>}
+                                            <td className="px-4 py-3 text-center text-xs font-mono text-slate-600 dark:text-slate-400">
+                                                {m.fuel_level_end !== null ? `${m.fuel_level_end}%` : '—'}
                                             </td>
-                                            <td className="px-4 py-3 text-right text-slate-500">{m.fuel_cost > 0 ? formatCurrency(m.fuel_cost) : '—'}</td>
                                             <td className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300">{formatCurrency(m.calculated_trip_cost)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                {(canEdit || canDelete) && (
+                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {canEdit && <button onClick={() => handleEditMil(m)} className="rounded p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Editar"><span className="material-symbols-outlined text-[16px]">edit</span></button>}
+                                                        {canDelete && <button onClick={() => handleDeleteMil(m.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar"><span className="material-symbols-outlined text-[16px]">delete</span></button>}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {tab === 'fuel' && (
+                <div className={sectionClass}>
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-blue-500">local_gas_station</span>Cargas de Combustible</h3>
+                        {canCreate && <button onClick={() => { setEditingFuelId(null); setFuelForm({ date: new Date().toISOString().split('T')[0], odometer: vehicle.current_mileage, fuel_liters: 0, cost: 0 }); setShowFuelForm(true); }} className="flex items-center gap-2 rounded bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 px-3 py-1.5 text-sm font-semibold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors">
+                            <span className="material-symbols-outlined text-[18px]">add</span>Registrar Carga
+                        </button>}
+                    </div>
+                    {fuelLogs.length === 0 ? <p className="text-sm text-slate-500">No hay registros de combustible.</p> : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800 dark:border-slate-700">
+                                    <tr>
+                                        <th className="px-4 py-3 font-semibold text-slate-500">Fecha</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500">Gasolinera</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500">Odómetro</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Litros</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-right">Costo</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Rendimiento (km/l)</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-right"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {[...fuelLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.odometer - a.odometer).map((log, i, arr) => {
+                                        // The array is sorted descending by odometer/date. So the 'previous' log (chronologically) is the next element in this reversed array.
+                                        const prevLog = arr[i + 1];
+                                        let rendimiento: number | null = null;
+                                        if (prevLog && log.fuel_liters > 0) {
+                                            const dist = log.odometer - prevLog.odometer;
+                                            if (dist > 0) rendimiento = dist / log.fuel_liters;
+                                        }
+
+                                        return (
+                                        <tr key={log.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(log.date).toLocaleDateString('es-MX')}</td>
+                                            <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{log.provider || '—'}</td>
+                                            <td className="px-4 py-3 font-mono text-xs text-slate-600">{log.odometer.toLocaleString()} km</td>
+                                            <td className="px-4 py-3 text-center text-xs font-mono text-slate-600 dark:text-slate-400">{log.fuel_liters.toFixed(1)} L</td>
+                                            <td className="px-4 py-3 text-right text-slate-500 font-medium">{formatCurrency(log.cost)}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                {rendimiento !== null ? (
+                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${rendimiento >= 10 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : rendimiento >= 5 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>
+                                                        {rendimiento.toFixed(1)}
+                                                    </span>
+                                                ) : <span className="text-xs text-slate-400" title="Requiere carga anterior">—</span>}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                {(canEdit || canDelete) && (
+                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {canEdit && <button onClick={() => handleEditFuel(log)} className="rounded p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors" title="Editar"><span className="material-symbols-outlined text-[16px]">edit</span></button>}
+                                                        {canDelete && <button onClick={() => handleDeleteFuel(log.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar"><span className="material-symbols-outlined text-[16px]">delete</span></button>}
+                                                    </div>
+                                                )}
+                                            </td>
                                         </tr>
                                         );
                                     })}
@@ -503,13 +646,38 @@ export default function VehicleDetail() {
                 </div>
             )}
 
+            {/* Fuel Modal */}
+            {showFuelForm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+                        <div className="mb-6 flex items-center justify-between">
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{editingFuelId ? 'Editar Carga' : 'Registrar Carga'}</h3>
+                            <button onClick={() => { setShowFuelForm(false); setEditingFuelId(null); setFuelForm({}); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
+                        </div>
+                        <form onSubmit={handleAddFuel} className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Fecha *</label><input required type="date" value={fuelForm.date || ''} onChange={e => setFuelForm({...fuelForm, date: e.target.value})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odómetro *</label><input required type="number" step="0.1" value={fuelForm.odometer || 0} onChange={e => setFuelForm({...fuelForm, odometer: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Litros Cargados *</label><input required type="number" step="0.01" value={fuelForm.fuel_liters || 0} onChange={e => setFuelForm({...fuelForm, fuel_liters: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Costo Total ($) *</label><input required type="number" step="0.01" value={fuelForm.cost || 0} onChange={e => setFuelForm({...fuelForm, cost: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                            </div>
+                            <div><label className="mb-1 block text-xs font-semibold text-slate-500">Gasolinera / Proveedor</label><input type="text" value={fuelForm.provider || ''} onChange={e => setFuelForm({...fuelForm, provider: e.target.value})} placeholder="Ej: Pemex" className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                            <div><label className="mb-1 block text-xs font-semibold text-slate-500">Notas</label><textarea value={fuelForm.notes || ''} onChange={e => setFuelForm({...fuelForm, notes: e.target.value})} rows={2} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900 resize-none" /></div>
+                            <button type="submit" className="w-full rounded-lg bg-blue-600 py-3 text-sm font-semibold text-white hover:bg-blue-700">{editingFuelId ? 'Actualizar Carga' : 'Guardar Carga'}</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Mileage Modal */}
             {showMilForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
                         <div className="mb-6 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Registrar Viaje</h3>
-                            <button onClick={() => setShowMilForm(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{editingMilId ? 'Editar Viaje' : 'Registrar Viaje'}</h3>
+                            <button onClick={() => { setShowMilForm(false); setEditingMilId(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
                         </div>
                         <form onSubmit={handleAddMil} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
@@ -545,17 +713,11 @@ export default function VehicleDetail() {
                                 <span>Costo op: <strong>{formatCurrency(((milForm.odometer_end || 0) - (milForm.odometer_start || 0)) * vehicle.cost_per_km)}</strong></span>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
-                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Litros Cargados</label><input type="number" step="0.01" value={(milForm as any).fuel_liters || 0} onChange={e => setMilForm({...milForm, fuel_liters: parseFloat(e.target.value)} as any)} placeholder="Ej: 65.5" className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
-                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Costo Combustible ($)</label><input type="number" step="0.01" value={milForm.fuel_cost || 0} onChange={e => setMilForm({...milForm, fuel_cost: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Nivel Gasolina Inicial (%)</label><input type="number" step="1" min="0" max="100" value={milForm.fuel_level_start !== null ? milForm.fuel_level_start : ''} onChange={e => setMilForm({...milForm, fuel_level_start: parseFloat(e.target.value)})} placeholder="Ej: 100" className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Nivel Gasolina Final (%)</label><input type="number" step="1" min="0" max="100" value={milForm.fuel_level_end !== null ? milForm.fuel_level_end : ''} onChange={e => setMilForm({...milForm, fuel_level_end: parseFloat(e.target.value)})} placeholder="Ej: 75" className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                             </div>
-                            {(milForm as any).fuel_liters > 0 && ((milForm.odometer_end || 0) - (milForm.odometer_start || 0)) > 0 && (
-                                <div className="flex items-center justify-center gap-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm border border-blue-100 dark:bg-blue-900/30 dark:border-blue-800/50">
-                                    <span className="material-symbols-outlined text-[16px]">local_gas_station</span>
-                                    <span>Rendimiento: <strong>{(((milForm.odometer_end || 0) - (milForm.odometer_start || 0)) / (milForm as any).fuel_liters).toFixed(1)} km/l</strong></span>
-                                </div>
-                            )}
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Observaciones</label><textarea value={milForm.notes || ''} onChange={e => setMilForm({...milForm, notes: e.target.value})} rows={2} placeholder="Notas del viaje..." className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900 resize-none" /></div>
-                            <button type="submit" className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700">Guardar Viaje</button>
+                            <button type="submit" className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700">{editingMilId ? 'Actualizar Viaje' : 'Guardar Viaje'}</button>
                         </form>
                     </div>
                 </div>

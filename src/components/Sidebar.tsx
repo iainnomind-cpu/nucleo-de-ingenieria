@@ -20,7 +20,16 @@ const navItems = [
   { label: 'WhatsApp Mktg', icon: 'chat', path: '/whatsapp', module: 'whatsapp' },
   { label: 'Tablero de Tareas', icon: 'task', path: '/tasks', module: 'tasks' },
   { label: 'Chat de Equipo', icon: 'forum', path: '/team', module: 'team' },
-  { label: 'Vacaciones y RH', icon: 'event_available', path: '/team/board', module: 'team' },
+  { 
+    label: 'Vacaciones y RH', 
+    icon: 'event_available', 
+    path: '/team/board', 
+    module: 'team',
+    subItems: [
+      { label: 'Planificador', path: '/team/board', icon: 'calendar_month' },
+      { label: 'Expedientes', path: '/team/directory', icon: 'folder_shared' }
+    ]
+  },
 ];
 
 function Sidebar() {
@@ -28,6 +37,7 @@ function Sidebar() {
   const { user, logout, hasPermission } = useAuth();
   const { isOpen, close } = useSidebar();
   const [unreadWaCount, setUnreadWaCount] = useState(0);
+  const [expandedMenu, setExpandedMenu] = useState<string | null>(null);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -87,35 +97,88 @@ function Sidebar() {
       >
         <nav className="flex flex-col gap-1">
           {visibleItems.map((item) => {
-            const isActive =
-              item.path === '/crm'
-                ? location.pathname === '/crm'
-                : location.pathname.startsWith(item.path);
+            let isActive = false;
+            if (item.path === '/crm') {
+              isActive = location.pathname === '/crm';
+            } else if (item.path === '/team') {
+              isActive = location.pathname === '/team' || location.pathname.startsWith('/team/space') || location.pathname.startsWith('/team/inbox');
+            } else {
+              isActive = location.pathname.startsWith(item.path) || (item.subItems?.some(s => location.pathname.startsWith(s.path)) ?? false);
+            }
+
+            const isExpanded = expandedMenu === item.label;
 
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={clsx(
-                  'group relative flex items-center gap-3 rounded-lg px-4 py-3 transition-all',
-                  isActive
-                    ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-content font-semibold'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+              <div key={item.label} className="flex flex-col">
+                {item.subItems ? (
+                  <>
+                    <button
+                      onClick={() => setExpandedMenu(isExpanded ? null : item.label)}
+                      className={clsx(
+                        'group relative flex items-center justify-between gap-3 rounded-lg px-4 py-3 transition-all',
+                        isActive
+                          ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-content font-semibold'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="material-symbols-outlined relative text-[24px]">
+                          {item.icon}
+                        </span>
+                        <span className="text-sm">{item.label}</span>
+                      </div>
+                      <span className={clsx("material-symbols-outlined text-[18px] transition-transform", isExpanded && "rotate-180")}>
+                        expand_more
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div className="flex flex-col gap-1 mt-1 pl-11 pr-2">
+                        {item.subItems.map(sub => {
+                          const isSubActive = location.pathname.startsWith(sub.path);
+                          return (
+                            <Link
+                              key={sub.path}
+                              to={sub.path}
+                              className={clsx(
+                                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all',
+                                isSubActive
+                                  ? 'bg-primary/5 text-primary dark:bg-primary/10 font-bold'
+                                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-200'
+                              )}
+                            >
+                                <span className="material-symbols-outlined text-[18px] opacity-70">{sub.icon}</span>
+                                {sub.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <Link
+                    to={item.path}
+                    className={clsx(
+                      'group relative flex items-center gap-3 rounded-lg px-4 py-3 transition-all',
+                      isActive
+                        ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-content font-semibold'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'
+                    )}
+                  >
+                    <span className="material-symbols-outlined relative text-[24px]">
+                      {item.icon}
+                      {item.module === 'whatsapp' && unreadWaCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900 shadow-sm" />
+                      )}
+                    </span>
+                    <span className="text-sm">{item.label}</span>
+                    {item.module === 'whatsapp' && unreadWaCount > 0 && (
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
+                        {unreadWaCount}
+                      </span>
+                    )}
+                  </Link>
                 )}
-              >
-                <span className="material-symbols-outlined relative text-[24px]">
-                  {item.icon}
-                  {item.module === 'whatsapp' && unreadWaCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 ring-2 ring-white dark:ring-slate-900 shadow-sm" />
-                  )}
-                </span>
-                <span className="text-sm">{item.label}</span>
-                {item.module === 'whatsapp' && unreadWaCount > 0 && (
-                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-sm">
-                    {unreadWaCount}
-                  </span>
-                )}
-              </Link>
+              </div>
             );
           })}
 

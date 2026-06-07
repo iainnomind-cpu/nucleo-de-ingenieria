@@ -67,3 +67,22 @@ export function calculateVacationDays(hireDateStr: string | null, baseDays: numb
     
     return baseDays + extra;
 }
+
+export interface HrDocumentFolder {
+    id: string;
+    employee_id: string;
+    name: string;
+    created_at: string;
+}
+
+export interface HrEmployeeDocument {
+    id: string;
+    employee_id: string;
+    folder_id: string | null;
+    file_name: string;
+    file_url: string;
+    file_type: string | null;
+    file_size_bytes: number | null;
+    uploaded_by: string | null;
+    created_at: string;
+}

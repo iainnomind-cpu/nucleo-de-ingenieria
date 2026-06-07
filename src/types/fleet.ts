@@ -73,6 +73,18 @@ export interface VehicleMaintenance {
     created_at: string;
 }
 
+export interface VehicleFuelLog {
+    id: string;
+    vehicle_id: string;
+    date: string;
+    odometer: number;
+    fuel_liters: number;
+    cost: number;
+    provider: string | null;
+    notes: string | null;
+    created_at: string;
+}
+
 // Labels & Helpers
 export const VEHICLE_TYPE_LABELS: Record<VehicleType, string> = {
     sedan: 'Sedán',
@@ -192,17 +204,31 @@ export function getServiceScheduleStatus(schedule: VehicleServiceSchedule, curre
     return { status, trigger, daysUntilDue, kmUntilDue };
 }
 
-export function calculateEfficiency(mileageRecords: VehicleMileage[]): {
+export function calculateEfficiency(fuelLogs: VehicleFuelLog[]): {
     avgKmPerLiter: number;
     totalKm: number;
     totalLiters: number;
     totalFuelCost: number;
     records: number;
 } {
-    const validRecords = mileageRecords.filter(m => m.fuel_liters > 0 && m.distance > 0);
-    const totalKm = validRecords.reduce((s, m) => s + m.distance, 0);
-    const totalLiters = validRecords.reduce((s, m) => s + m.fuel_liters, 0);
-    const totalFuelCost = mileageRecords.reduce((s, m) => s + (m.fuel_cost || 0), 0);
+    // Sort logs by date and odometer to calculate distances properly
+    const sortedLogs = [...fuelLogs].sort((a, b) => a.odometer - b.odometer);
+    let totalKm = 0;
+    let totalLiters = 0;
+    let totalFuelCost = 0;
+
+    for (let i = 1; i < sortedLogs.length; i++) {
+        const prev = sortedLogs[i - 1];
+        const curr = sortedLogs[i];
+        
+        const distance = curr.odometer - prev.odometer;
+        if (distance > 0 && curr.fuel_liters > 0) {
+            totalKm += distance;
+            totalLiters += curr.fuel_liters;
+            totalFuelCost += curr.cost;
+        }
+    }
+
     const avgKmPerLiter = totalLiters > 0 ? totalKm / totalLiters : 0;
-    return { avgKmPerLiter, totalKm, totalLiters, totalFuelCost, records: validRecords.length };
+    return { avgKmPerLiter, totalKm, totalLiters, totalFuelCost, records: sortedLogs.length > 1 ? sortedLogs.length - 1 : 0 };
 }

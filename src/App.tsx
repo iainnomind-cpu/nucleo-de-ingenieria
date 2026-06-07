@@ -31,6 +31,8 @@ import VehicleDetail from './pages/Fleet/VehicleDetail/VehicleDetail';
 import SpaceChat from './pages/Team/SpaceChat';
 import VacationsPlanner from './pages/Team/VacationsPlanner';
 import Inbox from './pages/Team/Inbox';
+import TeamDirectory from './pages/Team/TeamDirectory';
+import EmployeeProfile from './pages/Team/EmployeeProfile/EmployeeProfile';
 import TasksDashboard from './pages/Tasks/TasksDashboard';
 import WhatsAppDashboard from './pages/WhatsApp/WhatsAppDashboard';
 import ConversationsInbox from './pages/WhatsApp/ConversationsInbox';
@@ -149,6 +151,8 @@ function ProtectedApp() {
               <Route path="/team/space/:spaceId" element={<SpaceChat />} />
               <Route path="/team/board" element={<VacationsPlanner />} />
               <Route path="/team/inbox" element={<Inbox />} />
+              <Route path="/team/directory" element={<TeamDirectory />} />
+              <Route path="/team/directory/:id" element={<EmployeeProfile />} />
             </>
           )}
           {/* M9: WhatsApp Marketing */}
