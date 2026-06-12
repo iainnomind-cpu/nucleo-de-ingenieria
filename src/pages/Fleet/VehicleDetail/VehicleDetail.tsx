@@ -45,6 +45,7 @@ export default function VehicleDetail() {
     const [editingInsId, setEditingInsId] = useState<string | null>(null);
     const [editingMilId, setEditingMilId] = useState<string | null>(null);
     const [editingFuelId, setEditingFuelId] = useState<string | null>(null);
+    const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
     const [milForm, setMilForm] = useState<Partial<VehicleMileage>>({ 
         date: new Date().toISOString().split('T')[0], odometer_start: 0, odometer_end: 0 
     });
@@ -134,25 +135,31 @@ export default function VehicleDetail() {
         const dist = (milForm.odometer_end || 0) - (milForm.odometer_start || 0);
         const tripCost = dist * (vehicle?.cost_per_km || 0);
 
-        if (editingMilId) {
-            const { vehicle_id, id: _id, created_at, project, ...updateData } = milForm as any;
-            await supabase.from('vehicle_mileage').update({
-                ...updateData,
-                distance: dist,
-                calculated_trip_cost: tripCost
-            }).eq('id', editingMilId);
-        } else {
-            await supabase.from('vehicle_mileage').insert({ 
-                ...milForm, 
-                distance: dist,
-                vehicle_id: id, 
-                calculated_trip_cost: tripCost,
-            });
+        try {
+            if (editingMilId) {
+                const { vehicle_id, id: _id, created_at, project, distance: _dist, ...updateData } = milForm as any;
+                const { error } = await supabase.from('vehicle_mileage').update({
+                    ...updateData,
+                    calculated_trip_cost: tripCost
+                }).eq('id', editingMilId);
+                if (error) throw error;
+            } else {
+                const { distance: _dist, ...insertData } = milForm as any;
+                const { error } = await supabase.from('vehicle_mileage').insert({ 
+                    ...insertData,
+                    vehicle_id: id, 
+                    calculated_trip_cost: tripCost,
+                });
+                if (error) throw error;
+            }
+            setShowMilForm(false);
+            setMilForm({ date: new Date().toISOString().split('T')[0] });
+            setEditingMilId(null);
+            fetchAll();
+        } catch (error: any) {
+            console.error('Error saving mileage:', error);
+            alert('Error al guardar el viaje: ' + error.message);
         }
-        setShowMilForm(false);
-        setMilForm({ date: new Date().toISOString().split('T')[0] });
-        setEditingMilId(null);
-        fetchAll();
     };
 
     const handleEditMil = (mil: VehicleMileage) => {
@@ -223,9 +230,36 @@ export default function VehicleDetail() {
 
     const handleAddSchedule = async (e: React.FormEvent) => {
         e.preventDefault();
-        await supabase.from('vehicle_service_schedules').insert({ ...schedForm, vehicle_id: id });
+        if (editingSchedId) {
+            const { vehicle_id, id: _id, created_at, ...updateData } = schedForm as any;
+            await supabase.from('vehicle_service_schedules').update(updateData).eq('id', editingSchedId);
+        } else {
+            await supabase.from('vehicle_service_schedules').insert({ ...schedForm, vehicle_id: id });
+        }
         setShowSchedForm(false);
         setSchedForm({ service_name: '', interval_km: null, interval_months: null, last_service_date: null, last_service_mileage: null, status: 'active', priority: 'normal', notes: '' });
+        setEditingSchedId(null);
+        fetchAll();
+    };
+
+    const handleEditSchedule = (sched: VehicleServiceSchedule) => {
+        setSchedForm({
+            service_name: sched.service_name,
+            interval_km: sched.interval_km,
+            interval_months: sched.interval_months,
+            last_service_date: sched.last_service_date,
+            last_service_mileage: sched.last_service_mileage,
+            status: sched.status,
+            priority: sched.priority,
+            notes: sched.notes,
+        });
+        setEditingSchedId(sched.id);
+        setShowSchedForm(true);
+    };
+
+    const handleDeleteSchedule = async (schedId: string) => {
+        if (!window.confirm('¿Eliminar este servicio agendado? Esta acción no se puede deshacer.')) return;
+        await supabase.from('vehicle_service_schedules').delete().eq('id', schedId);
         fetchAll();
     };
 
@@ -761,7 +795,7 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                     <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-violet-500">event</span>Agenda de Servicios</h3>
-                        {canCreate && <button onClick={() => setShowSchedForm(true)} className="flex items-center gap-2 rounded bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 px-3 py-1.5 text-sm font-semibold hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors">
+                        {canCreate && <button onClick={() => { setEditingSchedId(null); setSchedForm({ service_name: '', interval_km: null, interval_months: null, last_service_date: null, last_service_mileage: null, status: 'active', priority: 'normal', notes: '' }); setShowSchedForm(true); }} className="flex items-center gap-2 rounded bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400 px-3 py-1.5 text-sm font-semibold hover:bg-violet-100 dark:hover:bg-violet-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Agendar Servicio
                         </button>}
                     </div>
@@ -789,11 +823,17 @@ export default function VehicleDetail() {
                                             </div>
                                             {s.last_service_date && <p className="text-[10px] text-slate-400 mt-1">Último servicio: {new Date(s.last_service_date).toLocaleDateString('es-MX')} @ {s.last_service_mileage?.toLocaleString()} km</p>}
                                         </div>
-                                        <div className="mt-3 sm:mt-0 sm:ml-4 flex gap-2">
+                                        <div className="mt-3 sm:mt-0 sm:ml-4 flex items-center gap-2">
                                             {s.status === 'active' && (st.status === 'overdue' || st.status === 'upcoming') && (
                                                 <button onClick={() => handleMarkServiceDone(s)} className="flex items-center gap-1 rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-emerald-700 transition-colors">
                                                     <span className="material-symbols-outlined text-[14px]">check</span>Realizado
                                                 </button>
+                                            )}
+                                            {(canEdit || canDelete) && (
+                                                <div className="flex items-center gap-1">
+                                                    {canEdit && <button onClick={() => handleEditSchedule(s)} className="rounded p-1 text-slate-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors" title="Editar"><span className="material-symbols-outlined text-[16px]">edit</span></button>}
+                                                    {canDelete && <button onClick={() => handleDeleteSchedule(s.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar"><span className="material-symbols-outlined text-[16px]">delete</span></button>}
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -876,8 +916,8 @@ export default function VehicleDetail() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
                         <div className="mb-6 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Agendar Servicio Recurrente</h3>
-                            <button onClick={() => setShowSchedForm(false)} className="text-slate-400 hover:text-slate-600"><span className="material-symbols-outlined">close</span></button>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{editingSchedId ? 'Editar Servicio Agendado' : 'Agendar Servicio Recurrente'}</h3>
+                            <button onClick={() => { setShowSchedForm(false); setEditingSchedId(null); }} className="text-slate-400 hover:text-slate-600"><span className="material-symbols-outlined">close</span></button>
                         </div>
                         <form onSubmit={handleAddSchedule} className="space-y-4">
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Nombre del Servicio *</label><input required type="text" value={schedForm.service_name || ''} onChange={e => setSchedForm({...schedForm, service_name: e.target.value})} placeholder="Ej: Cambio de aceite, Verificación, Afinación..." className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
@@ -898,7 +938,7 @@ export default function VehicleDetail() {
                                 </select>
                             </div>
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Notas</label><textarea value={schedForm.notes || ''} onChange={e => setSchedForm({...schedForm, notes: e.target.value})} rows={2} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900 resize-none" /></div>
-                            <button type="submit" className="w-full rounded-lg bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-700">Guardar Agenda</button>
+                            <button type="submit" className="w-full rounded-lg bg-violet-600 py-3 text-sm font-semibold text-white hover:bg-violet-700">{editingSchedId ? 'Actualizar Agenda' : 'Guardar Agenda'}</button>
                         </form>
                     </div>
                 </div>

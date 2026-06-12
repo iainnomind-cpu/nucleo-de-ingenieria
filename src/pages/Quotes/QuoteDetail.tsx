@@ -529,18 +529,32 @@ export default function QuoteDetail() {
             }
 
             // ─── ITEMS TABLE (Cant. | Descripción | Precio Unitario | Importe Total) ───
-            // Calculate the items subtotal (suma) directly from items — NO margin, NO operational costs
             const itemsSuma = items.reduce((sum, item) => sum + item.subtotal, 0);
+            
+            // We use the quote's calculated totals so operational costs and margins are included
+            const sumaValue = quote.subtotal + quote.margin_amount - quote.discount_amount;
+            const operationalCostsDiff = sumaValue - itemsSuma;
+
+            const tableBody: any[] = items.map(item => [
+                item.quantity.toString(),
+                item.description,
+                formatCurrency(item.unit_price),
+                formatCurrency(item.subtotal),
+            ]);
+
+            if (operationalCostsDiff > 0) {
+                tableBody.push([
+                    '1',
+                    'Costos Operativos y Administrativos',
+                    formatCurrency(operationalCostsDiff),
+                    formatCurrency(operationalCostsDiff),
+                ]);
+            }
 
             autoTable(doc, {
                 startY: y,
                 head: [['Cant.', 'Descripción', 'Precio Unitario', 'Importe Total']],
-                body: items.map(item => [
-                    item.quantity.toString(),
-                    item.description,
-                    formatCurrency(item.unit_price),
-                    formatCurrency(item.subtotal),
-                ]),
+                body: tableBody,
                 headStyles: { 
                     fillColor: [19, 60, 90], 
                     textColor: [255, 255, 255], 
@@ -563,8 +577,8 @@ export default function QuoteDetail() {
 
             // ─── TOTALS: Suma → IVA 16% → Total (matching Excel exactly) ───
             const taxRate = quote.tax_percent || 16;
-            const ivaAmount = itemsSuma * (taxRate / 100);
-            const totalFinal = itemsSuma + ivaAmount;
+            const ivaAmount = quote.tax_amount;
+            const totalFinal = quote.total;
 
             let ty = tableEndY + 4;
             const totalsX = marginR - 80;
@@ -581,7 +595,7 @@ export default function QuoteDetail() {
 
             // Suma
             doc.text('Suma:', totalsX, ty);
-            doc.text(formatCurrency(itemsSuma), marginR, ty, { align: 'right' });
+            doc.text(formatCurrency(sumaValue), marginR, ty, { align: 'right' });
             ty += 7;
 
             // IVA
@@ -724,9 +738,8 @@ export default function QuoteDetail() {
             }
 
             if (sendChannels.whatsapp && quote.client?.phone) {
-                // Calcular total cliente (Suma items + IVA) para la plantilla
-                const itemsSuma = items.reduce((s, i) => s + i.subtotal, 0);
-                const clientTotal = itemsSuma * (1 + (quote.tax_percent || 16) / 100);
+                // Usar el total real calculado en la cotización
+                const clientTotal = quote.total;
 
                 promises.push(
                     fetch('/api/whatsapp-send-quote', {
@@ -988,13 +1001,13 @@ export default function QuoteDetail() {
                             Vista Cliente (PDF)
                         </h3>
                         <div className="space-y-3 text-sm">
-                            <div className="flex justify-between"><span className="text-slate-500">Suma</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(items.reduce((s, i) => s + i.subtotal, 0))}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">IVA ({quote.tax_percent}%)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(items.reduce((s, i) => s + i.subtotal, 0) * (quote.tax_percent / 100))}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Suma</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal + quote.margin_amount - quote.discount_amount)}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">IVA ({quote.tax_percent}%)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.tax_amount)}</span></div>
                             <div className="border-t-2 border-primary/30 pt-3 flex justify-between">
                                 <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
-                                <span className="text-2xl font-bold text-primary">{formatCurrency(items.reduce((s, i) => s + i.subtotal, 0) * (1 + quote.tax_percent / 100))}</span>
+                                <span className="text-2xl font-bold text-primary">{formatCurrency(quote.total)}</span>
                             </div>
-                            <p className="text-[10px] text-slate-400 italic">{numberToWords(items.reduce((s, i) => s + i.subtotal, 0) * (1 + quote.tax_percent / 100))}</p>
+                            <p className="text-[10px] text-slate-400 italic">{numberToWords(quote.total)}</p>
                         </div>
                     </div>
 
