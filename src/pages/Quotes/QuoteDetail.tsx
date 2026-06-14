@@ -531,25 +531,22 @@ export default function QuoteDetail() {
             // ─── ITEMS TABLE (Cant. | Descripción | Precio Unitario | Importe Total) ───
             const itemsSuma = items.reduce((sum, item) => sum + item.subtotal, 0);
             
-            // We use the quote's calculated totals so operational costs and margins are included
+            // Distribute margin + operational costs proportionally across each item
+            // sumaValue = what the client pays before IVA (includes margin & operational costs)
             const sumaValue = quote.subtotal + quote.margin_amount - quote.discount_amount;
-            const operationalCostsDiff = sumaValue - itemsSuma;
+            // multiplier to scale each item's price to include the prorrated margin
+            const prorateMultiplier = itemsSuma > 0 ? sumaValue / itemsSuma : 1;
 
-            const tableBody: any[] = items.map(item => [
-                item.quantity.toString(),
-                item.description,
-                formatCurrency(item.unit_price),
-                formatCurrency(item.subtotal),
-            ]);
-
-            if (operationalCostsDiff > 0) {
-                tableBody.push([
-                    '1',
-                    'Costos Operativos y Administrativos',
-                    formatCurrency(operationalCostsDiff),
-                    formatCurrency(operationalCostsDiff),
-                ]);
-            }
+            const tableBody: any[] = items.map(item => {
+                const clientUnitPrice = item.unit_price * prorateMultiplier;
+                const clientSubtotal = item.subtotal * prorateMultiplier;
+                return [
+                    item.quantity.toString(),
+                    item.description,
+                    formatCurrency(clientUnitPrice),
+                    formatCurrency(clientSubtotal),
+                ];
+            });
 
             autoTable(doc, {
                 startY: y,
