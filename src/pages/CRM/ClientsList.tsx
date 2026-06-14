@@ -15,7 +15,7 @@ const STATUS_OPTIONS: ClientStatus[] = ['prospect', 'active', 'inactive', 'vip',
 
 export default function ClientsList() {
     const navigate = useNavigate();
-    const [clients, setClients] = useState<Client[]>([]);
+    const [allClients, setAllClients] = useState<Client[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState<ClientStatus | 'all'>('all');
@@ -40,10 +40,6 @@ export default function ClientsList() {
             .select('*, created_by_user:app_users(full_name)')
             .order('updated_at', { ascending: false });
 
-        if (filterStatus !== 'all') {
-            query = query.eq('status', filterStatus);
-        }
-
         if (searchTerm.trim()) {
             query = query.or(
                 `company_name.ilike.%${searchTerm}%,contact_name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`
@@ -54,14 +50,21 @@ export default function ClientsList() {
         if (error) {
             console.error('Error fetching clients:', error);
         } else {
-            setClients(data || []);
+            setAllClients(data || []);
         }
         setLoading(false);
-    }, [filterStatus, searchTerm]);
+    }, [searchTerm]);
 
     useEffect(() => {
         fetchClients();
     }, [fetchClients]);
+
+    // Filter clients locally based on filterStatus (from KPI cards or filter bar)
+    const clients = allClients.filter(c => {
+        if (filterStatus === 'all') return true;
+        if (filterStatus === 'active') return c.status === 'active' || c.status === 'vip';
+        return c.status === filterStatus;
+    });
 
     const handleDeleteClient = async (id: string) => {
         if (!confirm('¿Estás seguro de eliminar este cliente?')) return;
@@ -86,11 +89,20 @@ export default function ClientsList() {
         return 'text-red-500';
     };
 
-    // KPI summaries
-    const totalClients = clients.length;
-    const activeClients = clients.filter((c) => c.status === 'active' || c.status === 'vip').length;
-    const prospects = clients.filter((c) => c.status === 'prospect').length;
-    const overdueClients = clients.filter((c) => c.status === 'overdue').length;
+    // KPI summaries — always from ALL clients (unfiltered)
+    const totalClients = allClients.length;
+    const activeClients = allClients.filter((c) => c.status === 'active' || c.status === 'vip').length;
+    const prospects = allClients.filter((c) => c.status === 'prospect').length;
+    const overdueClients = allClients.filter((c) => c.status === 'overdue').length;
+
+    // KPI card definitions with their filter values
+    type KpiFilterValue = ClientStatus | 'all';
+    const kpiCards: { label: string; value: number; icon: string; color: string; filterValue: KpiFilterValue }[] = [
+        { label: 'Total Clientes', value: totalClients, icon: 'groups', color: 'from-sky-500 to-cyan-500', filterValue: 'all' },
+        { label: 'Activos / VIP', value: activeClients, icon: 'verified', color: 'from-emerald-500 to-teal-500', filterValue: 'active' },
+        { label: 'Prospectos', value: prospects, icon: 'person_search', color: 'from-amber-500 to-orange-500', filterValue: 'prospect' },
+        { label: 'Morosos', value: overdueClients, icon: 'warning', color: 'from-red-500 to-rose-500', filterValue: 'overdue' },
+    ];
 
     return (
         <div className="flex flex-1 flex-col gap-6 p-4 sm:p-8">
@@ -104,34 +116,37 @@ export default function ClientsList() {
                 </p>
             </div>
 
-            {/* KPI Cards */}
+            {/* KPI Cards — Clickable */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                    { label: 'Total Clientes', value: totalClients, icon: 'groups', color: 'from-sky-500 to-cyan-500' },
-                    { label: 'Activos / VIP', value: activeClients, icon: 'verified', color: 'from-emerald-500 to-teal-500' },
-                    { label: 'Prospectos', value: prospects, icon: 'person_search', color: 'from-amber-500 to-orange-500' },
-                    { label: 'Morosos', value: overdueClients, icon: 'warning', color: 'from-red-500 to-rose-500' },
-                ].map((kpi) => (
-                    <div
-                        key={kpi.label}
-                        className="group relative overflow-hidden rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl transition-all hover:shadow-md dark:border-slate-800/60 dark:bg-slate-900/50"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                                    {kpi.label}
-                                </p>
-                                <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{kpi.value}</p>
+                {kpiCards.map((kpi) => {
+                    const isSelected = filterStatus === kpi.filterValue;
+                    return (
+                        <div
+                            key={kpi.label}
+                            onClick={() => setFilterStatus(kpi.filterValue)}
+                            className={`group relative overflow-hidden rounded-xl border p-5 shadow-sm backdrop-blur-xl transition-all cursor-pointer hover:shadow-md ${
+                                isSelected
+                                    ? 'border-primary ring-2 ring-primary/30 bg-white dark:bg-slate-900/70'
+                                    : 'border-slate-200/60 bg-white/70 dark:border-slate-800/60 dark:bg-slate-900/50'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                        {kpi.label}
+                                    </p>
+                                    <p className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{kpi.value}</p>
+                                </div>
+                                <div
+                                    className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${kpi.color} shadow-lg`}
+                                >
+                                    <span className="material-symbols-outlined text-white text-[24px]">{kpi.icon}</span>
+                                </div>
                             </div>
-                            <div
-                                className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${kpi.color} shadow-lg`}
-                            >
-                                <span className="material-symbols-outlined text-white text-[24px]">{kpi.icon}</span>
-                            </div>
+                            <div className={`absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r ${kpi.color} ${isSelected ? 'opacity-100' : 'opacity-60'}`} />
                         </div>
-                        <div className={`absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r ${kpi.color} opacity-60`} />
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Search, Filters & Actions */}
