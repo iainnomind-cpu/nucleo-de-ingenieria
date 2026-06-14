@@ -533,7 +533,8 @@ export default function QuoteDetail() {
             
             // Distribute margin + operational costs proportionally across each item
             // sumaValue = what the client pays before IVA (includes margin & operational costs)
-            const sumaValue = quote.subtotal + quote.margin_amount - quote.discount_amount;
+            // Note: quote.subtotal already includes quote.margin_amount
+            const sumaValue = quote.subtotal - quote.discount_amount;
             // multiplier to scale each item's price to include the prorrated margin
             const prorateMultiplier = itemsSuma > 0 ? sumaValue / itemsSuma : 1;
 
@@ -998,7 +999,7 @@ export default function QuoteDetail() {
                             Vista Cliente (PDF)
                         </h3>
                         <div className="space-y-3 text-sm">
-                            <div className="flex justify-between"><span className="text-slate-500">Suma</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal + quote.margin_amount - quote.discount_amount)}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Suma</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal - quote.discount_amount)}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500">IVA ({quote.tax_percent}%)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.tax_amount)}</span></div>
                             <div className="border-t-2 border-primary/30 pt-3 flex justify-between">
                                 <span className="text-lg font-bold text-slate-900 dark:text-white">Total</span>
@@ -1015,7 +1016,7 @@ export default function QuoteDetail() {
                             Datos Internos (No aparece en PDF)
                         </h3>
                         <div className="space-y-2 text-sm">
-                            <div className="flex justify-between"><span className="text-slate-500">Subtotal (con costos op.)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal)}</span></div>
+                            <div className="flex justify-between"><span className="text-slate-500">Costo (con costos op.)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal - quote.margin_amount)}</span></div>
                             <div className="flex justify-between"><span className="text-slate-500">Margen ({quote.margin_percent}%)</span><span className="text-emerald-600">+{formatCurrency(quote.margin_amount)}</span></div>
                             {quote.discount_amount > 0 && <div className="flex justify-between"><span className="text-slate-500">Descuento ({quote.discount_percent}%)</span><span className="text-red-500">-{formatCurrency(quote.discount_amount)}</span></div>}
                             <div className="flex justify-between"><span className="text-slate-500">IVA ({quote.tax_percent}%)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.tax_amount)}</span></div>
