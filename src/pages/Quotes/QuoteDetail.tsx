@@ -12,6 +12,7 @@ import {
     formatCurrency,
     numberToWords,
     DEFAULT_POLICIES,
+    calculateQuoteTotals,
 } from '../../types/quotes';
 
 export default function QuoteDetail() {
@@ -1010,22 +1011,54 @@ export default function QuoteDetail() {
                     </div>
 
                     {/* Internal Financials (not shown to client) */}
-                    <div className="rounded-xl border border-amber-200/60 bg-amber-50/30 p-6 shadow-sm dark:border-amber-800/30 dark:bg-amber-900/10">
-                        <h3 className="mb-4 text-sm font-bold text-amber-800 dark:text-amber-400 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-[18px]">lock</span>
-                            Datos Internos (No aparece en PDF)
-                        </h3>
-                        <div className="space-y-2 text-sm">
-                            <div className="flex justify-between"><span className="text-slate-500">Costo (con costos op.)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.subtotal - quote.margin_amount)}</span></div>
-                            <div className="flex justify-between"><span className="text-slate-500">Margen ({quote.margin_percent}%)</span><span className="text-emerald-600">+{formatCurrency(quote.margin_amount)}</span></div>
-                            {quote.discount_amount > 0 && <div className="flex justify-between"><span className="text-slate-500">Descuento ({quote.discount_percent}%)</span><span className="text-red-500">-{formatCurrency(quote.discount_amount)}</span></div>}
-                            <div className="flex justify-between"><span className="text-slate-500">IVA ({quote.tax_percent}%)</span><span className="font-medium text-slate-900 dark:text-white">{formatCurrency(quote.tax_amount)}</span></div>
-                            <div className="border-t border-amber-200 pt-2 flex justify-between dark:border-amber-800">
-                                <span className="font-bold text-slate-900 dark:text-white">Total Interno</span>
-                                <span className="font-bold text-slate-900 dark:text-white">{formatCurrency(quote.total)}</span>
+                    {(() => {
+                        const totals = calculateQuoteTotals({
+                            items,
+                            distance_km: quote.distance_km || 0,
+                            crew_size: quote.crew_size,
+                            estimated_days: quote.estimated_days,
+                            cost_per_km: quote.cost_per_km,
+                            viaticos_per_person: quote.viaticos_per_person,
+                            insurance_cost: quote.insurance_cost,
+                            vehicle_wear: quote.vehicle_wear,
+                            maniobra_cost: quote.maniobra_cost,
+                            margin_percent: quote.margin_percent,
+                            discount_percent: quote.discount_percent,
+                            tax_percent: quote.tax_percent,
+                            risk_level: quote.risk_level,
+                            well_depth: quote.well_depth || 0,
+                            motor_hp: quote.motor_hp || 0,
+                        });
+
+                        return (
+                            <div className={`rounded-xl border p-6 shadow-sm backdrop-blur-xl ${totals.net_profit_percent >= totals.suggested_min_margin ? 'border-emerald-200/60 bg-emerald-50/30 dark:border-emerald-800/40 dark:bg-emerald-900/10' : totals.net_profit_percent > 0 ? 'border-amber-200/60 bg-amber-50/30 dark:border-amber-800/40 dark:bg-amber-900/10' : 'border-red-200/60 bg-red-50/30 dark:border-red-800/40 dark:bg-red-900/10'}`}>
+                                <h3 className="mb-4 text-sm font-bold flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                                    <span className="material-symbols-outlined text-[18px]">analytics</span>
+                                    Análisis de Utilidad (Interno)
+                                </h3>
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-slate-600 dark:text-slate-400">Utilidad Neta</span>
+                                        <span className={`text-lg font-bold ${totals.net_profit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                            {formatCurrency(totals.net_profit)}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">% sobre costo total</span>
+                                        <span className={`text-sm font-bold ${totals.net_profit_percent >= totals.suggested_min_margin ? 'text-emerald-600' : totals.net_profit_percent > 0 ? 'text-amber-600' : 'text-red-600'}`}>
+                                            {totals.net_profit_percent.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-500">Costo Total Interno</span>
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                            {formatCurrency(totals.cost_total)}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
+                        );
+                    })()}
 
                     {/* Operational Costs */}
                     <div className="rounded-xl border border-slate-200/60 bg-white/50 p-6 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/50">

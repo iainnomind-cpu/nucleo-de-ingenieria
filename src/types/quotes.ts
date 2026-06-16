@@ -148,12 +148,11 @@ export function calculateQuoteTotals(params: {
 
     // ── 2. PRECIO DE VENTA ──
 
-    // Margen de utilidad — se aplica directamente al costo, sin multiplicadores automáticos
-    // El usuario decide libremente el % viendo el costo de referencia
-    const marginAmount = costTotal * (params.margin_percent / 100);
+    // Margen de utilidad — se aplica SOLO al costo de los conceptos (items), no a los costos operativos
+    const marginAmount = itemsSubtotal * (params.margin_percent / 100);
 
-    // Subtotal de venta = costo + margen
-    const subtotal = costTotal + marginAmount;
+    // Subtotal de venta = costo de los conceptos + margen (costos operativos NO se cobran al cliente)
+    const subtotal = itemsSubtotal + marginAmount;
 
     // Descuento sobre el precio de venta
     const discountAmount = subtotal * (params.discount_percent / 100);
@@ -167,7 +166,7 @@ export function calculateQuoteTotals(params: {
     // Total final al cliente
     const total = beforeTax + taxAmount;
 
-    // Utilidad neta (lo que ganamos después de descuento, antes de IVA)
+    // Utilidad neta (lo que ganamos después de descuento, antes de IVA, menos TODOS los costos incluyendo operativos)
     const netProfit = beforeTax - costTotal;
     const netProfitPercent = costTotal > 0 ? (netProfit / costTotal) * 100 : 0;
 

@@ -795,8 +795,8 @@ export default function QuoteBuilder() {
                             </div>
                             <div className="p-4 space-y-2 text-sm">
                                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                                    <span>Costo base</span>
-                                    <span className="font-medium">{formatCurrency(totals.cost_total)}</span>
+                                    <span>Costo base (Conceptos)</span>
+                                    <span className="font-medium">{formatCurrency(totals.items_subtotal)}</span>
                                 </div>
                                 <div className="flex justify-between text-slate-600 dark:text-slate-400">
                                     <span>+ Margen de utilidad ({marginPercent}%)</span>
