@@ -184,9 +184,14 @@ export default function InventoryList() {
                         <span className="material-symbols-outlined text-[18px]">analytics</span>
                         Consumo x Proyecto
                     </button>
+                    <button onClick={() => navigate('/inventory/monthly-entries')}
+                        className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-600 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400">
+                        <span className="material-symbols-outlined text-[18px]">input</span>
+                        Entradas del Mes
+                    </button>
                     <button onClick={() => navigate('/inventory/monthly-exits')}
                         className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-600 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400">
-                        <span className="material-symbols-outlined text-[18px]">bar_chart</span>
+                        <span className="material-symbols-outlined text-[18px]">output</span>
                         Salidas del Mes
                     </button>
                     <button onClick={() => navigate('/inventory/uniforms')}

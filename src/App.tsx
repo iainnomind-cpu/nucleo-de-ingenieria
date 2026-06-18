@@ -18,6 +18,7 @@ import InventoryList from './pages/Inventory/InventoryList';
 import PurchaseList from './pages/Inventory/PurchaseList';
 import ConsumptionReport from './pages/Inventory/ConsumptionReport';
 import MonthlyExitsReport from './pages/Inventory/MonthlyExitsReport';
+import MonthlyEntriesReport from './pages/Inventory/MonthlyEntriesReport';
 import UniformsInventory from './pages/Inventory/UniformsInventory';
 import MaintenanceDashboard from './pages/Maintenance/MaintenanceDashboard';
 import EquipmentDetail from './pages/Maintenance/EquipmentDetail/EquipmentDetail';
@@ -105,6 +106,7 @@ function ProtectedApp() {
               <Route path="/inventory" element={<InventoryList />} />
               <Route path="/inventory/purchases" element={<PurchaseList />} />
               <Route path="/inventory/consumption" element={<ConsumptionReport />} />
+              <Route path="/inventory/monthly-entries" element={<MonthlyEntriesReport />} />
               <Route path="/inventory/monthly-exits" element={<MonthlyExitsReport />} />
               <Route path="/inventory/uniforms" element={<UniformsInventory />} />
             </>
