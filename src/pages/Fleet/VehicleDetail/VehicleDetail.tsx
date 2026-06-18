@@ -39,6 +39,9 @@ export default function VehicleDetail() {
     const [showFuelForm, setShowFuelForm] = useState(false);
     const [showMntForm, setShowMntForm] = useState(false);
     const [showSchedForm, setShowSchedForm] = useState(false);
+    // Quick-complete trip modal
+    const [completingMil, setCompletingMil] = useState<{ id: string; odometer_start: number } | null>(null);
+    const [completeForm, setCompleteForm] = useState<{ odometer_end: number; fuel_level_end: number | null; return_date: string }>({ odometer_end: 0, fuel_level_end: null, return_date: new Date().toISOString().slice(0, 16) });
 
     // Form states
     const [insForm, setInsForm] = useState<Partial<VehicleInsurance>>({});
@@ -525,8 +528,16 @@ export default function VehicleDetail() {
                                                 {m.project ? <span className="font-mono">{m.project.project_number}</span> : '—'}
                                             </td>
                                             <td className="px-4 py-3 font-mono text-xs">
-                                                <div className="text-slate-500">{m.odometer_start} - {m.odometer_end}</div>
-                                                <div className="font-bold text-emerald-500 mt-0.5">+{m.distance} km</div>
+                                                {!m.odometer_end ? (
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                                                        <span className="material-symbols-outlined text-[12px]">directions_car</span> En camino
+                                                    </span>
+                                                ) : (
+                                                    <>
+                                                        <div className="text-slate-500">{m.odometer_start} → {m.odometer_end}</div>
+                                                        <div className="font-bold text-emerald-500 mt-0.5">+{m.distance} km</div>
+                                                    </>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3 text-center text-xs font-mono text-slate-600 dark:text-slate-400">
                                                 {m.fuel_level_start !== null ? `${m.fuel_level_start}%` : '—'}
@@ -536,12 +547,19 @@ export default function VehicleDetail() {
                                             </td>
                                             <td className="px-4 py-3 text-right font-bold text-slate-700 dark:text-slate-300">{formatCurrency(m.calculated_trip_cost)}</td>
                                             <td className="px-4 py-3 text-right">
-                                                {(canEdit || canDelete) && (
-                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        {canEdit && <button onClick={() => handleEditMil(m)} className="rounded p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Editar"><span className="material-symbols-outlined text-[16px]">edit</span></button>}
-                                                        {canDelete && <button onClick={() => handleDeleteMil(m.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar"><span className="material-symbols-outlined text-[16px]">delete</span></button>}
-                                                    </div>
-                                                )}
+                                                <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                    {canEdit && !m.odometer_end && (
+                                                        <button
+                                                            onClick={() => { setCompletingMil({ id: m.id, odometer_start: m.odometer_start }); setCompleteForm({ odometer_end: m.odometer_start, fuel_level_end: null, return_date: new Date().toISOString().slice(0, 16) }); }}
+                                                            className="rounded px-2 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-400 dark:hover:bg-amber-900/60 text-xs font-semibold transition-colors"
+                                                            title="Registrar llegada"
+                                                        >
+                                                            <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">flag</span>Completar</span>
+                                                        </button>
+                                                    )}
+                                                    {canEdit && <button onClick={() => handleEditMil(m)} className="rounded p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors" title="Editar"><span className="material-symbols-outlined text-[16px]">edit</span></button>}
+                                                    {canDelete && <button onClick={() => handleDeleteMil(m.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar"><span className="material-symbols-outlined text-[16px]">delete</span></button>}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -740,18 +758,99 @@ export default function VehicleDetail() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odom. Inicial *</label><input required type="number" step="0.1" value={milForm.odometer_start || 0} onChange={e => setMilForm({...milForm, odometer_start: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
-                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odom. Final *</label><input required type="number" step="0.1" value={milForm.odometer_end || 0} onChange={e => setMilForm({...milForm, odometer_end: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
+                                <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odom. Final {!editingMilId && <span className="text-slate-400 font-normal">(opcional al salir)</span>}</label><input type="number" step="0.1" value={milForm.odometer_end || ''} onChange={e => setMilForm({...milForm, odometer_end: e.target.value ? parseFloat(e.target.value) : undefined})} placeholder="Ingresar al regresar" className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                             </div>
-                            <div className="flex justify-between items-center bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-sm border border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800/50">
-                                <span>Distancia: <strong>{((milForm.odometer_end || 0) - (milForm.odometer_start || 0)).toFixed(1)} km</strong></span>
-                                <span>Costo op: <strong>{formatCurrency(((milForm.odometer_end || 0) - (milForm.odometer_start || 0)) * vehicle.cost_per_km)}</strong></span>
-                            </div>
+                            {milForm.odometer_end ? (
+                                <div className="flex justify-between items-center bg-emerald-50 text-emerald-700 px-3 py-2 rounded-lg text-sm border border-emerald-100 dark:bg-emerald-900/30 dark:border-emerald-800/50">
+                                    <span>Distancia: <strong>{((milForm.odometer_end || 0) - (milForm.odometer_start || 0)).toFixed(1)} km</strong></span>
+                                    <span>Costo op: <strong>{formatCurrency(((milForm.odometer_end || 0) - (milForm.odometer_start || 0)) * vehicle.cost_per_km)}</strong></span>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 bg-amber-50 text-amber-700 px-3 py-2 rounded-lg text-sm border border-amber-100 dark:bg-amber-900/30 dark:border-amber-800/50">
+                                    <span className="material-symbols-outlined text-[16px]">info</span>
+                                    <span>El odómetro final se puede ingresar cuando el vehículo regrese.</span>
+                                </div>
+                            )}
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="mb-1 block text-xs font-semibold text-slate-500">Nivel Gasolina Inicial (%)</label><input type="number" step="1" min="0" max="100" value={milForm.fuel_level_start !== null ? milForm.fuel_level_start : ''} onChange={e => setMilForm({...milForm, fuel_level_start: parseFloat(e.target.value)})} placeholder="Ej: 100" className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                                 <div><label className="mb-1 block text-xs font-semibold text-slate-500">Nivel Gasolina Final (%)</label><input type="number" step="1" min="0" max="100" value={milForm.fuel_level_end !== null ? milForm.fuel_level_end : ''} onChange={e => setMilForm({...milForm, fuel_level_end: parseFloat(e.target.value)})} placeholder="Ej: 75" className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                             </div>
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Observaciones</label><textarea value={milForm.notes || ''} onChange={e => setMilForm({...milForm, notes: e.target.value})} rows={2} placeholder="Notas del viaje..." className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900 resize-none" /></div>
                             <button type="submit" className="w-full rounded-lg bg-emerald-600 py-3 text-sm font-semibold text-white hover:bg-emerald-700">{editingMilId ? 'Actualizar Viaje' : 'Guardar Viaje'}</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Complete Trip Modal */}
+            {completingMil && vehicle && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+                        <div className="mb-4 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-amber-500">flag</span>
+                                    Registrar Llegada
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Odómetro de salida: <strong className="font-mono text-slate-700 dark:text-slate-300">{completingMil.odometer_start} km</strong></p>
+                            </div>
+                            <button onClick={() => setCompletingMil(null)} className="text-slate-400 hover:text-slate-600"><span className="material-symbols-outlined">close</span></button>
+                        </div>
+                        <form onSubmit={async (e) => {
+                            e.preventDefault();
+                            if (!completingMil) return;
+                            const dist = completeForm.odometer_end - completingMil.odometer_start;
+                            const tripCost = dist > 0 ? dist * vehicle.cost_per_km : 0;
+                            await supabase.from('vehicle_mileage').update({
+                                odometer_end: completeForm.odometer_end,
+                                distance: dist > 0 ? dist : 0,
+                                fuel_level_end: completeForm.fuel_level_end,
+                                return_date: completeForm.return_date || null,
+                                calculated_trip_cost: tripCost,
+                            }).eq('id', completingMil.id);
+                            // Update vehicle current mileage if this is higher
+                            if (completeForm.odometer_end > vehicle.current_mileage) {
+                                await supabase.from('vehicles').update({ current_mileage: completeForm.odometer_end }).eq('id', vehicle.id);
+                            }
+                            setCompletingMil(null);
+                            fetchAll();
+                        }} className="space-y-4">
+                            <div>
+                                <label className="mb-1 block text-xs font-semibold text-slate-500">Odómetro Final (km) *</label>
+                                <input required type="number" step="0.1" min={completingMil.odometer_start}
+                                    value={completeForm.odometer_end || ''}
+                                    onChange={e => setCompleteForm({ ...completeForm, odometer_end: parseFloat(e.target.value) || 0 })}
+                                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    placeholder={`Mín: ${completingMil.odometer_start}`}
+                                />
+                                {completeForm.odometer_end > completingMil.odometer_start && (
+                                    <p className="mt-1 text-xs text-emerald-600 font-semibold">
+                                        Recorrido: {(completeForm.odometer_end - completingMil.odometer_start).toFixed(1)} km · Costo: {formatCurrency((completeForm.odometer_end - completingMil.odometer_start) * vehicle.cost_per_km)}
+                                    </p>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-500">Nivel Gasolina Final (%)</label>
+                                    <input type="number" step="1" min="0" max="100"
+                                        value={completeForm.fuel_level_end !== null ? completeForm.fuel_level_end : ''}
+                                        onChange={e => setCompleteForm({ ...completeForm, fuel_level_end: e.target.value ? parseFloat(e.target.value) : null })}
+                                        placeholder="Ej: 60"
+                                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="mb-1 block text-xs font-semibold text-slate-500">Fecha/Hora Regreso</label>
+                                    <input type="datetime-local"
+                                        value={completeForm.return_date}
+                                        onChange={e => setCompleteForm({ ...completeForm, return_date: e.target.value })}
+                                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                                    />
+                                </div>
+                            </div>
+                            <button type="submit" className="w-full rounded-lg bg-amber-500 py-3 text-sm font-semibold text-white hover:bg-amber-600">
+                                Registrar Llegada
+                            </button>
                         </form>
                     </div>
                 </div>
