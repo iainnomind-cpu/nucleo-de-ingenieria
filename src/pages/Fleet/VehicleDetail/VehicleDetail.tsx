@@ -48,6 +48,7 @@ export default function VehicleDetail() {
     const [editingInsId, setEditingInsId] = useState<string | null>(null);
     const [editingMilId, setEditingMilId] = useState<string | null>(null);
     const [editingFuelId, setEditingFuelId] = useState<string | null>(null);
+    const [editingMntId, setEditingMntId] = useState<string | null>(null);
     const [editingSchedId, setEditingSchedId] = useState<string | null>(null);
     const [milForm, setMilForm] = useState<Partial<VehicleMileage>>({ 
         date: new Date().toISOString().split('T')[0], odometer_start: 0, odometer_end: 0 
@@ -225,9 +226,36 @@ export default function VehicleDetail() {
 
     const handleAddMnt = async (e: React.FormEvent) => {
         e.preventDefault();
-        await supabase.from('vehicle_maintenance').insert({ ...mntForm, vehicle_id: id });
+        if (editingMntId) {
+            const { vehicle_id, id: _id, created_at, project, ...updateData } = mntForm as any;
+            await supabase.from('vehicle_maintenance').update(updateData).eq('id', editingMntId);
+        } else {
+            await supabase.from('vehicle_maintenance').insert({ ...mntForm, vehicle_id: id });
+        }
         setShowMntForm(false);
-        setMntForm({ service_date: new Date().toISOString().split('T')[0], cost: 0 });
+        setMntForm({ service_date: new Date().toISOString().split('T')[0], cost: 0, odometer_reading: vehicle?.current_mileage || 0 });
+        setEditingMntId(null);
+        fetchAll();
+    };
+
+    const handleEditMnt = (mnt: VehicleMaintenance) => {
+        setMntForm({
+            service_date: mnt.service_date,
+            service_type: mnt.service_type,
+            provider: mnt.provider,
+            cost: mnt.cost,
+            notes: mnt.notes,
+            project_id: mnt.project_id,
+            odometer_reading: mnt.odometer_reading,
+            next_service_mileage: mnt.next_service_mileage
+        });
+        setEditingMntId(mnt.id);
+        setShowMntForm(true);
+    };
+
+    const handleDeleteMnt = async (mntId: string) => {
+        if (!window.confirm('¿Eliminar este registro de mantenimiento? Esta acción no se puede deshacer.')) return;
+        await supabase.from('vehicle_maintenance').delete().eq('id', mntId);
         fetchAll();
     };
 
@@ -638,7 +666,7 @@ export default function VehicleDetail() {
                 <div className={sectionClass}>
                      <div className="flex justify-between items-center mb-6">
                         <h3 className="text-lg font-bold flex items-center gap-2"><span className="material-symbols-outlined text-amber-500">build</span>Historial de Mantenimientos</h3>
-                        {canCreate && <button onClick={() => setShowMntForm(true)} className="flex items-center gap-2 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 px-3 py-1.5 text-sm font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors">
+                        {canCreate && <button onClick={() => { setEditingMntId(null); setMntForm({ service_date: new Date().toISOString().split('T')[0], cost: 0, odometer_reading: vehicle?.current_mileage || 0 }); setShowMntForm(true); }} className="flex items-center gap-2 rounded bg-amber-50 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 px-3 py-1.5 text-sm font-semibold hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors">
                             <span className="material-symbols-outlined text-[18px]">add</span>Registrar Servicio
                         </button>}
                     </div>
@@ -652,11 +680,12 @@ export default function VehicleDetail() {
                                         <th className="px-4 py-3 font-semibold text-slate-500">Taller / Proveedor</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Proyecto Ref.</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-right">Costo</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-right"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {maintenance.map(m => (
-                                        <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                        <tr key={m.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
                                             <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.service_date).toLocaleDateString('es-MX')}</td>
                                             <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{m.service_type}</td>
                                             <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{m.provider || '—'}</td>
@@ -665,6 +694,14 @@ export default function VehicleDetail() {
                                                 {m.project ? <span className="font-mono text-red-500 font-bold">{m.project.project_number}</span> : '—'}
                                             </td>
                                             <td className="px-4 py-3 text-right font-bold text-amber-600">{formatCurrency(m.cost)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                {(canEdit || canDelete) && (
+                                                    <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        {canEdit && <button onClick={() => handleEditMnt(m)} className="rounded p-1 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors" title="Editar"><span className="material-symbols-outlined text-[16px]">edit</span></button>}
+                                                        {canDelete && <button onClick={() => handleDeleteMnt(m.id)} className="rounded p-1 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar"><span className="material-symbols-outlined text-[16px]">delete</span></button>}
+                                                    </div>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -862,8 +899,8 @@ export default function VehicleDetail() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
                         <div className="mb-6 flex items-center justify-between">
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">Registrar Mantenimiento/Falla</h3>
-                            <button onClick={() => setShowMntForm(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
+                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{editingMntId ? 'Editar Mantenimiento' : 'Registrar Mantenimiento/Falla'}</h3>
+                            <button onClick={() => { setShowMntForm(false); setEditingMntId(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><span className="material-symbols-outlined">close</span></button>
                         </div>
                         <form onSubmit={handleAddMnt} className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
@@ -883,7 +920,7 @@ export default function VehicleDetail() {
                             </div>
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Odómetro al servicio</label><input type="number" step="1" value={mntForm.odometer_reading || 0} onChange={e => setMntForm({...mntForm, odometer_reading: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
                             <div><label className="mb-1 block text-xs font-semibold text-slate-500">Siguiente Servicio (KM estim.)</label><input type="number" step="1" value={mntForm.next_service_mileage || ''} onChange={e => setMntForm({...mntForm, next_service_mileage: parseFloat(e.target.value)})} className="w-full rounded-lg border-0 bg-slate-50 p-2 text-sm focus:ring-2 focus:ring-primary dark:bg-slate-900" /></div>
-                            <button type="submit" className="w-full rounded-lg bg-amber-600 py-3 text-sm font-semibold text-white hover:bg-amber-700">Guardar Mantenimiento</button>
+                            <button type="submit" className="w-full rounded-lg bg-amber-600 py-3 text-sm font-semibold text-white hover:bg-amber-700">{editingMntId ? 'Actualizar Mantenimiento' : 'Guardar Mantenimiento'}</button>
                         </form>
                     </div>
                 </div>
