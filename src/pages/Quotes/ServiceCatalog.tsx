@@ -118,46 +118,55 @@ export default function ServiceCatalog() {
                 ))}
             </div>
 
-            {/* Form */}
+            {/* Form Modal */}
             {showForm && (
-                <form onSubmit={handleSubmit} className="rounded-xl border border-primary/20 bg-primary/5 p-6 dark:bg-primary/5">
-                    <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">{editing ? 'Editar Servicio' : 'Nuevo Servicio'}</h3>
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div className="md:col-span-2">
-                            <label className={labelClass}>Nombre *</label>
-                            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Ej: Aforo de pozo profundo" className={inputClass} />
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm overflow-y-auto">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+                        <div className="mb-6 flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">{editing ? 'Editar Servicio' : 'Nuevo Servicio'}</h3>
+                            <button onClick={() => { setShowForm(false); setEditing(null); }} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
                         </div>
-                        <div>
-                            <label className={labelClass}>Categoría</label>
-                            <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={inputClass}>
-                                {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelClass}>Precio Base</label>
-                            <input type="number" step="0.01" value={form.base_price} onChange={e => setForm({ ...form, base_price: e.target.value })} placeholder="15000" className={inputClass} />
-                        </div>
-                        <div>
-                            <label className={labelClass}>Unidad</label>
-                            <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className={inputClass}>
-                                <option value="servicio">Servicio</option>
-                                <option value="hora">Hora</option>
-                                <option value="metro">Metro</option>
-                                <option value="km">Kilómetro</option>
-                                <option value="pieza">Pieza</option>
-                                <option value="dia">Día</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelClass}>Descripción</label>
-                            <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Descripción breve..." className={inputClass} />
-                        </div>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <div className="md:col-span-2">
+                                    <label className={labelClass}>Nombre *</label>
+                                    <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required placeholder="Ej: Aforo de pozo profundo" className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Categoría</label>
+                                    <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className={inputClass}>
+                                        {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Precio Base</label>
+                                    <input type="number" step="0.01" value={form.base_price} onChange={e => setForm({ ...form, base_price: e.target.value })} placeholder="15000" className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Unidad</label>
+                                    <select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value })} className={inputClass}>
+                                        <option value="servicio">Servicio</option>
+                                        <option value="hora">Hora</option>
+                                        <option value="metro">Metro</option>
+                                        <option value="km">Kilómetro</option>
+                                        <option value="pieza">Pieza</option>
+                                        <option value="dia">Día</option>
+                                    </select>
+                                </div>
+                                <div className="md:col-span-3">
+                                    <label className={labelClass}>Descripción / Referencias (Opcional)</label>
+                                    <textarea rows={3} value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Descripción breve..." className={inputClass} />
+                                </div>
+                            </div>
+                            <div className="mt-6 flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-700">
+                                <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="rounded-lg px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700">Cancelar</button>
+                                <button type="submit" className="rounded-lg bg-primary px-6 py-2.5 text-sm font-bold text-white hover:bg-primary-dark">{editing ? 'Guardar Cambios' : 'Crear Servicio'}</button>
+                            </div>
+                        </form>
                     </div>
-                    <div className="mt-4 flex gap-2">
-                        <button type="submit" className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white">{editing ? 'Guardar' : 'Crear'}</button>
-                        <button type="button" onClick={() => { setShowForm(false); setEditing(null); }} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-700 dark:text-slate-400">Cancelar</button>
-                    </div>
-                </form>
+                </div>
             )}
 
             {/* Table */}
