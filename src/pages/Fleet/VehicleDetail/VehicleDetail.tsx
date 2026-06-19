@@ -41,7 +41,7 @@ export default function VehicleDetail() {
     const [showSchedForm, setShowSchedForm] = useState(false);
     // Quick-complete trip modal
     const [completingMil, setCompletingMil] = useState<{ id: string; odometer_start: number } | null>(null);
-    const [completeForm, setCompleteForm] = useState<{ odometer_end: number; fuel_level_end: number | null; return_date: string }>({ odometer_end: 0, fuel_level_end: null, return_date: new Date().toISOString().slice(0, 16) });
+    const [completeForm, setCompleteForm] = useState<{ odometer_end: number | string; fuel_level_end: number | string | null; return_date: string }>({ odometer_end: '', fuel_level_end: null, return_date: new Date().toISOString().slice(0, 16) });
 
     // Form states
     const [insForm, setInsForm] = useState<Partial<VehicleInsurance>>({});
@@ -136,14 +136,18 @@ export default function VehicleDetail() {
 
     const handleAddMil = async (e: React.FormEvent) => {
         e.preventDefault();
-        const dist = (milForm.odometer_end || 0) - (milForm.odometer_start || 0);
-        const tripCost = dist * (vehicle?.cost_per_km || 0);
+        const start = parseFloat(milForm.odometer_start as any) || 0;
+        const end = parseFloat(milForm.odometer_end as any) || 0;
+        const dist = end - start;
+        const tripCost = dist > 0 ? dist * (vehicle?.cost_per_km || 0) : 0;
 
         try {
             if (editingMilId) {
                 const { vehicle_id, id: _id, created_at, project, distance: _dist, ...updateData } = milForm as any;
                 const { error } = await supabase.from('vehicle_mileage').update({
                     ...updateData,
+                    odometer_start: start,
+                    odometer_end: end,
                     calculated_trip_cost: tripCost
                 }).eq('id', editingMilId);
                 if (error) throw error;
@@ -151,6 +155,8 @@ export default function VehicleDetail() {
                 const { distance: _dist, ...insertData } = milForm as any;
                 const { error } = await supabase.from('vehicle_mileage').insert({ 
                     ...insertData,
+                    odometer_start: start,
+                    odometer_end: end,
                     vehicle_id: id, 
                     calculated_trip_cost: tripCost,
                 });
@@ -836,18 +842,19 @@ export default function VehicleDetail() {
                         <form onSubmit={async (e) => {
                             e.preventDefault();
                             if (!completingMil) return;
-                            const dist = completeForm.odometer_end - completingMil.odometer_start;
+                            const endVal = parseFloat(completeForm.odometer_end as any) || 0;
+                            const dist = endVal - completingMil.odometer_start;
                             const tripCost = dist > 0 ? dist * vehicle.cost_per_km : 0;
                             await supabase.from('vehicle_mileage').update({
-                                odometer_end: completeForm.odometer_end,
+                                odometer_end: endVal,
                                 distance: dist > 0 ? dist : 0,
-                                fuel_level_end: completeForm.fuel_level_end,
+                                fuel_level_end: completeForm.fuel_level_end !== null && completeForm.fuel_level_end !== '' ? parseFloat(completeForm.fuel_level_end as any) : null,
                                 return_date: completeForm.return_date || null,
                                 calculated_trip_cost: tripCost,
                             }).eq('id', completingMil.id);
                             // Update vehicle current mileage if this is higher
-                            if (completeForm.odometer_end > vehicle.current_mileage) {
-                                await supabase.from('vehicles').update({ current_mileage: completeForm.odometer_end }).eq('id', vehicle.id);
+                            if (endVal > vehicle.current_mileage) {
+                                await supabase.from('vehicles').update({ current_mileage: endVal }).eq('id', vehicle.id);
                             }
                             setCompletingMil(null);
                             fetchAll();
@@ -855,14 +862,14 @@ export default function VehicleDetail() {
                             <div>
                                 <label className="mb-1 block text-xs font-semibold text-slate-500">Odómetro Final (km) *</label>
                                 <input required type="number" step="0.1" min={completingMil.odometer_start}
-                                    value={completeForm.odometer_end || ''}
-                                    onChange={e => setCompleteForm({ ...completeForm, odometer_end: parseFloat(e.target.value) || 0 })}
+                                    value={completeForm.odometer_end}
+                                    onChange={e => setCompleteForm({ ...completeForm, odometer_end: e.target.value })}
                                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                     placeholder={`Mín: ${completingMil.odometer_start}`}
                                 />
-                                {completeForm.odometer_end > completingMil.odometer_start && (
+                                {parseFloat(completeForm.odometer_end as any) > completingMil.odometer_start && (
                                     <p className="mt-1 text-xs text-emerald-600 font-semibold">
-                                        Recorrido: {(completeForm.odometer_end - completingMil.odometer_start).toFixed(1)} km · Costo: {formatCurrency((completeForm.odometer_end - completingMil.odometer_start) * vehicle.cost_per_km)}
+                                        Recorrido: {(parseFloat(completeForm.odometer_end as any) - completingMil.odometer_start).toFixed(1)} km · Costo: {formatCurrency((parseFloat(completeForm.odometer_end as any) - completingMil.odometer_start) * vehicle.cost_per_km)}
                                     </p>
                                 )}
                             </div>
@@ -871,7 +878,7 @@ export default function VehicleDetail() {
                                     <label className="mb-1 block text-xs font-semibold text-slate-500">Nivel Gasolina Final (%)</label>
                                     <input type="number" step="1" min="0" max="100"
                                         value={completeForm.fuel_level_end !== null ? completeForm.fuel_level_end : ''}
-                                        onChange={e => setCompleteForm({ ...completeForm, fuel_level_end: e.target.value ? parseFloat(e.target.value) : null })}
+                                        onChange={e => setCompleteForm({ ...completeForm, fuel_level_end: e.target.value })}
                                         placeholder="Ej: 60"
                                         className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm focus:ring-2 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                                     />
