@@ -33,6 +33,7 @@ import SpaceChat from './pages/Team/SpaceChat';
 import VacationsPlanner from './pages/Team/VacationsPlanner';
 import Inbox from './pages/Team/Inbox';
 import TeamDirectory from './pages/Team/TeamDirectory';
+import CompanyDocs from './pages/Team/CompanyDocs';
 import EmployeeProfile from './pages/Team/EmployeeProfile/EmployeeProfile';
 import TasksDashboard from './pages/Tasks/TasksDashboard';
 import WhatsAppDashboard from './pages/WhatsApp/WhatsAppDashboard';
@@ -154,6 +155,7 @@ function ProtectedApp() {
               <Route path="/team/board" element={<VacationsPlanner />} />
               <Route path="/team/inbox" element={<Inbox />} />
               <Route path="/team/directory" element={<TeamDirectory />} />
+              <Route path="/team/company-docs" element={<CompanyDocs />} />
               <Route path="/team/directory/:id" element={<EmployeeProfile />} />
             </>
           )}

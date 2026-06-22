@@ -137,9 +137,9 @@ export default function VacationsPlanner() {
                 a.employee_id === emp.id &&
                 new Date(a.start_date).getFullYear() <= filterYear
             );
-            // Only VACACIONES type counts against vacation balance
+            // Only VACACIONES type counts against vacation balance, and only if it's NOT marked as non-remunerative/compensated
             const usedVacation = yearAbsences
-                .filter(a => a.absence_type === 'VACACIONES')
+                .filter(a => a.absence_type === 'VACACIONES' && !a.is_compensated)
                 .reduce((sum, a) => sum + Number(a.days_count), 0);
             // Track unpaid leave separately
             const unpaidLeave = yearAbsences
@@ -264,7 +264,7 @@ export default function VacationsPlanner() {
                         <div className="md:col-span-2 flex items-center mt-6">
                             <label className="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" checked={form.is_compensated} onChange={e => setForm({ ...form, is_compensated: e.target.checked })} className="rounded border-slate-300 text-primary focus:ring-primary h-4 w-4" />
-                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Compensado (No afecta saldo de vacaciones)</span>
+                                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Permiso no remunerado / No descontar de vacaciones</span>
                             </label>
                         </div>
                     </div>

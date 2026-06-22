@@ -27,7 +27,8 @@ const navItems = [
     module: 'team',
     subItems: [
       { label: 'Planificador', path: '/team/board', icon: 'calendar_month' },
-      { label: 'Expedientes', path: '/team/directory', icon: 'folder_shared' }
+      { label: 'Expedientes de Personal', path: '/team/directory', icon: 'folder_shared' },
+      { label: 'Expediente Empresa', path: '/team/company-docs', icon: 'corporate_fare' }
     ]
   },
 ];
