@@ -85,9 +85,25 @@ export interface TeamTask {
     source_space_id: string | null;
     checklist: ChecklistItem[];
     tags: string[] | null;
+    recurrence: 'daily' | 'weekdays' | 'weekly' | 'monthly' | null;
+    recurrence_end_date: string | null;
+    parent_recurring_task_id: string | null;
     created_at: string;
     updated_at: string;
     project?: { id: string; project_number: string; title: string };
+    evidences?: TaskEvidence[];
+}
+
+export interface TaskEvidence {
+    id: string;
+    task_id: string;
+    file_name: string;
+    file_url: string;
+    file_type: string | null;
+    file_size_bytes: number | null;
+    uploaded_by: string | null;
+    notes: string | null;
+    created_at: string;
 }
 
 // ─── Check-ins ───

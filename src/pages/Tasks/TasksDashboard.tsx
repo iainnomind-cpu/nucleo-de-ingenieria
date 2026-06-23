@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import {
-    TeamTask, TaskStatus, TaskPriority,
+    TeamTask, TaskEvidence, TaskStatus, TaskPriority,
     TASK_STATUS_LABELS, TASK_STATUS_COLORS,
     TASK_PRIORITY_LABELS, TASK_PRIORITY_COLORS, TASK_PRIORITY_ICONS,
     getInitials, getAvatarColor,
@@ -10,10 +10,52 @@ import {
 
 type ViewMode = 'kanban' | 'my_day' | 'manager' | 'calendar';
 
+const RECURRENCE_LABELS: Record<string, string> = {
+    daily: 'Diaria',
+    weekdays: 'Días hábiles',
+    weekly: 'Semanal',
+    monthly: 'Mensual',
+};
+
+function formatBytes(bytes: number, d = 2) {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024, dm = d < 0 ? 0 : d, s = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${s[i]}`;
+}
+
+/** Generate all occurrence dates from startDate up to endDate for the given recurrence type */
+function generateOccurrences(startDate: string, endDate: string, recurrence: string): string[] {
+    const dates: string[] = [];
+    const start = new Date(startDate + 'T12:00:00');
+    const end = new Date(endDate + 'T12:00:00');
+    let current = new Date(start);
+
+    while (current <= end) {
+        const iso = current.toISOString().split('T')[0];
+        if (recurrence === 'weekdays') {
+            const dow = current.getDay();
+            if (dow !== 0 && dow !== 6) dates.push(iso);
+        } else {
+            dates.push(iso);
+        }
+
+        if (recurrence === 'daily' || recurrence === 'weekdays') {
+            current.setDate(current.getDate() + 1);
+        } else if (recurrence === 'weekly') {
+            current.setDate(current.getDate() + 7);
+        } else if (recurrence === 'monthly') {
+            current.setMonth(current.getMonth() + 1);
+        } else break;
+
+        if (dates.length > 500) break; // safety cap
+    }
+    return dates;
+}
+
 export default function TasksDashboard() {
     const { user, hasPermission } = useAuth();
     const CURRENT_USER = user?.full_name || 'Director';
-    // Permission: can this user assign tasks to OTHER people?
     const canAssignOthers = hasPermission('tasks', 'create');
 
     const [tasks, setTasks] = useState<TeamTask[]>([]);
@@ -30,15 +72,22 @@ export default function TasksDashboard() {
         return new Date(now.getFullYear(), now.getMonth(), 1);
     });
 
+    // Evidence modal
+    const [evidenceTask, setEvidenceTask] = useState<TeamTask | null>(null);
+    const [evidences, setEvidences] = useState<TaskEvidence[]>([]);
+    const [uploadingEvidence, setUploadingEvidence] = useState(false);
+    const [evidenceNote, setEvidenceNote] = useState('');
+
     const [form, setForm] = useState({
         title: '', description: '', assigned_to: '', priority: 'normal' as TaskPriority,
         due_date: '', project_id: '', tags: '',
+        recurrence: '' as '' | 'daily' | 'weekdays' | 'weekly' | 'monthly',
+        recurrence_end_date: '',
     });
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
         let q = supabase.from('team_tasks').select('*, project:projects(id, project_number, title)').order('due_date', { ascending: true });
-        // If user can't assign others, only show their own tasks
         if (!canAssignOthers && !filterUser) {
             q = q.eq('assigned_to', CURRENT_USER);
         } else if (filterUser) {
@@ -46,17 +95,14 @@ export default function TasksDashboard() {
         }
         if (filterPriority) q = q.eq('priority', filterPriority);
         const [tRes, pRes, usersRes] = await Promise.all([
-            q, 
+            q,
             supabase.from('projects').select('id, project_number, title').order('project_number', { ascending: false }),
             supabase.from('app_users').select('full_name').eq('is_active', true).order('full_name')
         ]);
         setTasks((tRes.data as TeamTask[]) || []);
         setProjects(pRes.data || []);
-        if (usersRes.data) {
-            setTeamMembers(usersRes.data.map(u => u.full_name).filter(Boolean));
-        } else {
-            setTeamMembers([]);
-        }
+        if (usersRes.data) setTeamMembers(usersRes.data.map((u: { full_name: string }) => u.full_name).filter(Boolean));
+        else setTeamMembers([]);
         setLoading(false);
     }, [filterUser, filterPriority, canAssignOthers, CURRENT_USER]);
 
@@ -64,9 +110,9 @@ export default function TasksDashboard() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Enforce: non-privileged users can only assign to themselves
         const assignedTo = canAssignOthers ? form.assigned_to : CURRENT_USER;
-        const payload = {
+
+        const basePayload = {
             title: form.title,
             description: form.description || null,
             assigned_to: assignedTo,
@@ -75,15 +121,43 @@ export default function TasksDashboard() {
             due_date: form.due_date || null,
             project_id: form.project_id || null,
             tags: form.tags ? form.tags.split(',').map(t => t.trim()) : null,
+            recurrence: form.recurrence || null,
+            recurrence_end_date: form.recurrence_end_date || null,
         };
+
         if (editingTask) {
-            await supabase.from('team_tasks').update(payload).eq('id', editingTask.id);
+            await supabase.from('team_tasks').update(basePayload).eq('id', editingTask.id);
+        } else if (form.recurrence && form.recurrence_end_date && form.due_date) {
+            // Generate all recurring instances
+            const dates = generateOccurrences(form.due_date, form.recurrence_end_date, form.recurrence);
+            if (dates.length === 0) {
+                alert('No se generaron instancias. Verifica las fechas.');
+                return;
+            }
+            // Insert parent (first date)
+            const { data: parent, error: parentErr } = await supabase.from('team_tasks').insert({
+                ...basePayload,
+                due_date: dates[0],
+            }).select().single();
+            if (parentErr || !parent) { alert('Error al crear la tarea: ' + parentErr?.message); return; }
+
+            // Insert children
+            if (dates.length > 1) {
+                await supabase.from('team_tasks').insert(
+                    dates.slice(1).map(date => ({
+                        ...basePayload,
+                        due_date: date,
+                        parent_recurring_task_id: parent.id,
+                    }))
+                );
+            }
         } else {
-            await supabase.from('team_tasks').insert(payload);
+            await supabase.from('team_tasks').insert(basePayload);
         }
+
         setShowForm(false);
         setEditingTask(null);
-        setForm({ title: '', description: '', assigned_to: '', priority: 'normal', due_date: '', project_id: '', tags: '' });
+        setForm({ title: '', description: '', assigned_to: '', priority: 'normal', due_date: '', project_id: '', tags: '', recurrence: '', recurrence_end_date: '' });
         fetchAll();
     };
 
@@ -97,6 +171,8 @@ export default function TasksDashboard() {
             due_date: t.due_date || '',
             project_id: t.project_id || '',
             tags: t.tags?.join(', ') || '',
+            recurrence: (t.recurrence as typeof form.recurrence) || '',
+            recurrence_end_date: t.recurrence_end_date || '',
         });
         setShowForm(true);
     };
@@ -112,7 +188,7 @@ export default function TasksDashboard() {
         if (status === 'completed') {
             updates.completed_at = new Date().toISOString();
             const task = tasks.find(t => t.id === id);
-            if (task && task.project_id) {
+            if (task?.project_id) {
                 await supabase.from('field_logs').insert({
                     project_id: task.project_id,
                     author: task.assigned_to || CURRENT_USER,
@@ -125,11 +201,56 @@ export default function TasksDashboard() {
         fetchAll();
     };
 
+    // ── Evidence management ──
+    const openEvidenceModal = async (t: TeamTask) => {
+        setEvidenceTask(t);
+        setEvidenceNote('');
+        const { data } = await supabase.from('task_evidences').select('*').eq('task_id', t.id).order('created_at', { ascending: false });
+        setEvidences((data as TaskEvidence[]) || []);
+    };
+
+    const handleEvidenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files?.[0] || !evidenceTask || !user) return;
+        const file = e.target.files[0];
+        setUploadingEvidence(true);
+        try {
+            const ext = file.name.split('.').pop();
+            const path = `tasks/${evidenceTask.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+            const { error: upErr } = await supabase.storage.from('task-evidences').upload(path, file);
+            if (upErr) throw upErr;
+            const { data: { publicUrl } } = supabase.storage.from('task-evidences').getPublicUrl(path);
+            await supabase.from('task_evidences').insert({
+                task_id: evidenceTask.id,
+                file_name: file.name,
+                file_url: publicUrl,
+                file_type: file.type,
+                file_size_bytes: file.size,
+                uploaded_by: CURRENT_USER,
+                notes: evidenceNote || null,
+            });
+            const { data } = await supabase.from('task_evidences').select('*').eq('task_id', evidenceTask.id).order('created_at', { ascending: false });
+            setEvidences((data as TaskEvidence[]) || []);
+            setEvidenceNote('');
+        } catch (err: unknown) {
+            alert('Error al subir evidencia: ' + (err instanceof Error ? err.message : String(err)));
+        } finally {
+            setUploadingEvidence(false);
+            if (e.target) e.target.value = '';
+        }
+    };
+
+    const deleteEvidence = async (ev: TaskEvidence) => {
+        if (!confirm('¿Eliminar esta evidencia?')) return;
+        await supabase.from('task_evidences').delete().eq('id', ev.id);
+        const urlParts = ev.file_url.split('/task-evidences/');
+        if (urlParts.length > 1) await supabase.storage.from('task-evidences').remove([urlParts[1]]);
+        setEvidences(prev => prev.filter(e => e.id !== ev.id));
+    };
+
     const today = new Date().toISOString().split('T')[0];
     const columns: TaskStatus[] = ['pending', 'in_progress', 'blocked', 'completed'];
     const columnIcons: Record<TaskStatus, string> = { pending: 'schedule', in_progress: 'play_circle', blocked: 'block', completed: 'check_circle' };
 
-    // ── Stats ──
     const pendingCount = tasks.filter(t => t.status !== 'completed').length;
     const overdueCount = tasks.filter(t => t.due_date && t.due_date < today && t.status !== 'completed').length;
     const completedThisWeek = tasks.filter(t => {
@@ -138,14 +259,12 @@ export default function TasksDashboard() {
         return new Date(t.completed_at) >= weekAgo;
     }).length;
 
-    // ── Calendar helpers ──
     const calendarDays = useMemo(() => {
         const year = calendarMonth.getFullYear();
         const month = calendarMonth.getMonth();
-        const firstDay = new Date(year, month, 1).getDay(); // 0=Sun
+        const firstDay = new Date(year, month, 1).getDay();
         const daysInMonth = new Date(year, month + 1, 0).getDate();
         const days: { date: string; day: number; isCurrentMonth: boolean }[] = [];
-        // Previous month padding
         const prevMonthDays = new Date(year, month, 0).getDate();
         for (let i = firstDay - 1; i >= 0; i--) {
             const d = prevMonthDays - i;
@@ -153,11 +272,9 @@ export default function TasksDashboard() {
             const prevYear = month === 0 ? year - 1 : year;
             days.push({ date: `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`, day: d, isCurrentMonth: false });
         }
-        // Current month
         for (let d = 1; d <= daysInMonth; d++) {
             days.push({ date: `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`, day: d, isCurrentMonth: true });
         }
-        // Next month padding
         const remaining = 42 - days.length;
         for (let d = 1; d <= remaining; d++) {
             const nextMonth = month === 11 ? 0 : month + 1;
@@ -189,7 +306,14 @@ export default function TasksDashboard() {
         return (
             <div className={`group rounded-lg border p-3 transition-all hover:shadow-md ${overdue ? 'border-red-300 bg-red-50/50 dark:border-red-900 dark:bg-red-900/10' : 'border-slate-200/60 bg-white/80 dark:border-slate-700/60 dark:bg-slate-900/60'}`}>
                 <div className="flex items-start justify-between mb-1.5">
-                    <span className={`material-symbols-outlined text-[14px] ${TASK_PRIORITY_COLORS[t.priority]}`} title={TASK_PRIORITY_LABELS[t.priority]}>{TASK_PRIORITY_ICONS[t.priority]}</span>
+                    <div className="flex items-center gap-1">
+                        <span className={`material-symbols-outlined text-[14px] ${TASK_PRIORITY_COLORS[t.priority]}`} title={TASK_PRIORITY_LABELS[t.priority]}>{TASK_PRIORITY_ICONS[t.priority]}</span>
+                        {t.recurrence && (
+                            <span className="text-[9px] font-bold text-violet-500 bg-violet-100 dark:bg-violet-900/30 px-1 rounded" title={`Recurrente: ${RECURRENCE_LABELS[t.recurrence]}`}>
+                                🔁 {RECURRENCE_LABELS[t.recurrence]}
+                            </span>
+                        )}
+                    </div>
                     <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
                         {t.status !== 'completed' && (
                             <button onClick={() => updateStatus(t.id, t.status === 'pending' ? 'in_progress' : 'completed')} className="rounded p-0.5 text-slate-400 hover:text-emerald-500" title={t.status === 'pending' ? 'Iniciar' : 'Completar'}>
@@ -206,6 +330,9 @@ export default function TasksDashboard() {
                                 <span className="material-symbols-outlined text-[14px]">play_arrow</span>
                             </button>
                         )}
+                        <button onClick={() => openEvidenceModal(t)} className="rounded p-0.5 text-slate-400 hover:text-amber-500" title="Evidencias">
+                            <span className="material-symbols-outlined text-[14px]">attach_file</span>
+                        </button>
                         <button onClick={() => startEdit(t)} className="rounded p-0.5 text-slate-400 hover:text-primary" title="Editar">
                             <span className="material-symbols-outlined text-[14px]">edit</span>
                         </button>
@@ -243,7 +370,6 @@ export default function TasksDashboard() {
                     <p className="mt-1 text-sm text-slate-500">Gestiona y da seguimiento a las tareas de todo el equipo.</p>
                 </div>
                 <div className="flex gap-2 items-center flex-wrap">
-                    {/* View toggle */}
                     <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
                         {([
                             { key: 'kanban', icon: 'view_kanban', label: 'Kanban' },
@@ -265,7 +391,7 @@ export default function TasksDashboard() {
                         <option value="">Prioridad</option>
                         {(['low', 'normal', 'high', 'urgent'] as TaskPriority[]).map(p => <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>)}
                     </select>
-                    <button onClick={() => { setShowForm(!showForm); setEditingTask(null); setForm({ title: '', description: '', assigned_to: '', priority: 'normal', due_date: '', project_id: '', tags: '' }); }}
+                    <button onClick={() => { setShowForm(!showForm); setEditingTask(null); setForm({ title: '', description: '', assigned_to: '', priority: 'normal', due_date: '', project_id: '', tags: '', recurrence: '', recurrence_end_date: '' }); }}
                         className="flex items-center gap-1 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-xs font-semibold text-white shadow-md shadow-primary/20 hover:shadow-lg transition-all">
                         <span className="material-symbols-outlined text-[16px]">add</span>Nueva Tarea
                     </button>
@@ -324,13 +450,38 @@ export default function TasksDashboard() {
                             )}
                         </div>
                         <div><label className={labelClass}>Prioridad</label><select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value as TaskPriority })} className={inputClass}>{(['low', 'normal', 'high', 'urgent'] as TaskPriority[]).map(p => <option key={p} value={p}>{TASK_PRIORITY_LABELS[p]}</option>)}</select></div>
-                        <div><label className={labelClass}>Fecha Límite</label><input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} className={inputClass} /></div>
+                        <div><label className={labelClass}>Fecha Inicio / Primera Ocurrencia</label><input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} className={inputClass} /></div>
+                        
+                        {/* Recurrence */}
+                        <div>
+                            <label className={labelClass}>Repetición 🔁</label>
+                            <select value={form.recurrence} onChange={e => setForm({ ...form, recurrence: e.target.value as typeof form.recurrence })} className={inputClass}>
+                                <option value="">Sin repetición</option>
+                                <option value="daily">Diaria</option>
+                                <option value="weekdays">Días hábiles (L-V)</option>
+                                <option value="weekly">Semanal</option>
+                                <option value="monthly">Mensual</option>
+                            </select>
+                        </div>
+
+                        {form.recurrence && (
+                            <div>
+                                <label className={labelClass}>Repetir hasta</label>
+                                <input type="date" value={form.recurrence_end_date} onChange={e => setForm({ ...form, recurrence_end_date: e.target.value })} required className={inputClass} min={form.due_date} />
+                                {form.due_date && form.recurrence_end_date && (
+                                    <p className="mt-1 text-[10px] text-primary font-semibold">
+                                        ≈ {generateOccurrences(form.due_date, form.recurrence_end_date, form.recurrence).length} instancias a crear
+                                    </p>
+                                )}
+                            </div>
+                        )}
+
                         <div><label className={labelClass}>Proyecto</label><select value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })} className={inputClass}><option value="">Ninguno</option>{projects.map(p => <option key={p.id} value={p.id}>{p.project_number} — {p.title}</option>)}</select></div>
                         <div><label className={labelClass}>Etiquetas</label><input value={form.tags} onChange={e => setForm({ ...form, tags: e.target.value })} placeholder="facturación, campo..." className={inputClass} /></div>
                         <div className="md:col-span-4"><label className={labelClass}>Descripción</label><textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={2} placeholder="Instrucciones detalladas..." className={inputClass + ' resize-none'} /></div>
                     </div>
                     <div className="mt-4 flex gap-2">
-                        <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-sm">{editingTask ? 'Guardar Cambios' : 'Crear Tarea'}</button>
+                        <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-sm">{editingTask ? 'Guardar Cambios' : form.recurrence ? 'Crear Serie de Tareas' : 'Crear Tarea'}</button>
                         <button type="button" onClick={() => { setShowForm(false); setEditingTask(null); }} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">Cancelar</button>
                     </div>
                 </form>
@@ -405,37 +556,27 @@ export default function TasksDashboard() {
                     {/* ═══ CALENDAR VIEW ═══ */}
                     {view === 'calendar' && (
                         <div className="rounded-xl border border-slate-200/60 bg-white/50 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
-                            {/* Calendar Header */}
                             <div className="flex items-center justify-between border-b border-slate-200/40 px-6 py-4 dark:border-slate-700/40">
-                                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))}
-                                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors">
+                                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1))} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors">
                                     <span className="material-symbols-outlined text-[20px]">chevron_left</span>
                                 </button>
-                                <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                                    {monthNames[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
-                                </h3>
-                                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))}
-                                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors">
+                                <h3 className="text-base font-bold text-slate-900 dark:text-white">{monthNames[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}</h3>
+                                <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1))} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors">
                                     <span className="material-symbols-outlined text-[20px]">chevron_right</span>
                                 </button>
                             </div>
-
-                            {/* Day headers */}
                             <div className="grid grid-cols-7 border-b border-slate-200/40 dark:border-slate-700/40">
                                 {dayNames.map(d => (
                                     <div key={d} className="py-2 text-center text-[11px] font-bold uppercase tracking-wider text-slate-400">{d}</div>
                                 ))}
                             </div>
-
-                            {/* Calendar Grid */}
                             <div className="grid grid-cols-7">
                                 {calendarDays.map((day, idx) => {
                                     const dayTasks = tasksByDate[day.date] || [];
                                     const isToday = day.date === today;
                                     const hasOverdue = dayTasks.some(t => t.status !== 'completed' && day.date < today);
                                     return (
-                                        <div key={idx}
-                                            className={`min-h-[100px] border-b border-r border-slate-100 p-1.5 dark:border-slate-800/60 transition-colors ${!day.isCurrentMonth ? 'bg-slate-50/30 dark:bg-slate-900/20' : ''} ${isToday ? 'bg-primary/5 dark:bg-primary/10' : ''}`}>
+                                        <div key={idx} className={`min-h-[100px] border-b border-r border-slate-100 p-1.5 dark:border-slate-800/60 transition-colors ${!day.isCurrentMonth ? 'bg-slate-50/30 dark:bg-slate-900/20' : ''} ${isToday ? 'bg-primary/5 dark:bg-primary/10' : ''}`}>
                                             <div className={`mb-1 text-right text-xs font-bold ${!day.isCurrentMonth ? 'text-slate-300 dark:text-slate-600' : isToday ? 'text-primary' : 'text-slate-600 dark:text-slate-400'} ${hasOverdue ? 'text-red-500' : ''}`}>
                                                 {isToday && <span className="mr-1 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle" />}
                                                 {day.day}
@@ -443,10 +584,10 @@ export default function TasksDashboard() {
                                             <div className="space-y-0.5">
                                                 {dayTasks.slice(0, 3).map(t => (
                                                     <div key={t.id}
-                                                        onClick={() => startEdit(t)}
+                                                        onClick={() => openEvidenceModal(t)}
                                                         className={`cursor-pointer truncate rounded px-1 py-0.5 text-[10px] font-medium transition-colors hover:opacity-80 ${t.status === 'completed' ? 'bg-emerald-100 text-emerald-700 line-through dark:bg-emerald-900/30 dark:text-emerald-400' : t.status === 'blocked' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400'}`}
                                                         title={`${t.title} — ${t.assigned_to}`}>
-                                                        {t.title}
+                                                        {t.recurrence && '🔁 '}{t.title}
                                                     </div>
                                                 ))}
                                                 {dayTasks.length > 3 && <p className="text-[9px] text-slate-400 text-center">+{dayTasks.length - 3} más</p>}
@@ -493,8 +634,6 @@ export default function TasksDashboard() {
                                     })}
                                 </div>
                             </div>
-
-                            {/* Full task table */}
                             <div className="rounded-xl border border-slate-200/60 bg-white/50 shadow-sm dark:border-slate-800/60 dark:bg-slate-900/50 overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead className="bg-slate-50/80 dark:bg-slate-800/50">
@@ -513,7 +652,10 @@ export default function TasksDashboard() {
                                             const overdue = t.due_date && t.due_date < today;
                                             return (
                                                 <tr key={t.id} className={`transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/50 ${overdue ? 'bg-red-50/30 dark:bg-red-900/5' : ''}`}>
-                                                    <td className="px-4 py-3"><p className="font-medium text-slate-900 dark:text-white text-sm">{t.title}</p>{t.description && <p className="text-[10px] text-slate-400 line-clamp-1">{t.description}</p>}</td>
+                                                    <td className="px-4 py-3">
+                                                        <p className="font-medium text-slate-900 dark:text-white text-sm">{t.recurrence && <span className="mr-1 text-violet-500">🔁</span>}{t.title}</p>
+                                                        {t.description && <p className="text-[10px] text-slate-400 line-clamp-1">{t.description}</p>}
+                                                    </td>
                                                     <td className="px-4 py-3 text-center"><div className="inline-flex items-center gap-1"><div className={`flex h-5 w-5 items-center justify-center rounded-full text-white text-[8px] font-bold ${getAvatarColor(t.assigned_to)}`}>{getInitials(t.assigned_to)}</div><span className="text-xs">{t.assigned_to}</span></div></td>
                                                     <td className="px-4 py-3 text-center"><span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${TASK_STATUS_COLORS[t.status].bg} ${TASK_STATUS_COLORS[t.status].text}`}>{TASK_STATUS_LABELS[t.status]}</span></td>
                                                     <td className="px-4 py-3 text-center"><span className={`material-symbols-outlined text-[14px] ${TASK_PRIORITY_COLORS[t.priority]}`}>{TASK_PRIORITY_ICONS[t.priority]}</span></td>
@@ -521,6 +663,7 @@ export default function TasksDashboard() {
                                                     <td className="px-4 py-3 text-center text-xs text-primary font-mono">{t.project?.project_number || '—'}</td>
                                                     <td className="px-4 py-3 text-center">
                                                         <div className="flex items-center justify-center gap-1">
+                                                            <button onClick={() => openEvidenceModal(t)} className="rounded p-1 text-slate-400 hover:text-amber-500" title="Evidencias"><span className="material-symbols-outlined text-[16px]">attach_file</span></button>
                                                             <button onClick={() => startEdit(t)} className="rounded p-1 text-slate-400 hover:text-primary"><span className="material-symbols-outlined text-[16px]">edit</span></button>
                                                             <button onClick={() => deleteTask(t.id)} className="rounded p-1 text-slate-400 hover:text-red-500"><span className="material-symbols-outlined text-[16px]">delete</span></button>
                                                         </div>
@@ -534,6 +677,100 @@ export default function TasksDashboard() {
                         </div>
                     )}
                 </>
+            )}
+
+            {/* ═══ EVIDENCE MODAL ═══ */}
+            {evidenceTask && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl dark:bg-slate-800 flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="flex items-start justify-between p-5 border-b border-slate-200 dark:border-slate-700">
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className="material-symbols-outlined text-amber-500">task</span>
+                                    <h3 className="font-bold text-slate-900 dark:text-white truncate">{evidenceTask.title}</h3>
+                                    {evidenceTask.recurrence && <span className="text-[10px] font-bold text-violet-500 bg-violet-100 dark:bg-violet-900/30 px-1.5 py-0.5 rounded">🔁 {RECURRENCE_LABELS[evidenceTask.recurrence]}</span>}
+                                </div>
+                                <p className="text-xs text-slate-400">{evidenceTask.assigned_to} · {evidenceTask.due_date ? new Date(evidenceTask.due_date + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Sin fecha'}</p>
+                            </div>
+                            <button onClick={() => setEvidenceTask(null)} className="ml-4 text-slate-400 hover:text-slate-600">
+                                <span className="material-symbols-outlined">close</span>
+                            </button>
+                        </div>
+
+                        {/* Quick status buttons */}
+                        <div className="flex gap-2 px-5 pt-4">
+                            {(['pending', 'in_progress', 'blocked', 'completed'] as TaskStatus[]).map(s => (
+                                <button key={s} onClick={() => { updateStatus(evidenceTask.id, s); setEvidenceTask({ ...evidenceTask, status: s }); }}
+                                    className={`flex-1 rounded-lg py-1.5 text-[10px] font-bold transition-all ${evidenceTask.status === s ? `${TASK_STATUS_COLORS[s].bg} ${TASK_STATUS_COLORS[s].text}` : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400 hover:opacity-80'}`}>
+                                    {TASK_STATUS_LABELS[s]}
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Evidence list */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Evidencias ({evidences.length})</h4>
+                            {evidences.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-8 text-slate-300 dark:text-slate-600">
+                                    <span className="material-symbols-outlined text-4xl mb-2">cloud_upload</span>
+                                    <p className="text-sm">Aún no hay evidencias</p>
+                                </div>
+                            )}
+                            {evidences.map(ev => (
+                                <div key={ev.id} className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-900/50">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm dark:bg-slate-800 text-slate-400">
+                                        <span className="material-symbols-outlined text-xl">
+                                            {ev.file_type?.includes('image') ? 'image' : ev.file_type?.includes('pdf') ? 'picture_as_pdf' : 'description'}
+                                        </span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{ev.file_name}</p>
+                                        <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                                            <span>{ev.uploaded_by}</span>
+                                            <span>·</span>
+                                            <span>{formatBytes(ev.file_size_bytes || 0)}</span>
+                                            <span>·</span>
+                                            <span>{new Date(ev.created_at).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                        </div>
+                                        {ev.notes && <p className="mt-1 text-[11px] text-slate-500 italic">"{ev.notes}"</p>}
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <a href={ev.file_url} target="_blank" rel="noopener noreferrer" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-slate-700" title="Ver">
+                                            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                                        </a>
+                                        <button onClick={() => deleteEvidence(ev)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20" title="Eliminar">
+                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Upload area */}
+                        <div className="border-t border-slate-200 p-5 dark:border-slate-700 space-y-3">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">Subir evidencia</h4>
+                            <input
+                                type="text"
+                                value={evidenceNote}
+                                onChange={e => setEvidenceNote(e.target.value)}
+                                placeholder="Nota u observación (opcional)..."
+                                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                            />
+                            <div>
+                                <input type="file" id="evidence-upload" className="hidden" onChange={handleEvidenceUpload} disabled={uploadingEvidence} accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx" />
+                                <label htmlFor="evidence-upload"
+                                    className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-3 text-sm font-medium transition-all ${uploadingEvidence ? 'border-slate-200 text-slate-300' : 'border-primary/30 text-primary hover:border-primary hover:bg-primary/5'}`}>
+                                    {uploadingEvidence ? (
+                                        <><div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />Subiendo...</>
+                                    ) : (
+                                        <><span className="material-symbols-outlined text-[18px]">upload_file</span>Seleccionar archivo (imagen, PDF, doc...)</>
+                                    )}
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
