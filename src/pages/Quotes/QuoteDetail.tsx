@@ -208,29 +208,39 @@ export default function QuoteDetail() {
     const handleNewVersion = async () => {
         if (!quote) return;
         const parentId = quote.parent_quote_id || quote.id;
-        
-        // Find highest version number
-        const { data: latestVersion } = await supabase.from('quotes')
-            .select('version')
-            .or(`id.eq.${parentId},parent_quote_id.eq.${parentId}`)
-            .order('version', { ascending: false })
-            .limit(1)
-            .single();
-            
-        const newVersion = (latestVersion?.version || 1) + 1;
-        
+
         // Get parent's base quote number
         const { data: parentData } = await supabase.from('quotes')
             .select('quote_number')
             .eq('id', parentId)
-            .single();
-            
+            .maybeSingle();
+
         if (!parentData) {
             alert('No se pudo encontrar la cotización original');
             return;
         }
 
-        const baseNumber = parentData.quote_number.split('-v')[0]; // Remove any existing version suffix
+        // Strip any existing -vN suffix to get the clean base number
+        const baseNumber = parentData.quote_number.split('-v')[0];
+
+        // Fetch ALL quote_numbers in this version family to find true max
+        const { data: familyQuotes } = await supabase.from('quotes')
+            .select('quote_number')
+            .or(`id.eq.${parentId},parent_quote_id.eq.${parentId}`);
+
+        // Parse version numbers from quote_numbers like COT-2026-0012-v3
+        let maxVersion = 1;
+        const versionRegex = new RegExp(`^${baseNumber.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-v(\\d+)$`);
+        if (familyQuotes) {
+            for (const q of familyQuotes) {
+                const m = q.quote_number.match(versionRegex);
+                if (m) {
+                    const v = parseInt(m[1], 10);
+                    if (v > maxVersion) maxVersion = v;
+                }
+            }
+        }
+        const newVersion = maxVersion + 1;
         const quoteNumber = `${baseNumber}-v${newVersion}`;
 
         const { data: newQ, error } = await supabase.from('quotes').insert({
