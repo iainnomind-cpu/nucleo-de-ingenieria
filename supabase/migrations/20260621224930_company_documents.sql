@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS company_documents (
     file_url TEXT NOT NULL,
     file_type VARCHAR(100),
     file_size_bytes BIGINT,
-    uploaded_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    uploaded_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
