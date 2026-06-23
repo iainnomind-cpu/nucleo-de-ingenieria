@@ -318,8 +318,22 @@ export default function QuoteBuilder() {
         } else {
             // ── INSERT new quote ──
             const year = new Date().getFullYear();
-            const { count } = await supabase.from('quotes').select('*', { count: 'exact', head: true });
-            const quoteNumber = `COT-${year}-${String((count || 0) + 1).padStart(4, '0')}`;
+            
+            const { data: lastQuote } = await supabase.from('quotes')
+                .select('quote_number')
+                .ilike('quote_number', `COT-${year}-%`)
+                .order('quote_number', { ascending: false })
+                .limit(1)
+                .single();
+                
+            let nextNumber = 1;
+            if (lastQuote && lastQuote.quote_number) {
+                const match = lastQuote.quote_number.match(new RegExp(`COT-${year}-(\\d+)`));
+                if (match) {
+                    nextNumber = parseInt(match[1], 10) + 1;
+                }
+            }
+            const quoteNumber = `COT-${year}-${String(nextNumber).padStart(4, '0')}`;
 
             const { data: quote, error } = await supabase.from('quotes').insert({
                 ...payload,

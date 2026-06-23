@@ -208,13 +208,30 @@ export default function QuoteDetail() {
     const handleNewVersion = async () => {
         if (!quote) return;
         const parentId = quote.parent_quote_id || quote.id;
-        // Count existing versions
-        const { count } = await supabase.from('quotes').select('*', { count: 'exact', head: true })
-            .or(`id.eq.${parentId},parent_quote_id.eq.${parentId}`);
-        const newVersion = (count || 1) + 1;
-        const year = new Date().getFullYear();
-        const { count: totalCount } = await supabase.from('quotes').select('*', { count: 'exact', head: true });
-        const quoteNumber = `COT-${year}-${String((totalCount || 0) + 1).padStart(4, '0')}`;
+        
+        // Find highest version number
+        const { data: latestVersion } = await supabase.from('quotes')
+            .select('version')
+            .or(`id.eq.${parentId},parent_quote_id.eq.${parentId}`)
+            .order('version', { ascending: false })
+            .limit(1)
+            .single();
+            
+        const newVersion = (latestVersion?.version || 1) + 1;
+        
+        // Get parent's base quote number
+        const { data: parentData } = await supabase.from('quotes')
+            .select('quote_number')
+            .eq('id', parentId)
+            .single();
+            
+        if (!parentData) {
+            alert('No se pudo encontrar la cotización original');
+            return;
+        }
+
+        const baseNumber = parentData.quote_number.split('-v')[0]; // Remove any existing version suffix
+        const quoteNumber = `${baseNumber}-v${newVersion}`;
 
         const { data: newQ, error } = await supabase.from('quotes').insert({
             ...Object.fromEntries(Object.entries(quote).filter(([k]) =>
