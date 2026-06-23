@@ -319,21 +319,24 @@ export default function QuoteBuilder() {
             // ── INSERT new quote ──
             const year = new Date().getFullYear();
             
-            const { data: lastQuote } = await supabase.from('quotes')
+            // Fetch ALL quote numbers for this year and find the true highest base number
+            // This avoids issues with version suffixes like COT-2026-0012-v2
+            const { data: allQuotes } = await supabase.from('quotes')
                 .select('quote_number')
-                .ilike('quote_number', `COT-${year}-%`)
-                .order('quote_number', { ascending: false })
-                .limit(1)
-                .single();
+                .ilike('quote_number', `COT-${year}-%`);
                 
-            let nextNumber = 1;
-            if (lastQuote && lastQuote.quote_number) {
-                const match = lastQuote.quote_number.match(new RegExp(`COT-${year}-(\\d+)`));
-                if (match) {
-                    nextNumber = parseInt(match[1], 10) + 1;
+            let maxNumber = 0;
+            const baseRegex = new RegExp(`^COT-${year}-(\\d{4})`);
+            if (allQuotes) {
+                for (const q of allQuotes) {
+                    const m = q.quote_number.match(baseRegex);
+                    if (m) {
+                        const n = parseInt(m[1], 10);
+                        if (n > maxNumber) maxNumber = n;
+                    }
                 }
             }
-            const quoteNumber = `COT-${year}-${String(nextNumber).padStart(4, '0')}`;
+            const quoteNumber = `COT-${year}-${String(maxNumber + 1).padStart(4, '0')}`;
 
             const { data: quote, error } = await supabase.from('quotes').insert({
                 ...payload,
