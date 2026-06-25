@@ -1,6 +1,6 @@
 -- 1. CREATE TABLES
 
-CREATE TABLE hr_document_folders (
+CREATE TABLE IF NOT EXISTS hr_document_folders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     employee_id UUID REFERENCES hr_employees(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE hr_document_folders (
     UNIQUE(employee_id, name)
 );
 
-CREATE TABLE hr_employee_documents (
+CREATE TABLE IF NOT EXISTS hr_employee_documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     employee_id UUID REFERENCES hr_employees(id) ON DELETE CASCADE,
     folder_id UUID REFERENCES hr_document_folders(id) ON DELETE SET NULL,
