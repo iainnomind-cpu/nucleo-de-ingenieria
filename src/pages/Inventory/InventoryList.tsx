@@ -97,7 +97,19 @@ export default function InventoryList() {
         if (editing) {
             await supabase.from('inventory_products').update(payload).eq('id', editing.id);
         } else {
-            await supabase.from('inventory_products').insert(payload);
+            const { data: newProd, error } = await supabase.from('inventory_products').insert(payload).select().single();
+            if (!error && newProd && payload.current_stock > 0) {
+                // Registrar el movimiento de entrada inicial para que aparezca en el reporte
+                await supabase.from('inventory_movements').insert({
+                    product_id: newProd.id,
+                    movement_type: 'entry',
+                    quantity: payload.current_stock,
+                    unit_cost: payload.unit_cost,
+                    total_cost: payload.current_stock * payload.unit_cost,
+                    reason: 'purchase',
+                    notes: 'Inventario inicial (registro de producto)',
+                });
+            }
         }
         setShowForm(false);
         fetchProducts();
