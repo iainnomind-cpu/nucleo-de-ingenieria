@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-    HREmployee, HRAbsence, AbsenceType, ABSENCE_TYPE_COLORS, calculateVacationDays
+    HREmployee, HRAbsence, AbsenceType, ABSENCE_TYPE_COLORS, calculateVacationDays, getCurrentAnniversaryPeriod
 } from '../../types/hr';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,7 +35,8 @@ export default function VacationsPlanner() {
         department: '',
         hire_date: new Date().toISOString().split('T')[0],
         vacation_start_date: '',
-        base_vacation_days: '12'
+        base_vacation_days: '12',
+        manual_vacation_adjustment: '0'
     });
 
     const fetchAll = useCallback(async () => {
@@ -88,6 +89,7 @@ export default function VacationsPlanner() {
             hire_date: employeeForm.hire_date || null,
             vacation_start_date: employeeForm.vacation_start_date || null,
             base_vacation_days: parseInt(employeeForm.base_vacation_days) || 12,
+            manual_vacation_adjustment: parseFloat(employeeForm.manual_vacation_adjustment) || 0,
             is_active: true
         };
         if (editingEmployee) {
@@ -97,7 +99,7 @@ export default function VacationsPlanner() {
         }
         setShowEmployeeForm(false);
         setEditingEmployee(null);
-        setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], vacation_start_date: '', base_vacation_days: '12' });
+        setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], vacation_start_date: '', base_vacation_days: '12', manual_vacation_adjustment: '0' });
         fetchAll();
     };
 
@@ -109,6 +111,7 @@ export default function VacationsPlanner() {
             hire_date: emp.hire_date || '',
             vacation_start_date: emp.vacation_start_date || '',
             base_vacation_days: emp.base_vacation_days.toString(),
+            manual_vacation_adjustment: (emp.manual_vacation_adjustment || 0).toString(),
         });
         setShowEmployeeForm(true);
         setShowForm(false);
@@ -132,24 +135,38 @@ export default function VacationsPlanner() {
     const balances = useMemo(() => {
         const map = new Map<string, { total: number, used: number, remaining: number, unpaidLeave: number, otherAbsences: number }>();
         employees.forEach(emp => {
-            const total = calculateVacationDays(emp.hire_date, emp.base_vacation_days, emp.vacation_start_date);
-            const yearAbsences = absences.filter(a =>
-                a.employee_id === emp.id &&
-                new Date(a.start_date).getFullYear() <= filterYear
-            );
+            const total = calculateVacationDays(emp.hire_date, emp.base_vacation_days, emp.vacation_start_date, filterYear);
+            const period = getCurrentAnniversaryPeriod(emp.hire_date, filterYear, emp.vacation_start_date);
+            
+            // Si el empleado aún no cumple año, `period` nos dice de cuándo a cuándo abarca.
+            // Contamos solo las ausencias que caen dentro de SU ciclo vacacional de este año, ignorando todo lo anterior.
+            const yearAbsences = absences.filter(a => {
+                if (a.employee_id !== emp.id) return false;
+                if (!period) return new Date(a.start_date).getFullYear() === filterYear;
+                
+                const absDate = new Date(a.start_date);
+                return absDate >= period.start && absDate <= period.end;
+            });
+            
             // Only VACACIONES type counts against vacation balance, and only if it's NOT marked as non-remunerative/compensated
             const usedVacation = yearAbsences
                 .filter(a => a.absence_type === 'VACACIONES' && !a.is_compensated)
                 .reduce((sum, a) => sum + Number(a.days_count), 0);
+            
             // Track unpaid leave separately
             const unpaidLeave = yearAbsences
                 .filter(a => a.absence_type === 'PERMISO NO REMUNERADO')
                 .reduce((sum, a) => sum + Number(a.days_count), 0);
+            
             // Other absences (incapacidad, capacitación, etc.) — informational only
             const otherAbsences = yearAbsences
                 .filter(a => a.absence_type !== 'VACACIONES' && a.absence_type !== 'PERMISO NO REMUNERADO')
                 .reduce((sum, a) => sum + Number(a.days_count), 0);
-            map.set(emp.id, { total, used: usedVacation, remaining: total - usedVacation, unpaidLeave, otherAbsences });
+                
+            const manualAdjustment = emp.manual_vacation_adjustment || 0;
+            const remaining = total - usedVacation + manualAdjustment;
+                
+            map.set(emp.id, { total, used: usedVacation, remaining, unpaidLeave, otherAbsences });
         });
         return map;
     }, [employees, absences, filterYear]);
@@ -187,7 +204,7 @@ export default function VacationsPlanner() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <button onClick={() => { setEditingEmployee(null); setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], vacation_start_date: '', base_vacation_days: '12' }); setShowEmployeeForm(!showEmployeeForm); setShowForm(false); }} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                    <button onClick={() => { setEditingEmployee(null); setEmployeeForm({ full_name: '', department: '', hire_date: new Date().toISOString().split('T')[0], vacation_start_date: '', base_vacation_days: '12', manual_vacation_adjustment: '0' }); setShowEmployeeForm(!showEmployeeForm); setShowForm(false); }} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <span className="material-symbols-outlined text-[18px]">person_add</span>
                         Nuevo Colaborador
                     </button>
@@ -223,6 +240,13 @@ export default function VacationsPlanner() {
                             <label className={labelClass}>Días Base Vacaciones</label>
                             <input type="number" required min="6" value={employeeForm.base_vacation_days} onChange={e => setEmployeeForm({ ...employeeForm, base_vacation_days: e.target.value })} className={inputClass} />
                             <p className="mt-1 text-[10px] text-slate-500">Por defecto: 12 días (LFT México)</p>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-4 mt-4 md:grid-cols-2">
+                        <div>
+                            <label className={labelClass}>Ajuste manual de vacaciones (+/-)</label>
+                            <input type="number" step="0.5" value={employeeForm.manual_vacation_adjustment} onChange={e => setEmployeeForm({ ...employeeForm, manual_vacation_adjustment: e.target.value })} className={inputClass} />
+                            <p className="mt-1 text-[10px] text-slate-500">Usa números positivos o negativos para agregar o quitar días al saldo de vacaciones.</p>
                         </div>
                     </div>
                     <div className="mt-4 flex gap-2">

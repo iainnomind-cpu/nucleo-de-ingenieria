@@ -8,6 +8,7 @@ export interface HREmployee {
     base_vacation_days: number;
     is_active: boolean;
     notes: string | null;
+    manual_vacation_adjustment: number;
     created_at: string;
     updated_at: string;
 }
@@ -44,17 +45,13 @@ export const ABSENCE_TYPE_COLORS: Record<AbsenceType, { bg: string; text: string
 
 // Helper: Calculate accumulated vacation days based on years worked.
 // Uses vacation_start_date as the reference if provided, otherwise falls back to hire_date.
-export function calculateVacationDays(hireDateStr: string | null, baseDays: number = 12, vacationStartDateStr?: string | null): number {
+export function calculateVacationDays(hireDateStr: string | null, baseDays: number = 12, vacationStartDateStr?: string | null, filterYear?: number): number {
     const refDateStr = vacationStartDateStr || hireDateStr;
     if (!refDateStr) return baseDays;
     const refDate = new Date(refDateStr);
-    const now = new Date();
+    const targetYear = filterYear || new Date().getFullYear();
     
-    let years = now.getFullYear() - refDate.getFullYear();
-    if (now.getMonth() < refDate.getMonth() || (now.getMonth() === refDate.getMonth() && now.getDate() < refDate.getDate())) {
-        years--;
-    }
-    
+    let years = targetYear - refDate.getFullYear();
     if (years < 1) return baseDays; // First year
 
     // According to new LFT (Mexico)
@@ -66,6 +63,23 @@ export function calculateVacationDays(hireDateStr: string | null, baseDays: numb
     }
     
     return baseDays + extra;
+}
+
+export function getCurrentAnniversaryPeriod(hireDateStr: string | null, filterYear: number, vacationStartDateStr?: string | null) {
+    const refDateStr = vacationStartDateStr || hireDateStr;
+    if (!refDateStr) return null;
+    
+    const refDate = new Date(refDateStr);
+    
+    // The anniversary falls in the year given by filterYear
+    const currentPeriodStart = new Date(filterYear, refDate.getMonth(), refDate.getDate());
+    
+    // Cycle ends the day before the next anniversary
+    const currentPeriodEnd = new Date(currentPeriodStart);
+    currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+    currentPeriodEnd.setDate(currentPeriodEnd.getDate() - 1);
+    
+    return { start: currentPeriodStart, end: currentPeriodEnd };
 }
 
 export interface HrDocumentFolder {
