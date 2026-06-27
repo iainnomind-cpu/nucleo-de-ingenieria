@@ -384,7 +384,7 @@ export default function VehicleDetail() {
                                 <span className="text-slate-500">Verificación Vehicular</span>
                                 <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${VERIFICATION_STATUS_COLORS[vehicle.verification_status || 'pending'].bg} ${VERIFICATION_STATUS_COLORS[vehicle.verification_status || 'pending'].text}`}>
                                     {VERIFICATION_STATUS_LABELS[vehicle.verification_status || 'pending']}
-                                    {vehicle.verification_date && <span className="ml-1 opacity-70">({new Date(vehicle.verification_date).toLocaleDateString('es-MX')})</span>}
+                                    {vehicle.verification_date && <span className="ml-1 opacity-70">({new Date(vehicle.verification_date + 'T12:00:00').toLocaleDateString('es-MX')})</span>}
                                 </span>
                             </div>
                         </div>
@@ -437,7 +437,7 @@ export default function VehicleDetail() {
                                     </div>
                                     <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                                         <span className="text-slate-500">Vigencia</span>
-                                        <span className="text-xs text-slate-600 dark:text-slate-400">{new Date(ins.start_date).toLocaleDateString('es-MX')} — {new Date(ins.end_date).toLocaleDateString('es-MX')}</span>
+                                        <span className="text-xs text-slate-600 dark:text-slate-400">{new Date(ins.start_date + 'T12:00:00').toLocaleDateString('es-MX')} — {new Date(ins.end_date + 'T12:00:00').toLocaleDateString('es-MX')}</span>
                                     </div>
                                     <div className="flex justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
                                         <span className="text-slate-500">Costo Póliza</span>
@@ -500,7 +500,7 @@ export default function VehicleDetail() {
                                     <div key={ins.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50">
                                         <div>
                                             <p className="font-bold text-slate-900 dark:text-white text-base">{ins.provider} <span className="text-xs font-mono font-normal text-slate-500 ml-2">#{ins.policy_number}</span></p>
-                                            <p className="text-xs text-slate-500 mt-1">Vigencia: {new Date(ins.start_date).toLocaleDateString('es-MX')} al {new Date(ins.end_date).toLocaleDateString('es-MX')}</p>
+                                            <p className="text-xs text-slate-500 mt-1">Vigencia: {new Date(ins.start_date + 'T12:00:00').toLocaleDateString('es-MX')} al {new Date(ins.end_date + 'T12:00:00').toLocaleDateString('es-MX')}</p>
                                             {ins.coverage_details && <p className="text-xs text-slate-400 mt-1 line-clamp-1">{ins.coverage_details}</p>}
                                         </div>
                                         <div className="mt-3 sm:mt-0 text-right flex flex-col sm:items-end gap-2">
@@ -552,7 +552,7 @@ export default function VehicleDetail() {
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {mileage.map(m => (
                                         <tr key={m.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.date).toLocaleDateString('es-MX')}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.date + 'T12:00:00').toLocaleDateString('es-MX')}</td>
                                             <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{m.driver_name}</td>
                                             <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">
                                                 {m.destination ? <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px] text-slate-400">location_on</span>{m.destination}</span> : '—'}
@@ -638,7 +638,7 @@ export default function VehicleDetail() {
 
                                         return (
                                         <tr key={log.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(log.date).toLocaleDateString('es-MX')}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(log.date + 'T12:00:00').toLocaleDateString('es-MX')}</td>
                                             <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{log.provider || '—'}</td>
                                             <td className="px-4 py-3 font-mono text-xs text-slate-600">{log.odometer.toLocaleString()} km</td>
                                             <td className="px-4 py-3 text-center text-xs font-mono text-slate-600 dark:text-slate-400">{log.fuel_liters.toFixed(1)} L</td>
@@ -692,7 +692,7 @@ export default function VehicleDetail() {
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                                     {maintenance.map(m => (
                                         <tr key={m.id} className="group hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
-                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.service_date).toLocaleDateString('es-MX')}</td>
+                                            <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.service_date + 'T12:00:00').toLocaleDateString('es-MX')}</td>
                                             <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{m.service_type}</td>
                                             <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{m.provider || '—'}</td>
                                             <td className="px-4 py-3 text-xs text-slate-500">
@@ -1021,7 +1021,7 @@ export default function VehicleDetail() {
                                         const pct = maxR > 0 ? (r / maxR) * 100 : 0;
                                         return (
                                             <div key={m.id} className="flex items-center gap-3">
-                                                <span className="text-xs text-slate-500 w-20 shrink-0">{new Date(m.date).toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}</span>
+                                                <span className="text-xs text-slate-500 w-20 shrink-0">{new Date(m.date + 'T12:00:00').toLocaleDateString('es-MX', { month: 'short', day: 'numeric' })}</span>
                                                 <div className="flex-1 h-6 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden relative">
                                                     <div className={`h-full rounded-full transition-all ${r >= 10 ? 'bg-emerald-500' : r >= 5 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${pct}%` }} />
                                                     <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-700 dark:text-slate-300">{r.toFixed(1)} km/l • {m.distance} km • {m.fuel_liters}L</span>
