@@ -1,4 +1,4 @@
-export type ProductCategory = 'ferreteria' | 'hidraulica' | 'electrica' | 'herramienta' | 'consumible' | 'epp' | 'papeleria' | 'souvenirs' | 'otro';
+export type ProductCategory = 'ferreteria' | 'hidraulica' | 'electrica' | 'herramienta' | 'consumible' | 'epp' | 'papeleria' | 'souvenirs' | 'ruta_critica' | 'alta_rotacion' | 'vehiculos' | 'otro';
 export type ProductUnit = 'pieza' | 'metro' | 'litro' | 'kg' | 'rollo' | 'tramo' | 'caja';
 export type Criticality = 'normal' | 'high_rotation' | 'critical_path';
 export type MovementType = 'entry' | 'exit' | 'adjustment';
@@ -72,6 +72,9 @@ export const CATEGORY_LABELS: Record<ProductCategory, string> = {
     epp: 'EPP',
     papeleria: 'Papelería',
     souvenirs: 'Souvenirs',
+    ruta_critica: 'Ruta Crítica',
+    alta_rotacion: 'Alta Rotación',
+    vehiculos: 'Vehículos / Activos',
     otro: 'Otro',
 };
 
@@ -84,6 +87,9 @@ export const CATEGORY_ICONS: Record<ProductCategory, string> = {
     epp: 'health_and_safety',
     papeleria: 'description',
     souvenirs: 'redeem',
+    ruta_critica: 'warning',
+    alta_rotacion: 'sync',
+    vehiculos: 'directions_car',
     otro: 'category',
 };
 
