@@ -292,8 +292,7 @@ export default function InventoryList() {
                 <div className="flex flex-wrap gap-2">
                     <select value={filterCat} onChange={e => setFilterCat(e.target.value as any)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium dark:border-slate-700 dark:bg-slate-800 dark:text-white">
                         <option value="all">Todas las categorías</option>
-                        <option value="vehiculos">Vehículos / Activos</option>
-                        {(Object.keys(CATEGORY_LABELS) as ProductCategory[]).filter(c => c !== 'vehiculos').map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                        {(Object.keys(CATEGORY_LABELS) as ProductCategory[]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                     </select>
                     <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 self-center" />
                     {(['all', 'oficina', 'bodega', 'limpieza_pozos', 'equipos_aforo'] as const).map(a => (
