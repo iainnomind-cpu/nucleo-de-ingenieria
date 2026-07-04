@@ -32,6 +32,11 @@ export default function ServiceCatalog() {
         const fetchedCats = Array.isArray(catData) ? catData : ['Otro'];
         setCategories(fetchedCats);
 
+        if (servicesRes.error) {
+            console.error('Error fetching services:', servicesRes.error);
+            alert('Error al cargar servicios: ' + servicesRes.error.message);
+        }
+
         let srvData = (servicesRes.data || []) as ServiceCatalogItem[];
         if (filterCat !== 'all') srvData = srvData.filter(s => s.category === filterCat);
         if (search.trim()) {
