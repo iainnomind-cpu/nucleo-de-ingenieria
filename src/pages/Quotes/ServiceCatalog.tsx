@@ -23,28 +23,43 @@ export default function ServiceCatalog() {
 
     const fetchServices = useCallback(async () => {
         setLoading(true);
-        const [settingsRes, servicesRes] = await Promise.all([
+        // Fetch service_categories setting and ALL services (bypassing the 1000-row default limit)
+        const [settingsRes] = await Promise.all([
             supabase.from('system_settings').select('value').eq('key', 'service_categories').single(),
-            supabase.from('service_catalog').select('*').order('category').order('name')
         ]);
-        
+
         const catData = settingsRes.data?.value;
         const fetchedCats = Array.isArray(catData) ? catData : ['Otro'];
         setCategories(fetchedCats);
 
-        if (servicesRes.error) {
-            console.error('Error fetching services:', servicesRes.error);
-            alert('Error al cargar servicios: ' + servicesRes.error.message);
+        // Paginated fetch to get beyond the 1000-row Supabase default limit
+        let allServices: ServiceCatalogItem[] = [];
+        let from = 0;
+        const pageSize = 1000;
+        let keepFetching = true;
+        while (keepFetching) {
+            const { data, error } = await supabase
+                .from('service_catalog')
+                .select('*')
+                .order('category')
+                .order('name')
+                .range(from, from + pageSize - 1);
+            if (error) {
+                console.error('Error fetching services:', error);
+                break;
+            }
+            if (!data || data.length === 0) break;
+            allServices = [...allServices, ...(data as ServiceCatalogItem[])];
+            if (data.length < pageSize) { keepFetching = false; } else { from += pageSize; }
         }
 
-        let srvData = (servicesRes.data || []) as ServiceCatalogItem[];
+        let srvData = allServices;
         if (filterCat !== 'all') srvData = srvData.filter(s => s.category === filterCat);
         if (search.trim()) {
             const low = search.toLowerCase();
             srvData = srvData.filter(s => s.name.toLowerCase().includes(low) || (s.description && s.description.toLowerCase().includes(low)));
         }
         setServices(srvData);
-
         setLoading(false);
     }, [filterCat, search]);
 
