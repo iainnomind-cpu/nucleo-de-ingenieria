@@ -30,12 +30,13 @@ export default function InventoryList() {
     const navigate = useNavigate();
     const [products, setProducts] = useState<InventoryProduct[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filterCat, setFilterCat] = useState<ProductCategory | 'all'>('all');
+    const [filterCat, setFilterCat] = useState<ProductCategory | 'all' | 'vehiculos'>('all');
     const [filterStock, setFilterStock] = useState<'all' | 'ok' | 'low' | 'out' | 'critical'>('all');
     const [filterArea, setFilterArea] = useState<InventoryArea | 'all'>('all');
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<InventoryProduct | null>(null);
+    const [saving, setSaving] = useState(false);
     const [showMovement, setShowMovement] = useState<InventoryProduct | null>(null);
     const { hasPermission } = useAuth();
     const canDelete = hasPermission('inventory', 'delete');
@@ -55,8 +56,37 @@ export default function InventoryList() {
 
     const fetchProducts = useCallback(async () => {
         setLoading(true);
+        
+        // If filter is 'vehiculos', only fetch vehicles - not inventory_products
+        if (filterCat === 'vehiculos') {
+            const { data: vehData } = await supabase.from('vehicles').select('*').in('status', ['active', 'maintenance']);
+            const vehicles = (vehData || []).map(v => ({
+                id: v.id,
+                code: v.plates,
+                name: `${v.brand} ${v.model} ${v.year}`,
+                description: v.notes || '',
+                category: 'vehiculos' as ProductCategory,
+                subcategory: v.vehicle_type,
+                unit: 'pieza' as ProductUnit,
+                current_stock: 1, min_stock: 1, max_stock: 1,
+                unit_cost: v.acquisition_cost || 0,
+                last_purchase_price: v.acquisition_cost || 0,
+                supplier: null, location: v.assigned_to || '',
+                area: 'vehiculo' as any,
+                criticality: 'normal', is_active: true,
+                created_at: v.created_at, updated_at: v.updated_at
+            } as any));
+            if (filterStock !== 'all') {
+                setProducts(vehicles.filter(p => getStockStatus(p) === filterStock));
+            } else {
+                setProducts(vehicles);
+            }
+            setLoading(false);
+            return;
+        }
+
         let q = supabase.from('inventory_products').select('*').eq('is_active', true).order('category').order('name');
-        if (filterCat !== 'all' && filterCat !== 'vehiculos') q = q.eq('category', filterCat);
+        if (filterCat !== 'all') q = q.eq('category', filterCat);
         if (filterArea !== 'all') q = q.eq('area', filterArea);
         if (search.trim()) q = q.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
         
@@ -65,15 +95,12 @@ export default function InventoryList() {
             supabase.from('vehicles').select('*').in('status', ['active', 'maintenance'])
         ]);
 
-        if (invRes.error) {
-            console.error(invRes.error);
-            setLoading(false);
-            return;
-        }
+        if (invRes.error) { console.error(invRes.error); setLoading(false); return; }
         
         let filtered = (invRes.data as InventoryProduct[]) || [];
         
-        if (filterCat === 'all' || filterCat === 'vehiculos') {
+        // Add vehicles only when showing ALL categories
+        if (filterCat === 'all') {
             const vehicles = (vehRes.data || []).map(v => ({
                 id: v.id,
                 code: v.plates,
@@ -82,22 +109,17 @@ export default function InventoryList() {
                 category: 'vehiculos' as ProductCategory,
                 subcategory: v.vehicle_type,
                 unit: 'pieza' as ProductUnit,
-                current_stock: 1,
-                min_stock: 1,
-                max_stock: 1,
+                current_stock: 1, min_stock: 1, max_stock: 1,
                 unit_cost: v.acquisition_cost || 0,
                 last_purchase_price: v.acquisition_cost || 0,
-                supplier: null,
-                location: v.assigned_to || '',
-                area: 'oficina',
-                criticality: 'normal',
-                is_active: true,
-                created_at: v.created_at,
-                updated_at: v.updated_at
+                supplier: null, location: v.assigned_to || '',
+                area: 'vehiculo' as any,
+                criticality: 'normal', is_active: true,
+                created_at: v.created_at, updated_at: v.updated_at
             } as any));
-            
             filtered = [...filtered, ...vehicles];
         }
+
         if (filterStock !== 'all') filtered = filtered.filter(p => getStockStatus(p) === filterStock);
         setProducts(filtered);
         setLoading(false);
@@ -106,13 +128,13 @@ export default function InventoryList() {
     useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
     const openCreateForm = () => {
-        setEditingProduct(null);
+        setEditing(null);
         setForm({ code: '', name: '', category: 'ferreteria', subcategory: '', unit: 'pieza', current_stock: '0', min_stock: '0', max_stock: '', unit_cost: '0', supplier: '', location: '', criticality: 'normal', description: '', area: 'oficina' });
         setShowForm(true);
     };
 
     const openEditForm = (p: InventoryProduct) => {
-        setEditingProduct(p.id);
+        setEditing(p);
         setForm({
             code: p.code, name: p.name, category: p.category, subcategory: p.subcategory || '', unit: p.unit,
             current_stock: p.current_stock.toString(), min_stock: p.min_stock.toString(), max_stock: p.max_stock?.toString() || '',
@@ -127,10 +149,10 @@ export default function InventoryList() {
         setSaving(true);
         try {
             if (form.category === 'vehiculos') {
-                if (editingProduct) {
+                if (editing) {
                     const { error } = await supabase.from('vehicles').update({
                         acquisition_cost: Number(form.unit_cost)
-                    }).eq('id', editingProduct);
+                    }).eq('id', editing.id);
                     if (error) throw error;
                 }
             } else {
@@ -140,27 +162,23 @@ export default function InventoryList() {
                     max_stock: form.max_stock ? Number(form.max_stock) : null, unit_cost: Number(form.unit_cost),
                     supplier: form.supplier || null, location: form.location || null, criticality: form.criticality, description: form.description || null, area: form.area
                 };
-
-                if (editingProduct) {
-                    const { error } = await supabase.from('inventory_products').update(productData).eq('id', editingProduct);
+                if (editing) {
+                    const { error } = await supabase.from('inventory_products').update(productData).eq('id', editing.id);
                     if (error) throw error;
                 } else {
                     const { data: newProd, error } = await supabase.from('inventory_products').insert([productData]).select().single();
                     if (error) throw error;
                     if (newProd && productData.current_stock > 0) {
                         await supabase.from('inventory_movements').insert({
-                            product_id: newProd.id,
-                            movement_type: 'entry',
-                            quantity: productData.current_stock,
-                            unit_cost: productData.unit_cost,
-                            total_cost: productData.current_stock * productData.unit_cost,
-                            reason: 'purchase',
-                            notes: 'Inventario inicial (registro de producto)',
+                            product_id: newProd.id, movement_type: 'entry', quantity: productData.current_stock,
+                            unit_cost: productData.unit_cost, total_cost: productData.current_stock * productData.unit_cost,
+                            reason: 'purchase', notes: 'Inventario inicial (registro de producto)',
                         });
                     }
                 }
             }
             setShowForm(false);
+            setEditing(null);
             fetchProducts();
         } catch (error) {
             console.error(error);
@@ -274,15 +292,31 @@ export default function InventoryList() {
                 <div className="flex flex-wrap gap-2">
                     <select value={filterCat} onChange={e => setFilterCat(e.target.value as any)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium dark:border-slate-700 dark:bg-slate-800 dark:text-white">
                         <option value="all">Todas las categorías</option>
-                        <option value="vehiculos">Vehículos</option>
-                        {(Object.keys(CATEGORY_LABELS) as ProductCategory[]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+                        <option value="vehiculos">Vehículos / Activos</option>
+                        {(Object.keys(CATEGORY_LABELS) as ProductCategory[]).filter(c => c !== 'vehiculos').map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
                     </select>
+                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 self-center" />
+                    {(['all', 'oficina', 'bodega', 'limpieza_pozos', 'equipos_aforo'] as const).map(a => (
+                        <button key={a} onClick={() => setFilterArea(a as InventoryArea | 'all')}
+                            className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition-all ${filterArea === a ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                            <span className="material-symbols-outlined text-[14px]">{a === 'all' ? 'apps' : AREA_ICONS[a]}</span>
+                            {a === 'all' ? 'Todas' : AREA_LABELS[a]}
+                        </button>
+                    ))}
+                    <div className="h-6 w-px bg-slate-200 dark:bg-slate-700 self-center" />
+                    {(['all', 'ok', 'low', 'out'] as const).map(s => (
+                        <button key={s} onClick={() => setFilterStock(s)}
+                            className={`flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-all ${filterStock === s ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                            {s !== 'all' && <span>{STOCK_STATUS_CONFIG[s].icon}</span>}
+                            {s === 'all' ? 'Todos' : STOCK_STATUS_CONFIG[s].label}
+                        </button>
+                    ))}
                 </div>
             </div>
 
             {showForm && (
                 <form onSubmit={handleSubmit} className="rounded-xl border border-primary/20 bg-primary/5 p-6">
-                    <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">{editingProduct ? 'Editar Producto' : 'Nuevo Producto'}</h3>
+                    <h3 className="mb-4 text-sm font-bold text-slate-900 dark:text-white">{editing ? 'Editar Producto' : 'Nuevo Producto'}</h3>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                         {form.category === 'vehiculos' ? (
                             <div className="col-span-3 text-sm text-amber-600 bg-amber-50 p-3 rounded-lg flex items-start gap-2">
@@ -295,7 +329,7 @@ export default function InventoryList() {
                                 <div><label className={labelClass}>Nombre del Producto</label><input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} className={inputClass} /></div>
                             </>
                         )}
-                        <div><label className={labelClass}>Categoría</label><select disabled={!!editingProduct && form.category === 'vehiculos'} value={form.category} onChange={e => setForm({ ...form, category: e.target.value as ProductCategory })} className={inputClass}>{(Object.keys(CATEGORY_LABELS) as ProductCategory[]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></div>
+                        <div><label className={labelClass}>Categoría</label><select disabled={!!editing && form.category === 'vehiculos'} value={form.category} onChange={e => setForm({ ...form, category: e.target.value as ProductCategory })} className={inputClass}>{(Object.keys(CATEGORY_LABELS) as ProductCategory[]).map(c => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}</select></div>
                         {form.category !== 'vehiculos' && (
                             <>
                                 <div><label className={labelClass}>Subcategoría</label><input value={form.subcategory} onChange={e => setForm({ ...form, subcategory: e.target.value })} className={inputClass} /></div>
