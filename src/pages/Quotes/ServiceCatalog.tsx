@@ -12,6 +12,7 @@ export default function ServiceCatalog() {
     const [showForm, setShowForm] = useState(false);
     const [editing, setEditing] = useState<ServiceCatalogItem | null>(null);
     const [filterCat, setFilterCat] = useState<string | 'all'>('all');
+    const [search, setSearch] = useState('');
     const [form, setForm] = useState({
         name: '',
         category: '',
@@ -33,10 +34,14 @@ export default function ServiceCatalog() {
 
         let srvData = (servicesRes.data || []) as ServiceCatalogItem[];
         if (filterCat !== 'all') srvData = srvData.filter(s => s.category === filterCat);
+        if (search.trim()) {
+            const low = search.toLowerCase();
+            srvData = srvData.filter(s => s.name.toLowerCase().includes(low) || (s.description && s.description.toLowerCase().includes(low)));
+        }
         setServices(srvData);
 
         setLoading(false);
-    }, [filterCat]);
+    }, [filterCat, search]);
 
     useEffect(() => { fetchServices(); }, [fetchServices]);
 
@@ -49,15 +54,22 @@ export default function ServiceCatalog() {
             base_price: parseFloat(form.base_price) || 0,
             unit: form.unit,
         };
-        if (editing) {
-            await supabase.from('service_catalog').update(payload).eq('id', editing.id);
-        } else {
-            await supabase.from('service_catalog').insert(payload);
+        try {
+            if (editing) {
+                const { error } = await supabase.from('service_catalog').update(payload).eq('id', editing.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('service_catalog').insert(payload);
+                if (error) throw error;
+            }
+            setShowForm(false);
+            setEditing(null);
+            setForm({ name: '', category: categories[0] || 'Otro', description: '', base_price: '', unit: 'servicio' });
+            fetchServices();
+        } catch (err: any) {
+            console.error('Error saving service:', err);
+            alert('Error al guardar el servicio: ' + (err.message || 'Error desconocido'));
         }
-        setShowForm(false);
-        setEditing(null);
-        setForm({ name: '', category: categories[0] || 'Otro', description: '', base_price: '', unit: 'servicio' });
-        fetchServices();
     };
 
     const handleEdit = (s: ServiceCatalogItem) => {
@@ -104,18 +116,29 @@ export default function ServiceCatalog() {
                 </button>
             </div>
 
-            {/* Category filter */}
-            <div className="flex flex-wrap gap-2">
-                <button onClick={() => setFilterCat('all')}
-                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${filterCat === 'all' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'}`}>
-                    Todos
-                </button>
-                {categories.map(c => (
-                    <button key={c} onClick={() => setFilterCat(c)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${filterCat === c ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'}`}>
-                        {c}
+            {/* Category filter and Search */}
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setFilterCat('all')}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${filterCat === 'all' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'}`}>
+                        Todos
                     </button>
-                ))}
+                    {categories.map(c => (
+                        <button key={c} onClick={() => setFilterCat(c)}
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${filterCat === c ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-400'}`}>
+                            {c}
+                        </button>
+                    ))}
+                </div>
+                <div className="relative w-full md:max-w-xs">
+                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-slate-400">search</span>
+                    <input 
+                        value={search} 
+                        onChange={e => setSearch(e.target.value)} 
+                        placeholder="Buscar servicio..." 
+                        className="w-full rounded-full border border-slate-200 bg-white py-2 pl-9 pr-4 text-sm outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                </div>
             </div>
 
             {/* Form Modal */}
