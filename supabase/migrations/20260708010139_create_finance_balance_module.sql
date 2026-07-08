@@ -56,14 +56,14 @@ ALTER TABLE finance_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE finance_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE finance_transactions ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "Allow authenticated full access to finance_accounts" 
-ON finance_accounts FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access to finance_accounts" 
+ON finance_accounts FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Allow authenticated full access to finance_categories" 
-ON finance_categories FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access to finance_categories" 
+ON finance_categories FOR ALL USING (true) WITH CHECK (true);
 
-CREATE POLICY "Allow authenticated full access to finance_transactions" 
-ON finance_transactions FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all access to finance_transactions" 
+ON finance_transactions FOR ALL USING (true) WITH CHECK (true);
 
 -- Functions and triggers
 CREATE TRIGGER update_finance_accounts_modtime
