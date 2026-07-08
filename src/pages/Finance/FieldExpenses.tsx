@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { FieldExpense, EXPENSE_TYPE_LABELS, EXPENSE_TYPE_ICONS } from '../../types/projects';
 import { formatCurrencyMXN } from '../../types/projects';
@@ -8,6 +9,7 @@ type ExpenseType = keyof typeof EXPENSE_TYPE_LABELS;
 const defaultForm = { employee_name: '', expense_type: 'viaticos' as ExpenseType, amount: '', expense_date: new Date().toISOString().split('T')[0], project_id: '', area_destination: '', payment_method: 'transfer' as 'transfer' | 'card' | 'cash', folio_fiscal: '', description: '', receipt_url: '' };
 
 export default function FieldExpenses() {
+    const navigate = useNavigate();
     const [expenses, setExpenses] = useState<FieldExpense[]>([]);
     const [projects, setProjects] = useState<{ id: string; project_number: string; title: string }[]>([]);
     const [loading, setLoading] = useState(true);
@@ -107,9 +109,18 @@ export default function FieldExpenses() {
     return (
         <div className="flex flex-1 flex-col gap-6 p-8">
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Gastos de Campo y Viáticos</h2>
-                    <p className="text-sm text-slate-500">Control maestro de erogaciones operativas</p>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/finance')}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                        title="Volver a Finanzas"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    </button>
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Gastos de Campo y Viáticos</h2>
+                        <p className="text-sm text-slate-500">Control maestro de erogaciones operativas</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-4">
                     <button onClick={() => { setEditingId(null); setForm(defaultForm); setShowForm(true); }} className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors">
