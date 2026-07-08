@@ -282,12 +282,55 @@ export function GeneralBalance() {
         return <div className="flex h-64 items-center justify-center"><div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div></div>;
     }
 
+    const handleInitialize = async () => {
+        setSaving(true);
+        try {
+            // First check if tables exist by doing a dummy select
+            const { error: checkErr } = await supabase.from('finance_accounts').select('id').limit(1);
+            if (checkErr) {
+                alert('Las tablas no existen aún. Asegúrate de haber ejecutado el SQL en Supabase (SQL Editor).');
+                return;
+            }
+
+            await supabase.from('finance_accounts').insert([
+                { name: 'Pyme', type: 'bank', initial_balance: 136095.52 },
+                { name: 'Crédito', type: 'credit', initial_balance: 0 },
+                { name: 'Efectivo', type: 'cash', initial_balance: 0 }
+            ]);
+            await supabase.from('finance_categories').insert([
+                { name: 'Nómina', color: 'bg-emerald-100 text-emerald-800', is_deductible: true },
+                { name: 'Pago de Impuestos', color: 'bg-rose-100 text-rose-800', is_deductible: true },
+                { name: 'IMSS', color: 'bg-sky-100 text-sky-800', is_deductible: true },
+                { name: 'TDC', color: 'bg-purple-100 text-purple-800', is_deductible: false },
+                { name: 'Facturas Crédito', color: 'bg-indigo-100 text-indigo-800', is_deductible: true },
+                { name: 'Gastos Deducibles', color: 'bg-amber-100 text-amber-800', is_deductible: true },
+                { name: 'Otros', color: 'bg-slate-100 text-slate-800', is_deductible: false }
+            ]);
+            await fetchData();
+        } catch (err: any) {
+            console.error('Error inicializando:', err);
+            alert('Error inicializando datos: ' + err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
     if (accounts.length === 0) {
         return (
             <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50">
-                <span className="material-symbols-outlined mb-2 text-4xl text-slate-400">warning</span>
+                <span className="material-symbols-outlined mb-2 text-4xl text-slate-400">account_balance</span>
                 <h3 className="text-lg font-bold text-slate-700 dark:text-slate-300">No hay cuentas configuradas</h3>
-                <p className="text-sm text-slate-500">Por favor, aplica la migración SQL de Balance General en la base de datos.</p>
+                <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
+                    Las tablas están creadas, pero faltan los datos iniciales (Cuentas y Categorías).
+                </p>
+                <button 
+                    onClick={handleInitialize}
+                    disabled={saving}
+                    className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:bg-primary-dark transition-colors"
+                >
+                    <span className="material-symbols-outlined text-[18px]">play_arrow</span>
+                    {saving ? 'Inicializando...' : 'Inicializar Cuentas por Defecto'}
+                </button>
             </div>
         );
     }
