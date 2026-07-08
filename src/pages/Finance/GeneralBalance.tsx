@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { FinanceAccount, FinanceCategory, FinanceTransaction, formatCurrencyFin } from '../../types/finance';
 
 export function GeneralBalance() {
     const { user } = useAuth();
+    const navigate = useNavigate();
     
     // Data State
     const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
@@ -339,9 +341,18 @@ export function GeneralBalance() {
         <div className="space-y-6">
             {/* Header & Tabs */}
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Balance General</h1>
-                    <p className="text-sm text-slate-500">Gestión de ingresos, egresos y conciliación bancaria interna.</p>
+                <div className="flex items-center gap-4">
+                    <button 
+                        onClick={() => navigate('/finance')}
+                        className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-primary dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700"
+                        title="Volver a Finanzas"
+                    >
+                        <span className="material-symbols-outlined text-[20px]">arrow_back</span>
+                    </button>
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Balance General</h1>
+                        <p className="text-sm text-slate-500">Gestión de ingresos, egresos y conciliación bancaria interna.</p>
+                    </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-800 dark:bg-slate-900">
                     {accounts.map(acc => (
