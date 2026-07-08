@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { FinanceAccount, FinanceCategory, FinanceTransaction, formatCurrencyFin } from '../../types/finance';
 
 export function GeneralBalance() {
-    const { user } = useAuth();
+    const { user, db: supabase } = useAuth();
     
     // Data State
     const [accounts, setAccounts] = useState<FinanceAccount[]>([]);
