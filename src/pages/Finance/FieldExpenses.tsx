@@ -5,7 +5,7 @@ import { formatCurrencyMXN } from '../../types/projects';
 
 type ExpenseType = keyof typeof EXPENSE_TYPE_LABELS;
 
-const defaultForm = { employee_name: '', expense_type: 'viaticos' as ExpenseType, amount: '', expense_date: new Date().toISOString().split('T')[0], project_id: '', description: '', receipt_url: '' };
+const defaultForm = { employee_name: '', expense_type: 'viaticos' as ExpenseType, amount: '', expense_date: new Date().toISOString().split('T')[0], project_id: '', area_destination: '', payment_method: 'transfer' as 'transfer' | 'card' | 'cash', folio_fiscal: '', description: '', receipt_url: '' };
 
 export default function FieldExpenses() {
     const [expenses, setExpenses] = useState<FieldExpense[]>([]);
@@ -45,18 +45,27 @@ export default function FieldExpenses() {
             amount: parseFloat(form.amount) || 0,
             expense_date: form.expense_date,
             project_id: form.project_id || null,
-            description: form.description || null,
+            area_destination: !form.project_id ? (form.area_destination || null) : null,
+            payment_method: form.payment_method,
+            folio_fiscal: form.folio_fiscal || null,
+            notes: form.description || null,
             receipt_url: form.receipt_url || null,
         };
-        if (editingId) {
-            await supabase.from('field_expenses').update(payload).eq('id', editingId);
-        } else {
-            await supabase.from('field_expenses').insert(payload);
+        try {
+            if (editingId) {
+                const { error } = await supabase.from('field_expenses').update(payload).eq('id', editingId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase.from('field_expenses').insert(payload);
+                if (error) throw error;
+            }
+            setShowForm(false);
+            setEditingId(null);
+            setForm(defaultForm);
+            fetchExpenses();
+        } catch (error: any) {
+            alert('Error al guardar el viático: ' + error.message);
         }
-        setShowForm(false);
-        setEditingId(null);
-        setForm(defaultForm);
-        fetchExpenses();
     };
 
     const handleEdit = (exp: FieldExpense) => {
@@ -66,7 +75,10 @@ export default function FieldExpenses() {
             amount: String(exp.amount),
             expense_date: exp.expense_date,
             project_id: exp.project_id || '',
-            description: exp.description || '',
+            area_destination: exp.area_destination || '',
+            payment_method: exp.payment_method || 'transfer',
+            folio_fiscal: exp.folio_fiscal || '',
+            description: exp.notes || '',
             receipt_url: exp.receipt_url || '',
         });
         setEditingId(exp.id);
@@ -135,14 +147,25 @@ export default function FieldExpenses() {
                                 </div>
                                 <div><label className={labelClass}>Monto *</label><input required type="number" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className={inputClass} placeholder="0.00" /></div>
                                 <div><label className={labelClass}>Fecha *</label><input required type="date" value={form.expense_date} onChange={e => setForm({ ...form, expense_date: e.target.value })} className={inputClass} /></div>
+                                <div><label className={labelClass}>Forma de Pago *</label>
+                                    <select value={form.payment_method} onChange={e => setForm({ ...form, payment_method: e.target.value as any })} className={inputClass}>
+                                        <option value="transfer">Transferencia</option>
+                                        <option value="card">Tarjeta</option>
+                                        <option value="cash">Efectivo</option>
+                                    </select>
+                                </div>
                                 <div><label className={labelClass}>Proyecto</label>
                                     <select value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })} className={inputClass}>
                                         <option value="">— Sin proyecto —</option>
                                         {projects.map(p => <option key={p.id} value={p.id}>{p.project_number} - {p.title}</option>)}
                                     </select>
                                 </div>
+                                {!form.project_id && (
+                                    <div className="col-span-2"><label className={labelClass}>Área / Destino</label><input value={form.area_destination} onChange={e => setForm({ ...form, area_destination: e.target.value })} className={inputClass} placeholder="Ej. Administración, Ventas, Oficina..." /></div>
+                                )}
                                 <div className="col-span-2"><label className={labelClass}>Descripción</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="Detalle del gasto..." /></div>
-                                <div className="col-span-2"><label className={labelClass}>URL Ticket / Recibo</label><input value={form.receipt_url} onChange={e => setForm({ ...form, receipt_url: e.target.value })} className={inputClass} placeholder="https://..." /></div>
+                                <div><label className={labelClass}>Folio Fiscal</label><input value={form.folio_fiscal} onChange={e => setForm({ ...form, folio_fiscal: e.target.value })} className={inputClass} placeholder="Ej. A1234..." /></div>
+                                <div><label className={labelClass}>URL Archivo (Opcional)</label><input value={form.receipt_url} onChange={e => setForm({ ...form, receipt_url: e.target.value })} className={inputClass} placeholder="https://..." /></div>
                             </div>
                             <button type="submit" className="w-full rounded-lg bg-orange-500 py-3 text-sm font-semibold text-white hover:bg-orange-600">{editingId ? 'Actualizar Viático' : 'Guardar Viático'}</button>
                         </form>
@@ -187,7 +210,9 @@ export default function FieldExpenses() {
                                         <th className="px-4 py-3 font-semibold text-slate-500">Fecha</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Responsable</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Concepto</th>
-                                        <th className="px-4 py-3 font-semibold text-slate-500">Proyecto</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500">Proyecto/Área</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Pago</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-center">Folio</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-center">Tkt</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-right">Monto</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-center w-20">Acciones</th>
@@ -206,7 +231,15 @@ export default function FieldExpenses() {
                                             </td>
                                             <td className="px-4 py-3 text-xs text-slate-500">
                                                 {/* @ts-ignore : mapped relation */}
-                                                {e.project ? <span className="font-mono">{e.project.project_number}</span> : '—'}
+                                                {e.project ? <span className="font-mono">{e.project.project_number}</span> : (e.area_destination || '—')}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-xs">
+                                                {e.payment_method === 'transfer' ? <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">Transf</span> :
+                                                 e.payment_method === 'card' ? <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">Tarj</span> :
+                                                 e.payment_method === 'cash' ? <span className="bg-emerald-100 text-emerald-700 px-2 py-1 rounded">Efect</span> : '—'}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-xs text-slate-600 font-mono">
+                                                {e.folio_fiscal || '—'}
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 {e.receipt_url && (

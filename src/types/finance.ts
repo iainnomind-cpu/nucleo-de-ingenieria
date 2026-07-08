@@ -100,3 +100,61 @@ export const AGING_COLORS: Record<AgingBucket, string> = { '0-30': 'from-emerald
 export function formatCurrencyFin(value: number): string {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);
 }
+
+// ==========================================
+// MÓDULO DE BALANCE GENERAL (FINANZAS)
+// ==========================================
+export type AccountType = 'bank' | 'credit' | 'cash';
+export type TransactionType = 'income' | 'expense';
+
+export interface FinanceAccount {
+    id: string;
+    name: string;
+    type: AccountType;
+    initial_balance: number;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface FinanceCategory {
+    id: string;
+    name: string;
+    color: string;
+    is_deductible: boolean;
+    created_at: string;
+}
+
+export interface FinanceTransaction {
+    id: string;
+    account_id: string;
+    category_id: string | null;
+    date: string;
+    description: string;
+    type: TransactionType;
+    amount: number;
+    invoice_number: string | null;
+    rfc: string | null;
+    is_invoiced: boolean;
+    created_by: string | null;
+    created_at: string;
+    updated_at: string;
+    
+    // Virtual relations when fetching
+    category?: FinanceCategory;
+}
+
+// Para el estado y la UI del balance general
+export interface AccountSummary {
+    initial_balance: number;
+    total_income: number;
+    total_expense: number;
+    current_balance: number;
+    
+    // Especiales
+    total_invoiced: number;
+    total_not_invoiced: number;
+    total_deductible: number;
+    
+    // Agrupación de gastos
+    expenses_by_category: Record<string, number>;
+}

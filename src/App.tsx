@@ -29,6 +29,7 @@ import InvoiceDetail from './pages/Finance/InvoiceDetail/InvoiceDetail';
 import FieldExpenses from './pages/Finance/FieldExpenses';
 import VehiclesList from './pages/Fleet/VehiclesList';
 import VehicleDetail from './pages/Fleet/VehicleDetail/VehicleDetail';
+import { GeneralBalance } from './pages/Finance/GeneralBalance';
 import SpaceChat from './pages/Team/SpaceChat';
 import VacationsPlanner from './pages/Team/VacationsPlanner';
 import Inbox from './pages/Team/Inbox';
@@ -134,6 +135,7 @@ function ProtectedApp() {
               <Route path="/finance/invoices" element={<InvoicesList />} />
               <Route path="/finance/invoices/:id" element={<InvoiceDetail />} />
               <Route path="/finance/viaticos" element={<FieldExpenses />} />
+              <Route path="/finance/balance" element={<GeneralBalance />} />
             </>
           )}
           {/* Flotilla */}

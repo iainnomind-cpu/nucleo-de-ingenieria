@@ -85,8 +85,8 @@ export default function InventoryList() {
             return;
         }
 
-        let q = supabase.from('inventory_products').select('*').eq('is_active', true).order('category').order('name');
-        if (filterCat !== 'all') q = q.eq('category', filterCat);
+        let q = supabase.from('inventory_products').select('*').eq('is_active', true).neq('category', 'vehiculos').order('category').order('name');
+        if (filterCat !== 'all' && filterCat !== 'vehiculos') q = q.eq('category', filterCat);
         if (filterArea !== 'all') q = q.eq('area', filterArea);
         if (search.trim()) q = q.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
         
@@ -99,8 +99,8 @@ export default function InventoryList() {
         
         let filtered = (invRes.data as InventoryProduct[]) || [];
         
-        // Add vehicles only when showing ALL categories
-        if (filterCat === 'all') {
+        // Add vehicles only when showing ALL categories AND ALL areas
+        if (filterCat === 'all' && filterArea === 'all') {
             const vehicles = (vehRes.data || []).map(v => ({
                 id: v.id,
                 code: v.plates,
@@ -110,8 +110,8 @@ export default function InventoryList() {
                 subcategory: v.vehicle_type,
                 unit: 'pieza' as ProductUnit,
                 current_stock: 1, min_stock: 1, max_stock: 1,
-                unit_cost: v.acquisition_cost || 0,
-                last_purchase_price: v.acquisition_cost || 0,
+                unit_cost: Number(v.acquisition_cost) || 0,
+                last_purchase_price: Number(v.acquisition_cost) || 0,
                 supplier: null, location: v.assigned_to || '',
                 area: 'vehiculo' as any,
                 criticality: 'normal', is_active: true,
@@ -245,7 +245,7 @@ export default function InventoryList() {
     const totalProducts = products.length;
     const lowStock = products.filter(p => getStockStatus(p) === 'low').length;
     const outOfStock = products.filter(p => getStockStatus(p) === 'out' || getStockStatus(p) === 'critical').length;
-    const totalValue = products.reduce((s, p) => s + (p.current_stock * p.unit_cost), 0);
+    const totalValue = products.reduce((s, p) => s + ((Number(p.current_stock) || 0) * (Number(p.unit_cost) || 0)), 0);
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5';
@@ -257,11 +257,21 @@ export default function InventoryList() {
                     <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-400">Inventario</h2>
                     <p className="mt-1 text-sm text-slate-500">Control de almacén en tiempo real.</p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={openCreateForm}
-                        className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20">
-                        <span className="material-symbols-outlined text-[20px]">add</span>
-                        Nuevo Producto
+                <div className="flex flex-wrap gap-2">
+                    <button onClick={() => navigate('/inventory/monthly-entries')} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-600 hover:bg-emerald-100 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-400">
+                        <span className="material-symbols-outlined text-[18px]">input</span>Entradas del Mes
+                    </button>
+                    <button onClick={() => navigate('/inventory/monthly-exits')} className="flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-medium text-indigo-600 hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-400">
+                        <span className="material-symbols-outlined text-[18px]">output</span>Salidas del Mes
+                    </button>
+                    <button onClick={() => navigate('/inventory/uniforms')} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="material-symbols-outlined text-[18px]">checkroom</span>Uniformes & EPP
+                    </button>
+                    <button onClick={() => navigate('/inventory/purchases')} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="material-symbols-outlined text-[18px]">shopping_cart</span>Compras
+                    </button>
+                    <button onClick={openCreateForm} className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all">
+                        <span className="material-symbols-outlined text-[20px]">add</span>Nuevo Producto
                     </button>
                 </div>
             </div>
@@ -333,6 +343,14 @@ export default function InventoryList() {
                             <>
                                 <div><label className={labelClass}>Subcategoría</label><input value={form.subcategory} onChange={e => setForm({ ...form, subcategory: e.target.value })} className={inputClass} /></div>
                                 <div><label className={labelClass}>Unidad de Medida</label><select value={form.unit} onChange={e => setForm({ ...form, unit: e.target.value as ProductUnit })} className={inputClass}>{(Object.keys(UNIT_LABELS) as ProductUnit[]).map(u => <option key={u} value={u}>{UNIT_LABELS[u]}</option>)}</select></div>
+                                <div><label className={labelClass}>Área</label>
+                                    <select value={form.area} onChange={e => setForm({ ...form, area: e.target.value as InventoryArea })} className={inputClass}>
+                                        <option value="oficina">Oficina</option>
+                                        <option value="bodega">Bodega (Almacén)</option>
+                                        <option value="limpieza_pozos">Limpieza de Pozos</option>
+                                        <option value="equipos_aforo">Equipos de Aforo</option>
+                                    </select>
+                                </div>
                             </>
                         )}
                     </div>

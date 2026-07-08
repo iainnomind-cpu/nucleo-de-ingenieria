@@ -96,10 +96,15 @@ export interface FieldExpense {
     amount: number;
     expense_date: string;
     receipt_url: string | null;
+    payment_method: 'transfer' | 'card' | 'cash' | null;
+    folio_fiscal: string | null;
+    area_destination: string | null;
     authorized_by: string | null;
     notes: string | null;
+    description: string | null;
     created_at: string;
     updated_at: string;
+    project?: { project_number: string; title: string };
 }
 
 export interface ProjectVehicle {

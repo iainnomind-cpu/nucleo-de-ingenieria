@@ -115,6 +115,9 @@ export default function FinanceDashboard() {
                     <p className="mt-1 text-sm text-slate-500">Visibilidad financiera en tiempo real.</p>
                 </div>
                 <div className="flex gap-2">
+                    <button onClick={() => navigate('/finance/balance')} className="flex items-center gap-2 rounded-lg border border-primary/50 bg-primary/10 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/20 transition-colors">
+                        <span className="material-symbols-outlined text-[18px]">account_balance</span>Balance General
+                    </button>
                     <button onClick={() => navigate('/finance/viaticos')} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700">
                         <span className="material-symbols-outlined text-[18px]">receipt_long</span>Viáticos
                     </button>
