@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../lib/AuthContext';
 import { FinanceAccount, FinanceCategory, FinanceTransaction, formatCurrencyFin } from '../../types/finance';
 
 export function GeneralBalance() {
