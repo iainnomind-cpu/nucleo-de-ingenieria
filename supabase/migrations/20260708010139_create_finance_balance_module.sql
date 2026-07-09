@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS finance_transactions (
     invoice_number TEXT,
     rfc TEXT,
     is_invoiced BOOLEAN DEFAULT false,
-    created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_by UUID REFERENCES app_users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
