@@ -192,7 +192,11 @@ export function GeneralBalance() {
             setEditingTrans(null);
             fetchData();
         } catch (error: any) {
-            alert('Error al guardar movimiento: ' + error.message);
+            console.error('Save transaction error:', error);
+            const errorMsg = error?.message || 'Error desconocido';
+            const errorCode = error?.code || '';
+            const errorDetails = error?.details || '';
+            alert(`No se pudo guardar. \nError: ${errorMsg}\nCódigo: ${errorCode}\nDetalles: ${errorDetails}`);
         } finally {
             setSaving(false);
         }
