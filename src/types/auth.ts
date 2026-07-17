@@ -35,7 +35,7 @@ export const MODULE_KEYS = [
     { key: 'quotes', label: 'Cotizaciones', icon: 'request_quote' },
     { key: 'projects', label: 'Proyectos', icon: 'engineering' },
     { key: 'inventory', label: 'Inventario', icon: 'warehouse' },
-    { key: 'maintenance', label: 'Mantenimiento', icon: 'build' },
+    { key: 'maintenance', label: 'Instalación y mantenimiento', icon: 'build' },
     { key: 'finance', label: 'Finanzas', icon: 'account_balance' },
     { key: 'fleet', label: 'Flotilla', icon: 'local_shipping' },
     { key: 'whatsapp', label: 'WhatsApp Mktg', icon: 'chat' },

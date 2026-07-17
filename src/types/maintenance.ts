@@ -1,4 +1,4 @@
-export type EquipmentType = 'variador' | 'ventilador' | 'bomba' | 'motor' | 'tablero' | 'cable' | 'tuberia' | 'pozo' | 'otro';
+export type EquipmentType = 'variador' | 'ventilador' | 'bomba' | 'motor' | 'tablero' | 'cable' | 'tuberia' | 'pozo' | 'arrancador_tension_reducida' | 'arrancador_tension_plena' | 'arrancador_suave' | 'transformador' | 'otro';
 export type EquipmentStatus = 'active' | 'maintenance' | 'inactive' | 'replaced';
 export type ServiceType = 'revision_general' | 'variador' | 'ventilador' | 'termografia' | 'ppm' | 'videograbacion' | 'otro';
 export type ScheduleStatus = 'scheduled' | 'notified' | 'confirmed' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
@@ -34,10 +34,49 @@ export interface InstalledEquipment {
     specs: Record<string, unknown>;
     status: EquipmentStatus;
     notes: string | null;
+    installation_id?: string | null; // Nuevo: ID del formato de maniobra/instalación
     created_at: string;
     updated_at: string;
     access_token?: string;
     client?: { id: string; company_name: string };
+}
+
+export interface WellInstallation {
+    id: string;
+    client_id: string | null;
+    folio: string;
+    installation_date: string;
+    location: string | null;
+    
+    // Datos del Pozo/Ademe
+    ademe_diameter: string | null;
+    ademe_material: string | null;
+    pipe_diameter: string | null;
+    pipe_length: string | null;
+    pipe_segments: number | null;
+    valv_check: number | null;
+    
+    // Datos del Equipo Principal
+    cable_gauge: string | null;
+    motor_hp: string | null;
+    pump_model: string | null;
+    starter_system: string | null;
+    protection_type: string | null;
+    has_ground: boolean;
+    ground_location: string | null;
+    
+    // Niveles
+    static_level: number | null;
+    dynamic_level: number | null;
+    flow_rate: number | null;
+    bottom_depth: number | null;
+    
+    created_by: string | null;
+    created_at: string;
+    updated_at: string;
+    
+    client?: { id: string; company_name: string };
+    equipment?: InstalledEquipment[]; // Relation to fetch linked equipment
 }
 
 export type FunctionalityStatus = 'normal' | 'intermittent' | 'stopped' | 'anomaly';
@@ -133,6 +172,12 @@ export interface VideoRecording {
     static_level: number | null;
     bottom_depth: number | null;
     casing_observations: string | null;
+    
+    // Nuevos campos
+    ademe_material: string | null;
+    ademe_diameter: string | null;
+    slot_type: string | null;
+    
     video_url: string | null;
     created_at: string;
 }
@@ -176,13 +221,37 @@ export interface MaintenanceContract {
 
 // Labels
 export const EQUIPMENT_TYPE_LABELS: Record<EquipmentType, string> = {
-    variador: 'Variador de Frecuencia', ventilador: 'Ventilador', bomba: 'Bomba',
-    motor: 'Motor', tablero: 'Tablero Eléctrico', cable: 'Cable', tuberia: 'Tubería', pozo: 'Pozo de Agua', otro: 'Otro',
+    bomba: 'Bomba Sumergible',
+    motor: 'Motor Eléctrico',
+    variador: 'Variador de Frecuencia',
+    ventilador: 'Ventilador / Extractor',
+    tablero: 'Tablero de Control',
+    cable: 'Cableado',
+    tuberia: 'Tubería de Columna',
+    pozo: 'Equipamiento de Pozo',
+    arrancador_tension_reducida: 'Arrancador a Tensión Reducida',
+    arrancador_tension_plena: 'Arrancador a Tensión Plena',
+    arrancador_suave: 'Arrancador Suave',
+    transformador: 'Transformador',
+    otro: 'Otro',
 };
+
 export const EQUIPMENT_TYPE_ICONS: Record<EquipmentType, string> = {
-    variador: 'speed', ventilador: 'mode_fan', bomba: 'water_pump', motor: 'electric_bolt',
-    tablero: 'electrical_services', cable: 'cable', tuberia: 'plumbing', pozo: 'water_well', otro: 'settings',
+    bomba: 'water_pump',
+    motor: 'settings_input_component',
+    variador: 'speed',
+    ventilador: 'mode_fan',
+    tablero: 'developer_board',
+    cable: 'cable',
+    tuberia: 'plumbing',
+    pozo: 'water_drop',
+    arrancador_tension_reducida: 'bolt',
+    arrancador_tension_plena: 'offline_bolt',
+    arrancador_suave: 'power',
+    transformador: 'electric_meter',
+    otro: 'category',
 };
+
 export const EQUIPMENT_STATUS_LABELS: Record<EquipmentStatus, string> = {
     active: 'Activo', maintenance: 'En Mantenimiento', inactive: 'Inactivo', replaced: 'Reemplazado',
 };

@@ -4,6 +4,12 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
 import { FinanceAccount, FinanceCategory, FinanceTransaction, formatCurrencyFin } from '../../types/finance';
 
+const getLocalDateString = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+};
+
 export function GeneralBalance() {
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -164,7 +170,22 @@ export function GeneralBalance() {
 
     const handleSaveTransaction = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!activeAccountId || !user) return;
+        
+        if (!activeAccountId) {
+            alert('No se ha seleccionado una cuenta bancaria o de efectivo para registrar el movimiento.');
+            return;
+        }
+        if (!user) {
+            alert('No se ha detectado una sesión válida de usuario. Por favor recarga la página.');
+            return;
+        }
+        
+        const numericAmount = Number(transForm.amount);
+        if (isNaN(numericAmount) || numericAmount <= 0) {
+            alert('El monto ingresado no es válido. Debe ser un número mayor a 0.');
+            return;
+        }
+        
         setSaving(true);
         
         const payload = {
@@ -172,7 +193,7 @@ export function GeneralBalance() {
             date: transForm.date,
             description: transForm.description,
             type: transForm.type,
-            amount: Number(transForm.amount),
+            amount: numericAmount,
             category_id: transForm.category_id || null,
             invoice_number: transForm.invoice_number || null,
             rfc: transForm.rfc || null,
@@ -245,7 +266,7 @@ export function GeneralBalance() {
     const openCreateTrans = (type: 'income' | 'expense') => {
         setEditingTrans(null);
         setTransForm({
-            date: new Date().toISOString().split('T')[0],
+            date: getLocalDateString(),
             description: '',
             type,
             amount: '',

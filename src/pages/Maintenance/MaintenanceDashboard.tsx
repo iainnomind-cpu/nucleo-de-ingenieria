@@ -17,6 +17,7 @@ import {
 import GoogleMapView, { MapPin } from '../../components/GoogleMap';
 import { NUCLEO_HQ, PinColor } from '../../lib/maps';
 import MaintenanceCalendar from './MaintenanceCalendar';
+import InstallationsTab from './InstallationsTab';
 import { triggerWaAutomation } from '../../lib/waAutomation';
 
 export default function MaintenanceDashboard() {
@@ -25,7 +26,7 @@ export default function MaintenanceDashboard() {
     const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
     const [warranties, setWarranties] = useState<(EquipmentWarranty & { equipment?: InstalledEquipment })[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<'calendar' | 'equipment' | 'warranties' | 'map' | 'proactive'>('calendar');
+    const [tab, setTab] = useState<'installations' | 'calendar' | 'equipment' | 'warranties' | 'map' | 'proactive'>('installations');
     const [proactiveAlerts, setProactiveAlerts] = useState<ProactiveMaintenanceAlert[]>([]);
     const [sendingWaId, setSendingWaId] = useState<string | null>(null);
     const [showEquipForm, setShowEquipForm] = useState(false);
@@ -120,8 +121,9 @@ export default function MaintenanceDashboard() {
     };
 
     const handleScheduleStatus = async (id: string, status: ScheduleStatus) => {
-        const updates: Record<string, unknown> = { status };
-        let costCreated = false;
+        try {
+            const updates: Record<string, unknown> = { status };
+            let costCreated = false;
         let msgCreated = false;
         let workOrderCreated = false;
 
@@ -162,8 +164,9 @@ export default function MaintenanceDashboard() {
             // Auto-create next schedule
             if (sch) {
                 const nextDate = new Date(sch.next_service_date);
-                nextDate.setMonth(nextDate.getMonth() + sch.frequency_months);
-                await supabase.from('maintenance_schedules').insert({
+                const freq = sch.frequency_months || 6;
+                nextDate.setMonth(nextDate.getMonth() + freq);
+                const autoRes = await supabase.from('maintenance_schedules').insert({
                     equipment_id: sch.equipment_id, client_id: sch.client_id, service_type: sch.service_type,
                     title: sch.title, frequency_months: sch.frequency_months,
                     last_service_date: sch.next_service_date,
@@ -246,6 +249,10 @@ export default function MaintenanceDashboard() {
         }
 
         fetchAll();
+        } catch (error: any) {
+            console.error('Error changing schedule status:', error);
+            alert('No se pudo actualizar el estado del mantenimiento: ' + error.message);
+        }
     };
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
@@ -351,6 +358,7 @@ export default function MaintenanceDashboard() {
             {/* Tabs */}
             <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
                 {[
+                    { key: 'installations', icon: 'plumbing', label: 'Instalaciones / Maniobras' },
                     { key: 'calendar', icon: 'calendar_month', label: `Agenda (${upcoming.length})` },
                     { key: 'proactive', icon: 'track_changes', label: `Proactivo`, badge: proactiveAlerts.length },
                     { key: 'map', icon: 'map', label: 'Mapa' },
@@ -410,6 +418,11 @@ export default function MaintenanceDashboard() {
                         );
                     })()}
                 </div>
+            )}
+
+            {/* TAB: Installations */}
+            {tab === 'installations' && (
+                <InstallationsTab />
             )}
 
             {/* TAB: Calendar */}

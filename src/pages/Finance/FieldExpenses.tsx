@@ -14,8 +14,14 @@ interface Advance {
     notes: string;
 }
 
-const defaultForm = { employee_name: '', expense_type: 'viaticos' as ExpenseType, amount: '', expense_date: new Date().toISOString().split('T')[0], project_id: '', area_destination: '', payment_method: 'transfer' as 'transfer' | 'card' | 'cash', folio_fiscal: '', description: '', receipt_url: '' };
-const defaultAdvanceForm = { employee_name: '', amount: '', date: new Date().toISOString().split('T')[0], notes: '' };
+const getLocalDateString = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+};
+
+const defaultForm = { employee_name: '', expense_type: 'viaticos' as ExpenseType, amount: '', expense_date: getLocalDateString(), project_id: '', area_destination: '', payment_method: 'transfer' as 'transfer' | 'card' | 'cash', folio_fiscal: '', description: '', receipt_url: '' };
+const defaultAdvanceForm = { employee_name: '', amount: '', date: getLocalDateString(), notes: '' };
 
 export default function FieldExpenses() {
     const navigate = useNavigate();
@@ -24,6 +30,7 @@ export default function FieldExpenses() {
     const [advances, setAdvances] = useState<Advance[]>([]);
     const [allTimeExpenses, setAllTimeExpenses] = useState<FieldExpense[]>([]);
     const [allTimeAdvances, setAllTimeAdvances] = useState<Advance[]>([]);
+    const [allTimeBudgets, setAllTimeBudgets] = useState<{ week_start: string; amount: number }[]>([]);
     
     const [projects, setProjects] = useState<{ id: string; project_number: string; title: string }[]>([]);
     const [weeklyBudget, setWeeklyBudget] = useState<{ id: string; amount: number } | null>(null);
@@ -60,7 +67,7 @@ export default function FieldExpenses() {
         setLoading(true);
         const { startStr, endStr } = getWeekRange(weekOffset);
 
-        const [expRes, advRes, allExpRes, allAdvRes, projRes, budgetRes] = await Promise.all([
+        const [expRes, advRes, allExpRes, allAdvRes, projRes, budgetRes, allBudgetsRes] = await Promise.all([
             supabase.from('field_expenses').select('*, project:projects(project_number, title)')
                 .gte('expense_date', startStr)
                 .lte('expense_date', endStr)
@@ -70,9 +77,10 @@ export default function FieldExpenses() {
                 .lte('date', endStr)
                 .order('date', { ascending: false }),
             supabase.from('field_expenses').select('employee_name, amount'),
-            supabase.from('field_advances').select('employee_name, amount'),
+            supabase.from('field_advances').select('employee_name, amount, date'),
             supabase.from('projects').select('id, project_number, title').order('project_number', { ascending: false }),
-            supabase.from('field_weekly_budgets').select('*').eq('week_start', startStr).maybeSingle()
+            supabase.from('field_weekly_budgets').select('*').eq('week_start', startStr).maybeSingle(),
+            supabase.from('field_weekly_budgets').select('week_start, amount')
         ]);
 
         setExpenses((expRes.data as unknown as FieldExpense[]) || []);
@@ -81,6 +89,7 @@ export default function FieldExpenses() {
         setAllTimeAdvances(allAdvRes.data || []);
         setProjects(projRes.data || []);
         setWeeklyBudget(budgetRes.data || null);
+        setAllTimeBudgets(allBudgetsRes.data || []);
         setLoading(false);
     }, [weekOffset, getWeekRange]);
 
@@ -137,7 +146,7 @@ export default function FieldExpenses() {
     };
 
     const handleUpdateBudget = async () => {
-        const amt = prompt('Presupuesto global de caja para la semana (Monto Final):', String(weeklyBudget?.amount || '0'));
+        const amt = prompt('Reposición / Monto Manual agregado a Caja para esta semana:', String(weeklyBudget?.amount || '0'));
         if (amt === null) return;
         const val = parseFloat(amt) || 0;
         const { startStr } = getWeekRange(weekOffset);
@@ -167,9 +176,18 @@ export default function FieldExpenses() {
     };
 
     // Calculations
+    const { start, end, startStr } = getWeekRange(weekOffset);
     const weekTotalExpenses = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const weekTotalAdvances = advances.reduce((s, e) => s + Number(e.amount), 0);
-    const cajaAmount = weeklyBudget ? Number(weeklyBudget.amount) : 0;
+    
+    const manualReplenish = weeklyBudget ? Number(weeklyBudget.amount) : 0;
+    
+    // Calculate carried over amount: Sum of all budgets before startStr - Sum of all advances before startStr
+    const pastBudgets = allTimeBudgets.filter(b => b.week_start < startStr).reduce((s, b) => s + Number(b.amount), 0);
+    const pastAdvances = allTimeAdvances.filter(a => a.date < startStr).reduce((s, a) => s + Number(a.amount), 0);
+    const carriedOver = pastBudgets - pastAdvances;
+    
+    const cajaAmount = carriedOver + manualReplenish;
     const cajaRemaining = cajaAmount - weekTotalAdvances;
 
     // Employee Balances (All Time)
@@ -186,7 +204,6 @@ export default function FieldExpenses() {
         empBalances[k].balance = empBalances[k].assigned - empBalances[k].spent;
     });
 
-    const { start, end } = getWeekRange(weekOffset);
     const weekLabel = `Semana del ${start.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} al ${end.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}`;
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
