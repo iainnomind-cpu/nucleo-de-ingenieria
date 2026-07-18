@@ -82,8 +82,10 @@ export function GeneralBalance() {
             setCategories(catData || []);
 
             // Fetch Transactions for current month
+            const [yearStr, monthStr] = filterMonth.split('-');
             const startDate = `${filterMonth}-01`;
-            const endDate = new Date(new Date(startDate).getFullYear(), new Date(startDate).getMonth() + 1, 0).toISOString().split('T')[0];
+            const endDay = new Date(parseInt(yearStr, 10), parseInt(monthStr, 10), 0).getDate();
+            const endDate = `${filterMonth}-${String(endDay).padStart(2, '0')}`;
             
             const { data: transData, error: transErr } = await supabase
                 .from('finance_transactions')
