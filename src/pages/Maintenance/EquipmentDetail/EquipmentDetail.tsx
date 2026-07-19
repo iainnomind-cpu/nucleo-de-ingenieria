@@ -38,6 +38,7 @@ export default function EquipmentDetail() {
     const [config, setConfig] = useState({ max_voltage_unbalance: 3, max_amperage_unbalance: 10 });
     const [warForm, setWarForm] = useState({ warranty_type: 'supplier' as WarrantyType, provider: '', start_date: '', end_date: '', coverage: '' });
     const [videoForm, setVideoForm] = useState({
+        id: '',
         recording_date: new Date().toISOString().split('T')[0], recorded_by: '',
         grid_depth: '', static_level: '', bottom_depth: '', casing_observations: '', video_url: '',
         ademe_material: '', ademe_diameter: '', slot_type: ''
@@ -97,7 +98,7 @@ export default function EquipmentDetail() {
 
     const handleAddVideo = async (e: React.FormEvent) => {
         e.preventDefault();
-        await supabase.from('video_recordings').insert({
+        const payload = {
             equipment_id: id,
             recording_date: videoForm.recording_date,
             recorded_by: videoForm.recorded_by || null,
@@ -109,9 +110,16 @@ export default function EquipmentDetail() {
             ademe_material: videoForm.ademe_material || null,
             ademe_diameter: videoForm.ademe_diameter || null,
             slot_type: videoForm.slot_type || null,
-        });
+        };
+
+        if (videoForm.id) {
+            await supabase.from('video_recordings').update(payload).eq('id', videoForm.id);
+        } else {
+            await supabase.from('video_recordings').insert(payload);
+        }
+        
         setShowVideoForm(false);
-        setVideoForm({ recording_date: new Date().toISOString().split('T')[0], recorded_by: '', grid_depth: '', static_level: '', bottom_depth: '', casing_observations: '', video_url: '', ademe_material: '', ademe_diameter: '', slot_type: '' });
+        setVideoForm({ id: '', recording_date: new Date().toISOString().split('T')[0], recorded_by: '', grid_depth: '', static_level: '', bottom_depth: '', casing_observations: '', video_url: '', ademe_material: '', ademe_diameter: '', slot_type: '' });
         fetchAll();
     };
 
@@ -248,6 +256,7 @@ export default function EquipmentDetail() {
                                         <th className="px-3 py-2 text-left font-semibold text-slate-500">Por</th>
                                         <th className="px-2 py-2 text-center font-semibold text-slate-500" title="Fotos">📷</th>
                                         {MONITORING_FIELDS.map(f => <th key={f.key} className="px-2 py-2 text-right font-semibold text-slate-500" title={f.label}>{f.label.substring(0, 8)}</th>)}
+                                        <th className="px-2 py-2 text-right font-semibold text-slate-500">Acciones</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -269,6 +278,11 @@ export default function EquipmentDetail() {
                                                 const val = (log as unknown as Record<string, number | null>)[f.key];
                                                 return <td key={f.key} className="px-2 py-2 text-right text-slate-600 dark:text-slate-300">{val != null ? val : '—'}</td>;
                                             })}
+                                            <td className="px-2 py-2 text-right">
+                                                <button onClick={(e) => { e.stopPropagation(); setSelectedLog(log); setShowLogForm(true); }} className="text-slate-400 hover:text-primary transition-colors">
+                                                    <span className="material-symbols-outlined text-[16px]">edit</span>
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -426,11 +440,31 @@ export default function EquipmentDetail() {
                                         <div className="flex-1 space-y-2">
                                             <div className="flex items-center justify-between">
                                                 <p className="font-bold text-sm text-slate-900 dark:text-white">{new Date(v.recording_date + 'T00:00:00').toLocaleDateString('es-MX')} — {v.recorded_by || 'Operador n/a'}</p>
-                                                {v.video_url && (
-                                                    <a href={v.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-600 hover:bg-sky-100 dark:bg-sky-900/20 dark:hover:bg-sky-900/40">
-                                                        <span className="material-symbols-outlined text-[14px]">play_circle</span> Ver Video
-                                                    </a>
-                                                )}
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => {
+                                                        setVideoForm({
+                                                            id: v.id,
+                                                            recording_date: v.recording_date,
+                                                            recorded_by: v.recorded_by || '',
+                                                            grid_depth: v.grid_depth?.toString() || '',
+                                                            static_level: v.static_level?.toString() || '',
+                                                            bottom_depth: v.bottom_depth?.toString() || '',
+                                                            casing_observations: v.casing_observations || '',
+                                                            video_url: v.video_url || '',
+                                                            ademe_material: v.ademe_material || '',
+                                                            ademe_diameter: v.ademe_diameter || '',
+                                                            slot_type: v.slot_type || ''
+                                                        });
+                                                        setShowVideoForm(true);
+                                                    }} className="flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700">
+                                                        <span className="material-symbols-outlined text-[14px]">edit</span> Editar
+                                                    </button>
+                                                    {v.video_url && (
+                                                        <a href={v.video_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 rounded bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-600 hover:bg-sky-100 dark:bg-sky-900/20 dark:hover:bg-sky-900/40">
+                                                            <span className="material-symbols-outlined text-[14px]">play_circle</span> Ver Video
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 rounded bg-slate-50 p-3 text-xs dark:bg-slate-800/50 mt-2">

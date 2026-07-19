@@ -1,6 +1,6 @@
 export type EquipmentType = 'variador' | 'ventilador' | 'bomba' | 'motor' | 'tablero' | 'cable' | 'tuberia' | 'pozo' | 'arrancador_tension_reducida' | 'arrancador_tension_plena' | 'arrancador_suave' | 'transformador' | 'otro';
 export type EquipmentStatus = 'active' | 'maintenance' | 'inactive' | 'replaced';
-export type ServiceType = 'revision_general' | 'variador' | 'ventilador' | 'termografia' | 'ppm' | 'videograbacion' | 'otro';
+export type ServiceType = 'revision_general' | 'variador' | 'ventilador' | 'termografia' | 'ppm' | 'videograbacion' | 'instalacion' | 'maniobra' | 'aforo' | 'mantenimiento' | 'otro';
 export type ScheduleStatus = 'scheduled' | 'notified' | 'confirmed' | 'in_progress' | 'completed' | 'overdue' | 'cancelled';
 export type WarrantyType = 'supplier' | 'nucleo';
 export type WarrantyStatus = 'active' | 'expired' | 'claimed' | 'void';
@@ -113,7 +113,7 @@ export const FUNCTIONALITY_STATUS_COLORS: Record<FunctionalityStatus, { bg: stri
 
 export interface MaintenanceSchedule {
     id: string;
-    equipment_id: string;
+    equipment_id: string | null;
     client_id: string | null;
     service_type: ServiceType;
     title: string;
@@ -122,7 +122,8 @@ export interface MaintenanceSchedule {
     last_service_date: string | null;
     next_service_date: string;
     alert_days_before: number;
-    assigned_to: string | null;
+    assigned_to: string | null; // This represents personnel/quienes irían
+    departure_time?: string | null;
     status: ScheduleStatus;
     completed_at: string | null;
     completion_notes: string | null;
@@ -264,14 +265,28 @@ export const EQUIPMENT_STATUS_COLORS: Record<EquipmentStatus, { bg: string; text
 
 export const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
     revision_general: 'Revisión General', variador: 'Variador de Frecuencia', ventilador: 'Ventilador',
-    termografia: 'Termografía', ppm: 'Prueba PPM', videograbacion: 'Videograbación', otro: 'Otro',
+    termografia: 'Termografía',
+    ppm: 'PPM',
+    videograbacion: 'Videograbación',
+    instalacion: 'Instalación',
+    maniobra: 'Maniobra',
+    aforo: 'Aforo',
+    mantenimiento: 'Mantenimiento General',
+    otro: 'Otro'
 };
 export const SERVICE_TYPE_ICONS: Record<ServiceType, string> = {
     revision_general: 'checklist', variador: 'speed', ventilador: 'mode_fan',
-    termografia: 'device_thermostat', ppm: 'science', videograbacion: 'videocam', otro: 'build',
+    termografia: 'thermostat',
+    ppm: 'science',
+    videograbacion: 'videocam',
+    instalacion: 'build',
+    maniobra: 'engineering',
+    aforo: 'water_drop',
+    mantenimiento: 'plumbing',
+    otro: 'build'
 };
 export const SERVICE_FREQUENCY: Record<ServiceType, number> = {
-    revision_general: 1, variador: 12, ventilador: 8, termografia: 6, ppm: 3, videograbacion: 12, otro: 12,
+    revision_general: 1, variador: 12, ventilador: 8, termografia: 6, ppm: 3, videograbacion: 12, instalacion: 12, maniobra: 12, aforo: 12, mantenimiento: 12, otro: 12,
 };
 
 export const SCHEDULE_STATUS_LABELS: Record<ScheduleStatus, string> = {

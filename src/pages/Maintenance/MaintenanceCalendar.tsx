@@ -349,8 +349,14 @@ function DayScheduleCard({ schedule: s, isExpanded, onToggle, onStatusChange }: 
                 <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-slate-900 dark:text-white truncate">{s.title || SERVICE_TYPE_LABELS[s.service_type]}</p>
                     <div className="flex items-center gap-1.5 mt-0.5 text-[11px] text-slate-400">
-                        {s.equipment?.well_name && <span>{s.equipment.well_name}</span>}
-                        {s.equipment?.name && <><span>·</span><span className="truncate">{s.equipment.name}</span></>}
+                        {s.equipment ? (
+                            <>
+                                {s.equipment.well_name && <span>{s.equipment.well_name}</span>}
+                                {s.equipment.name && <><span>·</span><span className="truncate">{s.equipment.name}</span></>}
+                            </>
+                        ) : (
+                            <span className="font-medium text-slate-500">Actividad General</span>
+                        )}
                     </div>
                 </div>
                 <div className="text-right shrink-0">
@@ -381,6 +387,12 @@ function DayScheduleCard({ schedule: s, isExpanded, onToggle, onStatusChange }: 
                                 {days < 0 ? `${Math.abs(days)} días vencido` : days === 0 ? 'Hoy' : `En ${days} días`}
                             </span>
                         </div>
+                        {s.departure_time && (
+                            <div className="flex items-center gap-2 text-slate-500">
+                                <span className="material-symbols-outlined text-[14px]">timer</span>
+                                <span>Salida: <strong className="text-slate-700 dark:text-slate-300">{s.departure_time.substring(0, 5)} hrs</strong></span>
+                            </div>
+                        )}
                         {s.frequency_months && (
                             <div className="flex items-center gap-2 text-slate-500">
                                 <span className="material-symbols-outlined text-[14px]">repeat</span>

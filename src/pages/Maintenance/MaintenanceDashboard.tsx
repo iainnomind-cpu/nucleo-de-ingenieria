@@ -40,7 +40,7 @@ export default function MaintenanceDashboard() {
     // Schedule form
     const [schForm, setSchForm] = useState({
         equipment_id: '', service_type: 'revision_general' as ServiceType, title: '', next_service_date: '',
-        assigned_to: '', alert_days_before: '15',
+        assigned_to: '', alert_days_before: '15', departure_time: '', description: ''
     });
 
     const [clients, setClients] = useState<{ id: string; company_name: string }[]>([]);
@@ -91,12 +91,14 @@ export default function MaintenanceDashboard() {
 
     const handleAddSchedule = async (e: React.FormEvent) => {
         e.preventDefault();
-        const eq = equipment.find(e => e.id === schForm.equipment_id);
-        await supabase.from('maintenance_schedules').insert({
-            equipment_id: schForm.equipment_id, client_id: eq?.client_id || null,
+        const eq = schForm.equipment_id ? equipment.find(e => e.id === schForm.equipment_id) : null;
+        const res = await supabase.from('maintenance_schedules').insert({
+            equipment_id: schForm.equipment_id || null, client_id: eq?.client_id || null,
             service_type: schForm.service_type, title: schForm.title || SERVICE_TYPE_LABELS[schForm.service_type],
-            frequency_months: SERVICE_FREQUENCY[schForm.service_type],
+            description: schForm.description || null,
+            frequency_months: SERVICE_FREQUENCY[schForm.service_type] || 12,
             next_service_date: schForm.next_service_date, assigned_to: schForm.assigned_to || null,
+            departure_time: schForm.departure_time || null,
             alert_days_before: parseInt(schForm.alert_days_before) || 15,
         }).select().single();
 
@@ -116,7 +118,7 @@ export default function MaintenanceDashboard() {
         }
 
         setShowScheduleForm(false);
-        setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15' });
+        setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '' });
         fetchAll();
     };
 
@@ -326,7 +328,7 @@ export default function MaintenanceDashboard() {
                         <div className="mb-6 flex items-center justify-between">
                             <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
                                 <span className="material-symbols-outlined text-primary text-[22px]">calendar_add_on</span>
-                                Programar Mantenimiento
+                                Programar Actividad del Día
                             </h3>
                             <button onClick={() => setShowScheduleForm(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"><span className="material-symbols-outlined text-[20px]">close</span></button>
                         </div>
@@ -340,15 +342,17 @@ export default function MaintenanceDashboard() {
                         )}
                         <form onSubmit={handleAddSchedule}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                                <div className="md:col-span-2"><label className={labelClass}>Equipo *</label><select value={schForm.equipment_id} onChange={e => setSchForm({ ...schForm, equipment_id: e.target.value })} required className={inputClass}><option value="">Seleccionar equipo...</option>{equipment.map(eq => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}</select></div>
+                                <div className="md:col-span-2"><label className={labelClass}>Equipo (Opcional para actividades generales)</label><select value={schForm.equipment_id} onChange={e => setSchForm({ ...schForm, equipment_id: e.target.value })} className={inputClass}><option value="">Sin equipo / Actividad general</option>{equipment.map(eq => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}</select></div>
                                 <div><label className={labelClass}>Tipo Servicio</label><select value={schForm.service_type} onChange={e => setSchForm({ ...schForm, service_type: e.target.value as ServiceType, title: SERVICE_TYPE_LABELS[e.target.value as ServiceType] })} className={inputClass}>{(Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]).map(t => <option key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</option>)}</select></div>
                                 <div><label className={labelClass}>Próxima Fecha *</label><input type="date" value={schForm.next_service_date} onChange={e => setSchForm({ ...schForm, next_service_date: e.target.value })} required className={inputClass} /></div>
                                 <div><label className={labelClass}>Título (opcional)</label><input value={schForm.title} onChange={e => setSchForm({ ...schForm, title: e.target.value })} placeholder="Se auto-genera del tipo de servicio" className={inputClass} /></div>
-                                <div><label className={labelClass}>Asignado a</label><input value={schForm.assigned_to} onChange={e => setSchForm({ ...schForm, assigned_to: e.target.value })} placeholder="Nombre del técnico" className={inputClass} /></div>
+                                <div><label className={labelClass}>Asignado a / Personal</label><input value={schForm.assigned_to} onChange={e => setSchForm({ ...schForm, assigned_to: e.target.value })} placeholder="Ej. Juan, Pedro, Luis" className={inputClass} /></div>
+                                <div><label className={labelClass}>Hora de salida</label><input type="time" value={schForm.departure_time} onChange={e => setSchForm({ ...schForm, departure_time: e.target.value })} className={inputClass} /></div>
+                                <div className="md:col-span-2"><label className={labelClass}>¿Qué harán? (Detalles)</label><textarea value={schForm.description} onChange={e => setSchForm({ ...schForm, description: e.target.value })} placeholder="Actividades a realizar..." rows={2} className={inputClass} /></div>
                             </div>
                             <div className="mt-6 flex justify-end gap-3">
                                 <button type="button" onClick={() => setShowScheduleForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">Cancelar</button>
-                                <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">Programar Servicio</button>
+                                <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">Programar Actividad</button>
                             </div>
                         </form>
                     </div>
