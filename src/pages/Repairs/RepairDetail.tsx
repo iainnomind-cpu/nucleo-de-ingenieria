@@ -36,6 +36,7 @@ export default function RepairDetail() {
     const [editSection, setEditSection] = useState<string | null>(null);
     const [editData, setEditData] = useState<Record<string, any>>({});
     const [afterPhotos, setAfterPhotos] = useState<PhotoAttachment[]>([]);
+    const [deliveryPhotos, setDeliveryPhotos] = useState<PhotoAttachment[]>([]);
 
     const fetchAll = useCallback(async () => {
         if (!id) return;
@@ -50,7 +51,9 @@ export default function RepairDetail() {
             supabase.from('clients').select('id, company_name').order('company_name'),
         ]);
         if (!rRes.data) { navigate('/repairs'); return; }
-        setRepair(rRes.data as EquipmentRepair);
+        const repairData = rRes.data as EquipmentRepair;
+        setRepair(repairData);
+        setDeliveryPhotos((repairData.delivery_photos as PhotoAttachment[]) || []);
         setParts((pRes.data as RepairPart[]) || []);
         setTimeline((tRes.data as RepairTimelineEvent[]) || []);
         setCarriers((cRes.data as ShippingCarrier[]) || []);
@@ -517,6 +520,31 @@ export default function RepairDetail() {
                                 <InfoField label="Notas" value={repair.delivery_notes} />
                             </div>
                         )}
+
+                        {/* Fotos de Entrega — siempre visibles desde que se marca 'delivered' */}
+                        {(repair.status === 'delivered' || repair.status === 'invoiced' || repair.status === 'completed') && (
+                            <div className="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-700/60">
+                                <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-lime-600 text-[16px]">photo_camera</span>
+                                    Evidencia fotográfica de entrega
+                                </p>
+                                {deliveryPhotos.length > 0
+                                    ? <PhotoGallery photos={deliveryPhotos} />
+                                    : null}
+                                <div className="mt-2">
+                                    <PhotoUploader
+                                        photos={deliveryPhotos}
+                                        onPhotosChange={async (photos) => {
+                                            setDeliveryPhotos(photos);
+                                            await supabase.from('equipment_repairs').update({ delivery_photos: photos }).eq('id', repair.id);
+                                        }}
+                                        folder={`repairs/delivery/${id}`}
+                                        uploaderName="Evidencia Entrega"
+                                        compact
+                                    />
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Step 10: Facturación */}
@@ -632,7 +660,7 @@ export default function RepairDetail() {
 
             {/* TAB: Photos */}
             {tab === 'photos' && (
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
                     <div className={sectionClass}>
                         <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-red-500 text-[18px]">photo_camera</span>Antes (Problema)</h4>
                         {repair.photos_before && (repair.photos_before as unknown[]).length > 0
@@ -646,6 +674,27 @@ export default function RepairDetail() {
                             : isActive
                             ? <PhotoUploader photos={afterPhotos} onPhotosChange={async (photos) => { setAfterPhotos(photos); await supabase.from('equipment_repairs').update({ photos_after: photos }).eq('id', repair.id); }} folder={`repairs/after/${id}`} uploaderName="Técnico" compact />
                             : <p className="text-sm text-slate-400 py-6 text-center">Sin fotos</p>}
+                    </div>
+                    <div className={sectionClass}>
+                        <h4 className="text-sm font-bold text-lime-700 dark:text-lime-400 mb-3 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-lime-600 text-[18px]">assignment_turned_in</span>
+                            Evidencia de Entrega al Cliente
+                        </h4>
+                        {deliveryPhotos.length > 0
+                            ? <PhotoGallery photos={deliveryPhotos} />
+                            : <p className="text-sm text-slate-400 py-4 text-center">Sin fotos de entrega</p>}
+                        <div className="mt-3 border-t border-slate-200/60 pt-3 dark:border-slate-700/60">
+                            <PhotoUploader
+                                photos={deliveryPhotos}
+                                onPhotosChange={async (photos) => {
+                                    setDeliveryPhotos(photos);
+                                    await supabase.from('equipment_repairs').update({ delivery_photos: photos }).eq('id', repair.id);
+                                }}
+                                folder={`repairs/delivery/${id}`}
+                                uploaderName="Entrega"
+                                compact
+                            />
+                        </div>
                     </div>
                 </div>
             )}

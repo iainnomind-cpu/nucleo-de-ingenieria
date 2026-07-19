@@ -72,6 +72,7 @@ export interface EquipmentRepair {
     // 9) Entrega
     delivery_date: string | null;
     delivery_notes: string | null;
+    delivery_photos: unknown[];
     // 10) Facturación
     invoice_number: string | null;
     invoice_date: string | null;

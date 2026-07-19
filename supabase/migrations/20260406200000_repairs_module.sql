@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS equipment_repairs (
     -- 9) ENTREGA AL CLIENTE
     delivery_date DATE,
     delivery_notes TEXT,
+    delivery_photos JSONB DEFAULT '[]'::jsonb,
 
     -- 10) FACTURACIÓN
     invoice_number TEXT,
