@@ -18,6 +18,7 @@ import GoogleMapView, { MapPin } from '../../components/GoogleMap';
 import { NUCLEO_HQ, PinColor } from '../../lib/maps';
 import MaintenanceCalendar from './MaintenanceCalendar';
 import InstallationsTab from './InstallationsTab';
+import VideoRecordingTab from './VideoRecordingTab';
 import { triggerWaAutomation } from '../../lib/waAutomation';
 
 export default function MaintenanceDashboard() {
@@ -26,11 +27,12 @@ export default function MaintenanceDashboard() {
     const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
     const [warranties, setWarranties] = useState<(EquipmentWarranty & { equipment?: InstalledEquipment })[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<'installations' | 'calendar' | 'equipment' | 'warranties' | 'map' | 'proactive'>('installations');
+    const [tab, setTab] = useState<'installations' | 'calendar' | 'video' | 'equipment' | 'warranties' | 'map' | 'proactive'>('installations');
     const [proactiveAlerts, setProactiveAlerts] = useState<ProactiveMaintenanceAlert[]>([]);
     const [sendingWaId, setSendingWaId] = useState<string | null>(null);
     const [showEquipForm, setShowEquipForm] = useState(false);
     const [showScheduleForm, setShowScheduleForm] = useState(false);
+    const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
 
     // Equipment form
     const [eqForm, setEqForm] = useState({
@@ -92,34 +94,64 @@ export default function MaintenanceDashboard() {
     const handleAddSchedule = async (e: React.FormEvent) => {
         e.preventDefault();
         const eq = schForm.equipment_id ? equipment.find(e => e.id === schForm.equipment_id) : null;
-        const res = await supabase.from('maintenance_schedules').insert({
-            equipment_id: schForm.equipment_id || null, client_id: eq?.client_id || null,
-            service_type: schForm.service_type, title: schForm.title || SERVICE_TYPE_LABELS[schForm.service_type],
-            description: schForm.description || null,
-            frequency_months: SERVICE_FREQUENCY[schForm.service_type] || 12,
-            next_service_date: schForm.next_service_date, assigned_to: schForm.assigned_to || null,
-            departure_time: schForm.departure_time || null,
-            alert_days_before: parseInt(schForm.alert_days_before) || 15,
-        }).select().single();
 
-        if (res.data) {
-            triggerWaAutomation({
-                module: 'maintenance',
-                event: 'upcoming', // Agendar mantenimiento
-                record: {
-                    title: res.data.title,
-                    service_type: res.data.service_type,
-                    assigned_to: res.data.assigned_to,
-                    equipment_name: eq?.name || '',
-                    next_service_date: res.data.next_service_date
-                },
-                referenceId: res.data.id
-            });
+        if (editingScheduleId) {
+            // UPDATE existing schedule
+            await supabase.from('maintenance_schedules').update({
+                equipment_id: schForm.equipment_id || null, client_id: eq?.client_id || null,
+                service_type: schForm.service_type, title: schForm.title || SERVICE_TYPE_LABELS[schForm.service_type],
+                description: schForm.description || null,
+                next_service_date: schForm.next_service_date, assigned_to: schForm.assigned_to || null,
+                departure_time: schForm.departure_time || null,
+                alert_days_before: parseInt(schForm.alert_days_before) || 15,
+            }).eq('id', editingScheduleId);
+        } else {
+            // INSERT new schedule
+            const res = await supabase.from('maintenance_schedules').insert({
+                equipment_id: schForm.equipment_id || null, client_id: eq?.client_id || null,
+                service_type: schForm.service_type, title: schForm.title || SERVICE_TYPE_LABELS[schForm.service_type],
+                description: schForm.description || null,
+                frequency_months: SERVICE_FREQUENCY[schForm.service_type] || 12,
+                next_service_date: schForm.next_service_date, assigned_to: schForm.assigned_to || null,
+                departure_time: schForm.departure_time || null,
+                alert_days_before: parseInt(schForm.alert_days_before) || 15,
+            }).select().single();
+
+            if (res.data) {
+                triggerWaAutomation({
+                    module: 'maintenance',
+                    event: 'upcoming',
+                    record: {
+                        title: res.data.title,
+                        service_type: res.data.service_type,
+                        assigned_to: res.data.assigned_to,
+                        equipment_name: eq?.name || '',
+                        next_service_date: res.data.next_service_date
+                    },
+                    referenceId: res.data.id
+                });
+            }
         }
 
         setShowScheduleForm(false);
+        setEditingScheduleId(null);
         setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '' });
         fetchAll();
+    };
+
+    const handleEditSchedule = (s: MaintenanceSchedule) => {
+        setEditingScheduleId(s.id);
+        setSchForm({
+            equipment_id: s.equipment_id || '',
+            service_type: s.service_type,
+            title: s.title || '',
+            next_service_date: s.next_service_date,
+            assigned_to: s.assigned_to || '',
+            alert_days_before: String(s.alert_days_before || 15),
+            departure_time: s.departure_time || '',
+            description: s.description || '',
+        });
+        setShowScheduleForm(true);
     };
 
     const handleScheduleStatus = async (id: string, status: ScheduleStatus) => {
@@ -328,9 +360,9 @@ export default function MaintenanceDashboard() {
                         <div className="mb-6 flex items-center justify-between">
                             <h3 className="flex items-center gap-2 text-lg font-bold text-slate-900 dark:text-white">
                                 <span className="material-symbols-outlined text-primary text-[22px]">calendar_add_on</span>
-                                Programar Actividad del Día
+                                {editingScheduleId ? 'Editar Programación' : 'Programar Actividad del Día'}
                             </h3>
-                            <button onClick={() => setShowScheduleForm(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"><span className="material-symbols-outlined text-[20px]">close</span></button>
+                            <button onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '' }); }} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"><span className="material-symbols-outlined text-[20px]">close</span></button>
                         </div>
                         {schForm.next_service_date && (
                             <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2.5 dark:bg-primary/20">
@@ -351,8 +383,8 @@ export default function MaintenanceDashboard() {
                                 <div className="md:col-span-2"><label className={labelClass}>¿Qué harán? (Detalles)</label><textarea value={schForm.description} onChange={e => setSchForm({ ...schForm, description: e.target.value })} placeholder="Actividades a realizar..." rows={2} className={inputClass} /></div>
                             </div>
                             <div className="mt-6 flex justify-end gap-3">
-                                <button type="button" onClick={() => setShowScheduleForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">Cancelar</button>
-                                <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">Programar Actividad</button>
+                                <button type="button" onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '' }); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">{editingScheduleId ? 'Guardar Cambios' : 'Programar Actividad'}</button>
                             </div>
                         </form>
                     </div>
@@ -364,6 +396,7 @@ export default function MaintenanceDashboard() {
                 {[
                     { key: 'installations', icon: 'plumbing', label: 'Instalaciones / Maniobras' },
                     { key: 'calendar', icon: 'calendar_month', label: `Agenda (${upcoming.length})` },
+                    { key: 'video', icon: 'videocam', label: 'Videograbación' },
                     { key: 'proactive', icon: 'track_changes', label: `Proactivo`, badge: proactiveAlerts.length },
                     { key: 'map', icon: 'map', label: 'Mapa' },
                     { key: 'equipment', icon: 'precision_manufacturing', label: `Equipos (${equipment.length})` },
@@ -429,11 +462,19 @@ export default function MaintenanceDashboard() {
                 <InstallationsTab />
             )}
 
+            {/* TAB: Video */}
+            {tab === 'video' && (
+                <div className="rounded-xl border border-slate-200/60 bg-white/50 p-6 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
+                    <VideoRecordingTab />
+                </div>
+            )}
+
             {/* TAB: Calendar */}
             {tab === 'calendar' && (
                 <MaintenanceCalendar
                     schedules={schedules.filter(s => s.status !== 'cancelled')}
                     onStatusChange={handleScheduleStatus}
+                    onEdit={handleEditSchedule}
                     onDayClick={(date) => {
                         setSchForm({ ...schForm, next_service_date: date });
                         setShowScheduleForm(true);
@@ -723,7 +764,7 @@ export default function MaintenanceDashboard() {
 }
 
 // Schedule Card Component
-function ScheduleCard({ schedule: s, onStatusChange }: { schedule: MaintenanceSchedule; onStatusChange: (id: string, status: ScheduleStatus) => void }) {
+function ScheduleCard({ schedule: s, onStatusChange, onEdit }: { schedule: MaintenanceSchedule; onStatusChange: (id: string, status: ScheduleStatus) => void; onEdit: (s: MaintenanceSchedule) => void }) {
     const days = getDaysUntil(s.next_service_date);
     return (
         <div className="flex items-center gap-4 rounded-lg border border-slate-200/60 p-4 transition-colors hover:bg-slate-50/50 dark:border-slate-700/60 dark:hover:bg-slate-800/30">
@@ -734,11 +775,12 @@ function ScheduleCard({ schedule: s, onStatusChange }: { schedule: MaintenanceSc
                 <p className="font-medium text-sm text-slate-900 dark:text-white">{s.title}</p>
                 <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
                     {s.equipment?.well_name && <span>{s.equipment.well_name}</span>}
-                    <span>·</span>
-                    <span>{s.equipment?.name}</span>
+                    {s.equipment?.name && <><span>·</span><span>{s.equipment.name}</span></>}
                     {s.assigned_to && <><span>·</span><span>{s.assigned_to}</span></>}
                     {s.client?.company_name && <><span>·</span><span>{s.client.company_name}</span></>}
+                    {s.departure_time && <><span>·</span><span className="font-semibold text-sky-500">Salida: {s.departure_time.substring(0,5)}</span></>}
                 </div>
+                {s.description && <p className="mt-0.5 text-xs text-slate-400 italic truncate">{s.description}</p>}
             </div>
             <div className="text-right shrink-0">
                 <p className={`text-sm font-bold ${getUrgencyColor(days)}`}>{days < 0 ? `${Math.abs(days)}d vencido` : days === 0 ? 'Hoy' : `${days}d`}</p>
@@ -746,9 +788,10 @@ function ScheduleCard({ schedule: s, onStatusChange }: { schedule: MaintenanceSc
             </div>
             <span className={`rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${SCHEDULE_STATUS_COLORS[s.status].bg} ${SCHEDULE_STATUS_COLORS[s.status].text}`}>{SCHEDULE_STATUS_LABELS[s.status]}</span>
             <div className="flex gap-1 shrink-0">
+                <button onClick={() => onEdit(s)} className="rounded p-1 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar programación"><span className="material-symbols-outlined text-[18px]">edit</span></button>
                 {s.status === 'scheduled' && <button onClick={() => onStatusChange(s.id, 'confirmed')} className="rounded p-1 text-indigo-500 hover:bg-indigo-50" title="Confirmar"><span className="material-symbols-outlined text-[18px]">check</span></button>}
                 {(s.status === 'confirmed' || s.status === 'notified') && <button onClick={() => onStatusChange(s.id, 'in_progress')} className="rounded p-1 text-amber-500 hover:bg-amber-50" title="Iniciar"><span className="material-symbols-outlined text-[18px]">play_arrow</span></button>}
-                {s.status === 'in_progress' && <button onClick={() => onStatusChange(s.id, 'completed')} className="rounded p-1 text-emerald-500 hover:bg-emerald-50" title="Completar (crea siguiente automático)"><span className="material-symbols-outlined text-[18px]">check_circle</span></button>}
+                {s.status === 'in_progress' && <button onClick={() => onStatusChange(s.id, 'completed')} className="rounded p-1 text-emerald-500 hover:bg-emerald-50" title="Completar"><span className="material-symbols-outlined text-[18px]">check_circle</span></button>}
                 {s.status !== 'completed' && s.status !== 'cancelled' && <button onClick={() => onStatusChange(s.id, 'completed')} className="rounded p-1 text-slate-400 hover:text-emerald-500" title="Marcar completado"><span className="material-symbols-outlined text-[16px]">done_all</span></button>}
             </div>
         </div>

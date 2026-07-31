@@ -10,6 +10,7 @@ export default function InstallationsTab() {
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     
     // Form state
     const [form, setForm] = useState<Partial<WellInstallation>>({
@@ -67,40 +68,88 @@ export default function InstallationsTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            // Insert installation
-            const { data: newInst, error: instErr } = await supabase.from('well_installations').insert([{
-                ...form,
-                created_by: user?.id
-            }]).select().single();
-            
-            if (instErr) throw instErr;
+            if (editingId) {
+                // UPDATE existing installation
+                const { error: instErr } = await supabase.from('well_installations').update({
+                    ...form,
+                }).eq('id', editingId);
+                if (instErr) throw instErr;
+            } else {
+                // INSERT new installation
+                const { data: newInst, error: instErr } = await supabase.from('well_installations').insert([{
+                    ...form,
+                    created_by: user?.id
+                }]).select().single();
+                
+                if (instErr) throw instErr;
 
-            // Insert associated equipment
-            if (newInst && formEquipment.length > 0) {
-                const equipmentToInsert = formEquipment.map(eq => ({
-                    client_id: form.client_id || null,
-                    name: eq.name || 'Equipo',
-                    equipment_type: eq.equipment_type || 'otro',
-                    brand: eq.brand || null,
-                    model: eq.model || null,
-                    serial_number: eq.serial_number || null,
-                    well_name: form.location || null, // Assuming location is well name
-                    installation_date: form.installation_date,
-                    location: form.location || null,
-                    status: 'active',
-                    installation_id: newInst.id
-                }));
-                const { error: eqErr } = await supabase.from('installed_equipment').insert(equipmentToInsert);
-                if (eqErr) throw eqErr;
+                // Insert associated equipment
+                if (newInst && formEquipment.length > 0) {
+                    const equipmentToInsert = formEquipment.map(eq => ({
+                        client_id: form.client_id || null,
+                        name: eq.name || 'Equipo',
+                        equipment_type: eq.equipment_type || 'otro',
+                        brand: eq.brand || null,
+                        model: eq.model || null,
+                        serial_number: eq.serial_number || null,
+                        well_name: form.location || null,
+                        installation_date: form.installation_date,
+                        location: form.location || null,
+                        status: 'active',
+                        installation_id: newInst.id
+                    }));
+                    const { error: eqErr } = await supabase.from('installed_equipment').insert(equipmentToInsert);
+                    if (eqErr) throw eqErr;
+                }
             }
 
             setShowForm(false);
+            setEditingId(null);
             fetchData();
         } catch (error: any) {
             alert('Error al guardar maniobra: ' + error.message);
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleEditClick = (inst: WellInstallation) => {
+        setEditingId(inst.id);
+        setForm({
+            folio: inst.folio,
+            installation_date: inst.installation_date,
+            client_id: inst.client_id || '',
+            location: inst.location || '',
+            ademe_diameter: inst.ademe_diameter || '',
+            ademe_material: inst.ademe_material || '',
+            pipe_diameter: inst.pipe_diameter || '',
+            pipe_length: inst.pipe_length || '',
+            pipe_segments: inst.pipe_segments || 0,
+            valv_check: inst.valv_check || 0,
+            cable_gauge: inst.cable_gauge || '',
+            motor_hp: inst.motor_hp || '',
+            pump_model: inst.pump_model || '',
+            starter_system: inst.starter_system || '',
+            protection_type: inst.protection_type || '',
+            has_ground: inst.has_ground || false,
+            ground_location: inst.ground_location || '',
+            static_level: inst.static_level || 0,
+            dynamic_level: inst.dynamic_level || 0,
+            flow_rate: inst.flow_rate || 0,
+            bottom_depth: inst.bottom_depth || 0,
+        });
+        if (inst.equipment && inst.equipment.length > 0) {
+            setFormEquipment(inst.equipment.map(eq => ({
+                name: eq.name,
+                equipment_type: eq.equipment_type,
+                brand: eq.brand || '',
+                model: eq.model || '',
+                serial_number: eq.serial_number || '',
+            })));
+        } else {
+            setFormEquipment([{ name: 'Bomba Principal', equipment_type: 'bomba', brand: '', model: '' }]);
+        }
+        setShowForm(true);
     };
 
     const addEquipmentField = () => {
@@ -153,9 +202,14 @@ export default function InstallationsTab() {
                                     </h3>
                                     <p className="text-sm text-slate-500">{inst.location}</p>
                                 </div>
-                                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                                    {inst.installation_date}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                                        {inst.installation_date}
+                                    </span>
+                                    <button onClick={() => handleEditClick(inst)} className="rounded-lg p-1.5 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar instalación">
+                                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                </div>
                             </div>
                             
                             <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -200,8 +254,10 @@ export default function InstallationsTab() {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm overflow-y-auto">
                     <div className="w-full max-w-4xl rounded-xl bg-white shadow-2xl dark:bg-slate-900 my-8">
                         <div className="flex items-center justify-between border-b border-slate-100 p-5 dark:border-slate-800">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Formato de Maniobras</h2>
-                            <button onClick={() => setShowForm(false)} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">
+                                {editingId ? 'Editar Maniobra / Instalación' : 'Formato de Maniobras'}
+                            </h2>
+                            <button onClick={() => { setShowForm(false); setEditingId(null); }} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
                                 <span className="material-symbols-outlined text-[20px]">close</span>
                             </button>
                         </div>
@@ -326,9 +382,9 @@ export default function InstallationsTab() {
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
-                                <button type="button" onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
                                 <button type="submit" disabled={saving} className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary-dark">
-                                    {saving ? 'Guardando...' : 'Guardar Maniobra e Inventario'}
+                                    {saving ? 'Guardando...' : (editingId ? 'Guardar Cambios' : 'Guardar Maniobra e Inventario')}
                                 </button>
                             </div>
                         </form>

@@ -10,6 +10,7 @@ interface Props {
     schedules: MaintenanceSchedule[];
     onStatusChange: (id: string, status: ScheduleStatus) => void;
     onDayClick: (date: string) => void;
+    onEdit: (s: MaintenanceSchedule) => void;
 }
 
 const DAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
@@ -23,7 +24,7 @@ interface CalendarDay {
     schedules: MaintenanceSchedule[];
 }
 
-export default function MaintenanceCalendar({ schedules, onStatusChange, onDayClick }: Props) {
+export default function MaintenanceCalendar({ schedules, onStatusChange, onDayClick, onEdit }: Props) {
     const today = new Date();
     const [currentMonth, setCurrentMonth] = useState(today.getMonth());
     const [currentYear, setCurrentYear] = useState(today.getFullYear());
@@ -312,6 +313,7 @@ export default function MaintenanceCalendar({ schedules, onStatusChange, onDayCl
                                         isExpanded={selectedSchedule?.id === s.id}
                                         onToggle={() => setSelectedSchedule(selectedSchedule?.id === s.id ? null : s)}
                                         onStatusChange={onStatusChange}
+                                        onEdit={onEdit}
                                     />
                                 ))}
                             </div>
@@ -324,11 +326,12 @@ export default function MaintenanceCalendar({ schedules, onStatusChange, onDayCl
 }
 
 /* Detail card for side panel */
-function DayScheduleCard({ schedule: s, isExpanded, onToggle, onStatusChange }: {
+function DayScheduleCard({ schedule: s, isExpanded, onToggle, onStatusChange, onEdit }: {
     schedule: MaintenanceSchedule;
     isExpanded: boolean;
     onToggle: () => void;
     onStatusChange: (id: string, status: ScheduleStatus) => void;
+    onEdit: (s: MaintenanceSchedule) => void;
 }) {
     const days = getDaysUntil(s.next_service_date);
     const statusColor = SCHEDULE_STATUS_COLORS[s.status] || SCHEDULE_STATUS_COLORS.scheduled;
@@ -407,6 +410,10 @@ function DayScheduleCard({ schedule: s, isExpanded, onToggle, onStatusChange }: 
                     {/* Actions */}
                     {s.status !== 'completed' && s.status !== 'cancelled' && (
                         <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3 dark:border-slate-700/60">
+                            <button onClick={() => onEdit(s)}
+                                className="flex items-center gap-1 rounded-lg bg-sky-50 px-3 py-1.5 text-[11px] font-semibold text-sky-600 transition-all hover:bg-sky-100 dark:bg-sky-900/20 dark:text-sky-400 dark:hover:bg-sky-900/40">
+                                <span className="material-symbols-outlined text-[14px]">edit</span>Editar
+                            </button>
                             {s.status === 'scheduled' && (
                                 <button onClick={() => onStatusChange(s.id, 'confirmed')}
                                     className="flex items-center gap-1 rounded-lg bg-indigo-50 px-3 py-1.5 text-[11px] font-semibold text-indigo-600 transition-all hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40">
