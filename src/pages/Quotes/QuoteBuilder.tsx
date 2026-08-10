@@ -76,7 +76,16 @@ export default function QuoteBuilder() {
     const [insuranceCost, setInsuranceCost] = useState('0');
     const [vehicleWear, setVehicleWear] = useState('0');
     const [maniobraCost, setManiobraCost] = useState('0');
-    const [validUntil, setValidUntil] = useState('');
+    // Helper: returns YYYY-MM-DD in LOCAL timezone (fixes UTC offset bug that shows previous month)
+    const localDateStr = (offsetDays = 0) => {
+        const d = new Date();
+        d.setDate(d.getDate() + offsetDays);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    };
+    const [validUntil, setValidUntil] = useState(() => localDateStr(30));
     const [notes, setNotes] = useState('');
     // New fields for Excel-format cotización
     const [clientAddress, setClientAddress] = useState('');

@@ -18,6 +18,9 @@ import GoogleMapView, { MapPin } from '../../components/GoogleMap';
 import { NUCLEO_HQ, PinColor } from '../../lib/maps';
 import MaintenanceCalendar from './MaintenanceCalendar';
 import InstallationsTab from './InstallationsTab';
+import UninstallationsTab from './UninstallationsTab';
+import AforoTab from './AforoTab';
+import ElectricPanelTab from './ElectricPanelTab';
 import VideoRecordingTab from './VideoRecordingTab';
 import { triggerWaAutomation } from '../../lib/waAutomation';
 
@@ -27,7 +30,7 @@ export default function MaintenanceDashboard() {
     const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
     const [warranties, setWarranties] = useState<(EquipmentWarranty & { equipment?: InstalledEquipment })[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<'installations' | 'calendar' | 'video' | 'equipment' | 'warranties' | 'map' | 'proactive'>('installations');
+    const [tab, setTab] = useState<'installations' | 'desinstalaciones' | 'aforo' | 'cuadro_electrico' | 'calendar' | 'video' | 'equipment' | 'warranties' | 'map' | 'proactive'>('installations');
     const [proactiveAlerts, setProactiveAlerts] = useState<ProactiveMaintenanceAlert[]>([]);
     const [sendingWaId, setSendingWaId] = useState<string | null>(null);
     const [showEquipForm, setShowEquipForm] = useState(false);
@@ -392,9 +395,12 @@ export default function MaintenanceDashboard() {
             )}
 
             {/* Tabs */}
-            <div className="flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
+            <div className="flex flex-wrap gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
                 {[
-                    { key: 'installations', icon: 'plumbing', label: 'Instalaciones / Maniobras' },
+                    { key: 'installations', icon: 'plumbing', label: 'Instalaciones' },
+                    { key: 'desinstalaciones', icon: 'settings_backup_restore', label: 'Desinstalaciones' },
+                    { key: 'aforo', icon: 'water_pump', label: 'AFORO' },
+                    { key: 'cuadro_electrico', icon: 'electrical_services', label: 'Cuadro Eléctrico' },
                     { key: 'calendar', icon: 'calendar_month', label: `Agenda (${upcoming.length})` },
                     { key: 'video', icon: 'videocam', label: 'Videograbación' },
                     { key: 'proactive', icon: 'track_changes', label: `Proactivo`, badge: proactiveAlerts.length },
@@ -403,8 +409,8 @@ export default function MaintenanceDashboard() {
                     { key: 'warranties', icon: 'verified_user', label: `Garantías (${warranties.length})` },
                 ].map(t => (
                     <button key={t.key} onClick={() => setTab(t.key as typeof tab)}
-                        className={`flex flex-1 items-center justify-center gap-2 rounded-md px-4 py-2.5 text-sm font-medium transition-all ${tab === t.key ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}>
-                        <span className="material-symbols-outlined text-[18px]">{t.icon}</span>{t.label}
+                        className={`flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-all ${tab === t.key ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-500 hover:text-slate-700'}`}>
+                        <span className="material-symbols-outlined text-[16px]">{t.icon}</span>{t.label}
                         {'badge' in t && (t as any).badge > 0 && (
                             <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">{(t as any).badge}</span>
                         )}
@@ -460,6 +466,21 @@ export default function MaintenanceDashboard() {
             {/* TAB: Installations */}
             {tab === 'installations' && (
                 <InstallationsTab />
+            )}
+
+            {/* TAB: Desinstalaciones */}
+            {tab === 'desinstalaciones' && (
+                <UninstallationsTab />
+            )}
+
+            {/* TAB: AFORO */}
+            {tab === 'aforo' && (
+                <AforoTab />
+            )}
+
+            {/* TAB: Cuadro Eléctrico */}
+            {tab === 'cuadro_electrico' && (
+                <ElectricPanelTab />
             )}
 
             {/* TAB: Video */}
