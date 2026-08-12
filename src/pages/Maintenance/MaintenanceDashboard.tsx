@@ -22,6 +22,7 @@ import UninstallationsTab from './UninstallationsTab';
 import AforoTab from './AforoTab';
 import ElectricPanelTab from './ElectricPanelTab';
 import VideoRecordingTab from './VideoRecordingTab';
+import StartupFormatTab from './StartupFormatTab';
 import { triggerWaAutomation } from '../../lib/waAutomation';
 
 export default function MaintenanceDashboard() {
@@ -30,7 +31,7 @@ export default function MaintenanceDashboard() {
     const [schedules, setSchedules] = useState<MaintenanceSchedule[]>([]);
     const [warranties, setWarranties] = useState<(EquipmentWarranty & { equipment?: InstalledEquipment })[]>([]);
     const [loading, setLoading] = useState(true);
-    const [tab, setTab] = useState<'installations' | 'desinstalaciones' | 'aforo' | 'cuadro_electrico' | 'calendar' | 'video' | 'equipment' | 'warranties' | 'map' | 'proactive'>('installations');
+    const [tab, setTab] = useState<'installations' | 'desinstalaciones' | 'aforo' | 'cuadro_electrico' | 'arranque' | 'calendar' | 'video' | 'equipment' | 'warranties' | 'map' | 'proactive'>('installations');
     const [proactiveAlerts, setProactiveAlerts] = useState<ProactiveMaintenanceAlert[]>([]);
     const [sendingWaId, setSendingWaId] = useState<string | null>(null);
     const [showEquipForm, setShowEquipForm] = useState(false);
@@ -401,6 +402,7 @@ export default function MaintenanceDashboard() {
                     { key: 'desinstalaciones', icon: 'settings_backup_restore', label: 'Desinstalaciones' },
                     { key: 'aforo', icon: 'water_pump', label: 'AFORO' },
                     { key: 'cuadro_electrico', icon: 'electrical_services', label: 'Cuadro Eléctrico' },
+                    { key: 'arranque', icon: 'power_settings_new', label: 'Servicio de Arranque' },
                     { key: 'calendar', icon: 'calendar_month', label: `Agenda (${upcoming.length})` },
                     { key: 'video', icon: 'videocam', label: 'Videograbación' },
                     { key: 'proactive', icon: 'track_changes', label: `Proactivo`, badge: proactiveAlerts.length },
@@ -481,6 +483,11 @@ export default function MaintenanceDashboard() {
             {/* TAB: Cuadro Eléctrico */}
             {tab === 'cuadro_electrico' && (
                 <ElectricPanelTab />
+            )}
+
+            {/* TAB: Arranque */}
+            {tab === 'arranque' && (
+                <StartupFormatTab />
             )}
 
             {/* TAB: Video */}

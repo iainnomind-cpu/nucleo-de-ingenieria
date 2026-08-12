@@ -27,8 +27,7 @@ interface AforoRecord {
     drilled_by?: string;
     start_datetime?: string;
     aforo_formula?: string;
-    aforo_static?: string;
-    aforo_dynamic?: string;
+    observations?: string;
     client?: { id: string; company_name: string };
     measurements?: AforoMeasurement[];
     created_at?: string;
@@ -72,8 +71,7 @@ const EMPTY_FORM: Omit<AforoRecord, 'id'> = {
     drilled_by: '',
     start_datetime: '',
     aforo_formula: '',
-    aforo_static: '',
-    aforo_dynamic: '',
+    observations: '',
 };
 
 function makeEmptyMeasurements(count: number): AforoMeasurement[] {
@@ -93,7 +91,7 @@ export default function AforoTab() {
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<Omit<AforoRecord, 'id'>>(EMPTY_FORM);
-    const [measurements, setMeasurements] = useState<AforoMeasurement[]>(makeEmptyMeasurements(12));
+    const [measurements, setMeasurements] = useState<AforoMeasurement[]>(makeEmptyMeasurements(24));
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -109,7 +107,7 @@ export default function AforoTab() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const handleDurationChange = (hours: 24 | 48) => {
-        const rowCount = hours === 24 ? 12 : 24;
+        const rowCount = hours === 24 ? 24 : 48;
         setForm(f => ({ ...f, duration_hours: hours }));
         setMeasurements(prev => {
             const next = makeEmptyMeasurements(rowCount);
@@ -145,7 +143,10 @@ export default function AforoTab() {
 
             const measToInsert = measurements
                 .filter(m => m.day_label || m.hour_label || m.dynamic_level || m.flow_lps)
-                .map(m => ({ ...m, aforo_id: recordId, id: undefined }));
+                .map(m => {
+                    const { id, ...rest } = m;
+                    return { ...rest, aforo_id: recordId };
+                });
             if (measToInsert.length > 0) {
                 const { error: measErr } = await supabase.from('aforo_measurements').insert(measToInsert);
                 if (measErr) throw measErr;
@@ -154,7 +155,7 @@ export default function AforoTab() {
             setShowForm(false);
             setEditingId(null);
             setForm(EMPTY_FORM);
-            setMeasurements(makeEmptyMeasurements(12));
+            setMeasurements(makeEmptyMeasurements(24));
             fetchData();
         } catch (err: any) {
             alert('Error al guardar aforo: ' + err.message);
@@ -166,7 +167,7 @@ export default function AforoTab() {
     const handleEditClick = (rec: AforoRecord) => {
         setEditingId(rec.id);
         setForm({ ...EMPTY_FORM, ...rec, client_id: rec.client_id || '' });
-        const rowCount = rec.duration_hours === 48 ? 24 : 12;
+        const rowCount = rec.duration_hours === 24 ? 24 : 48;
         const base = makeEmptyMeasurements(rowCount);
         if (rec.measurements) {
             rec.measurements.sort((a, b) => a.row_index - b.row_index).forEach(m => {
@@ -240,7 +241,7 @@ export default function AforoTab() {
 <div class="grid3" style="margin-bottom:10px;">
   <div class="field"><label>Fecha y Hora de Inicio</label><span>${rec.start_datetime ? new Date(rec.start_datetime).toLocaleString('es-MX') : ''}</span></div>
   <div class="field"><label>Fórmula de Gasto</label><span>${rec.aforo_formula || ''}</span></div>
-  <div class="field"><label>Aforo Estático / Dinámico</label><span>Estático: ${rec.aforo_static || ''} &nbsp; Dinámico: ${rec.aforo_dynamic || ''}</span></div>
+  <div class="field" style="grid-column: span 2;"><label>Observaciones (Aforo)</label><span>${rec.observations || ''}</span></div>
 </div>
 
 <div class="grid2">
@@ -262,9 +263,9 @@ export default function AforoTab() {
     <div class="grid2">
       <div class="field"><label>Profundidad Total</label><span>${rec.well_total_depth || ''}</span></div>
       <div class="field"><label>Diámetro del Tubo</label><span>${rec.well_pipe_diameter || ''}</span></div>
-      <div class="field"><label>Long. Tubo Uso</label><span>${rec.well_pipe_use_length || ''}</span></div>
+      <div class="field"><label>Long. Tubo Liso</label><span>${rec.well_pipe_use_length || ''}</span></div>
       <div class="field"><label>Long. de Ademe</label><span>${rec.well_ademe_length || ''}</span></div>
-      <div class="field"><label>Long. Tubo Anulares</label><span>${rec.well_annular_length || ''}</span></div>
+      <div class="field"><label>Long. Tubo Ranurado</label><span>${rec.well_annular_length || ''}</span></div>
       <div class="field"><label>Long. Filtro de Grava</label><span>${rec.well_gravel_filter_length || ''}</span></div>
       <div class="field"><label>Diám. Filtro Cementación</label><span>${rec.well_cement_diameter || ''}</span></div>
       <div class="field"><label>Nivel Hidrostático</label><span>${rec.hydrostatic_level || ''}</span></div>
@@ -302,7 +303,12 @@ export default function AforoTab() {
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Formato de Aforo</h2>
                     <p className="text-sm text-slate-500">Registro de aforos de pozos — 24 y 48 horas.</p>
                 </div>
-                <button onClick={() => { setForm(EMPTY_FORM); setMeasurements(makeEmptyMeasurements(12)); setEditingId(null); setShowForm(true); }}
+                <button onClick={() => { 
+                    setForm({ ...EMPTY_FORM, folio: `No. ${(records.length + 1).toString().padStart(4, '0')}` }); 
+                    setMeasurements(makeEmptyMeasurements(24)); 
+                    setEditingId(null); 
+                    setShowForm(true); 
+                }}
                     className="flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-700">
                     <span className="material-symbols-outlined text-[20px]">add</span>
                     Nuevo Aforo
@@ -390,9 +396,9 @@ export default function AforoTab() {
                                 <div><label className={labelClass}>Perforó</label><input type="text" value={form.drilled_by || ''} onChange={e => setForm(f => ({ ...f, drilled_by: e.target.value }))} className={inputClass} /></div>
                                 <div><label className={labelClass}>Fecha y Hora de Inicio</label><input type="datetime-local" value={form.start_datetime || ''} onChange={e => setForm(f => ({ ...f, start_datetime: e.target.value }))} className={inputClass} /></div>
                                 <div><label className={labelClass}>Fórmula de Gasto</label><input type="text" value={form.aforo_formula || ''} onChange={e => setForm(f => ({ ...f, aforo_formula: e.target.value }))} className={inputClass} placeholder="Q = A x V" /></div>
-                                <div className="flex gap-2">
-                                    <div className="flex-1"><label className={labelClass}>Aforo Estático</label><input type="text" value={form.aforo_static || ''} onChange={e => setForm(f => ({ ...f, aforo_static: e.target.value }))} className={inputClass} /></div>
-                                    <div className="flex-1"><label className={labelClass}>Aforo Dinámico</label><input type="text" value={form.aforo_dynamic || ''} onChange={e => setForm(f => ({ ...f, aforo_dynamic: e.target.value }))} className={inputClass} /></div>
+                                <div className="sm:col-span-4 mt-2">
+                                    <label className={labelClass}>Observaciones (Generales del Aforo)</label>
+                                    <textarea value={form.observations || ''} onChange={e => setForm(f => ({ ...f, observations: e.target.value }))} className={inputClass} rows={2}></textarea>
                                 </div>
                             </div>
 
@@ -431,9 +437,9 @@ export default function AforoTab() {
                                         {[
                                             ['well_total_depth', 'Profundidad Total'],
                                             ['well_pipe_diameter', 'Diámetro del Tubo'],
-                                            ['well_pipe_use_length', 'Long. Tubo Uso'],
+                                            ['well_pipe_use_length', 'Long. Tubo Liso'],
                                             ['well_ademe_length', 'Long. de Ademe'],
-                                            ['well_annular_length', 'Long. Tubo Anulares'],
+                                            ['well_annular_length', 'Long. Tubo Ranurado'],
                                             ['well_gravel_filter_length', 'Long. Filtro de Grava'],
                                             ['well_cement_diameter', 'Diám. Filtro Cementación'],
                                             ['hydrostatic_level', 'Nivel Hidrostático'],

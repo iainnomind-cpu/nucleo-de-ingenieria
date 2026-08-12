@@ -390,19 +390,29 @@ function CatalogosTab() {
 // ============================================================
 function UsuariosTab() {
     const [users, setUsers] = useState<AppUser[]>([]);
+    const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [editingUser, setEditingUser] = useState<AppUser | null>(null);
     const [form, setForm] = useState({ full_name: '', email: '', password: '', permissions: buildEmptyPermissions(), avatar_color: '#6366f1', phone: '' });
     const [formError, setFormError] = useState('');
     const [saving, setSaving] = useState(false);
+    const [deactivateTarget, setDeactivateTarget] = useState<AppUser | null>(null);
+    const [reassignTo, setReassignTo] = useState('');
+    const [deactivating, setDeactivating] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const [usersRes] = await Promise.all([
+        const [usersRes, tasksRes] = await Promise.all([
             supabase.from('app_users').select('*').order('full_name'),
+            supabase.from('team_tasks').select('assigned_to').neq('status', 'completed'),
         ]);
         setUsers(usersRes.data || []);
+        const counts: Record<string, number> = {};
+        for (const t of (tasksRes.data || [])) {
+            counts[t.assigned_to] = (counts[t.assigned_to] || 0) + 1;
+        }
+        setTaskCounts(counts);
         setLoading(false);
     }, []);
 
@@ -420,10 +430,8 @@ function UsuariosTab() {
         if (!form.full_name.trim() || !form.email.trim()) { setFormError('Nombre y email son obligatorios'); return; }
         if (!form.password && !editingUser) { setFormError('La contraseña es obligatoria'); return; }
         if (form.password && !isPasswordValid(form.password)) { setFormError('La contraseña no cumple los requisitos de seguridad'); return; }
-
         setSaving(true);
         if (editingUser) {
-            // Actualizar info básica
             const { error } = await supabase.from('app_users').update({
                 full_name: form.full_name.trim(),
                 email: form.email.trim().toLowerCase(),
@@ -431,17 +439,13 @@ function UsuariosTab() {
                 avatar_color: form.avatar_color,
                 phone: form.phone.trim() || null,
             }).eq('id', editingUser.id);
-
             if (error) { setFormError(error.message); setSaving(false); return; }
-
-            // Cambiar contraseña si se proporcionó
             if (form.password) {
                 const { data } = await supabase.rpc('update_user_password', { p_user_id: editingUser.id, p_new_password: form.password });
                 const result = data as { success: boolean; message?: string } | null;
                 if (result && !result.success) { setFormError(result.message || 'Error al cambiar contraseña'); setSaving(false); return; }
             }
         } else {
-            // Crear nuevo
             const { data } = await supabase.rpc('create_app_user', {
                 p_full_name: form.full_name.trim(),
                 p_email: form.email.trim().toLowerCase(),
@@ -453,7 +457,6 @@ function UsuariosTab() {
             const result = data as { success: boolean; message?: string } | null;
             if (result && !result.success) { setFormError(result.message || 'Error al crear usuario'); setSaving(false); return; }
         }
-
         setSaving(false);
         resetForm();
         fetchData();
@@ -467,20 +470,85 @@ function UsuariosTab() {
         setFormError('');
     };
 
-    const handleToggleActive = async (u: AppUser) => {
-        await supabase.from('app_users').update({ is_active: !u.is_active }).eq('id', u.id);
+    const confirmDeactivate = async () => {
+        if (!deactivateTarget) return;
+        setDeactivating(true);
+        if (reassignTo && (taskCounts[deactivateTarget.full_name] || 0) > 0) {
+            await supabase.from('team_tasks')
+                .update({ assigned_to: reassignTo })
+                .eq('assigned_to', deactivateTarget.full_name)
+                .neq('status', 'completed');
+        }
+        await supabase.from('app_users').update({ is_active: false }).eq('id', deactivateTarget.id);
+        setDeactivateTarget(null);
+        setReassignTo('');
+        setDeactivating(false);
         fetchData();
+    };
+
+    const handleToggleActive = async (u: AppUser) => {
+        if (u.is_active) {
+            setDeactivateTarget(u);
+            setReassignTo('');
+        } else {
+            await supabase.from('app_users').update({ is_active: true }).eq('id', u.id);
+            fetchData();
+        }
     };
 
     if (loading) return <div className="flex justify-center py-12"><div className="h-10 w-10 animate-spin rounded-full border-4 border-primary border-t-transparent" /></div>;
 
     return (
         <div>
+            {/* Deactivate Confirmation Modal */}
+            {deactivateTarget && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
+                    <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
+                        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
+                            <span className="material-symbols-outlined text-amber-600 text-[24px]">person_off</span>
+                        </div>
+                        <h4 className="text-base font-bold text-slate-900 dark:text-white">Dar de baja a {deactivateTarget.full_name}</h4>
+                        <p className="mt-1 text-sm text-slate-500">Este usuario no podrá iniciar sesión. Sus datos se conservan.</p>
+                        {(taskCounts[deactivateTarget.full_name] || 0) > 0 && (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-800/40 dark:bg-amber-900/20">
+                                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                    ⚠️ Tiene {taskCounts[deactivateTarget.full_name]} tareas pendientes
+                                </p>
+                                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">¿Reasignar a otro usuario? (opcional)</p>
+                                <select
+                                    value={reassignTo}
+                                    onChange={e => setReassignTo(e.target.value)}
+                                    className="mt-2 w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm dark:border-amber-700 dark:bg-slate-700 dark:text-white"
+                                >
+                                    <option value="">— No reasignar —</option>
+                                    {users.filter(u => u.is_active && u.id !== deactivateTarget.id).map(u => (
+                                        <option key={u.id} value={u.full_name}>{u.full_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                        <div className="mt-5 flex gap-3">
+                            <button onClick={confirmDeactivate} disabled={deactivating}
+                                className="flex-1 rounded-lg bg-amber-500 py-2.5 text-sm font-semibold text-white hover:bg-amber-600 disabled:opacity-50">
+                                {deactivating ? 'Procesando...' : 'Confirmar Baja'}
+                            </button>
+                            <button onClick={() => { setDeactivateTarget(null); setReassignTo(''); }}
+                                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 dark:border-slate-700 dark:text-slate-400">
+                                Cancelar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Header */}
             <div className="mb-6 flex items-center justify-between">
                 <div>
                     <h3 className="text-lg font-bold text-slate-900 dark:text-white">Directorio de Usuarios</h3>
-                    <p className="text-sm text-slate-500">{users.length} usuarios registrados</p>
+                    <p className="text-sm text-slate-500">
+                        <span className="text-emerald-600 font-semibold">{users.filter(u => u.is_active).length} activos</span>
+                        {users.some(u => !u.is_active) && <span className="ml-2 text-slate-400">· {users.filter(u => !u.is_active).length} dados de baja</span>}
+                    </p>
                 </div>
                 <button
                     onClick={() => { resetForm(); setForm(f => ({ ...f, permissions: buildEmptyPermissions() })); setShowForm(true); }}
@@ -641,18 +709,15 @@ function UsuariosTab() {
                 </div>
             )}
 
-            {/* User Cards Grid */}
+            {/* User Cards — Active */}
+            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">Usuarios Activos</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {users.map(u => (
+                {users.filter(u => u.is_active).map(u => (
                     <div key={u.id}
                         onClick={() => handleEditUser(u)}
-                        className={`group cursor-pointer rounded-xl border p-5 transition-all hover:shadow-md ${
-                            u.is_active
-                                ? 'border-slate-200/60 bg-white/50 hover:border-primary/30 dark:border-slate-800/60 dark:bg-slate-900/50'
-                                : 'border-slate-200/40 bg-slate-100/50 opacity-60 dark:border-slate-800/40 dark:bg-slate-900/30'
-                        }`}
+                        className="group cursor-pointer rounded-xl border border-slate-200/60 bg-white/50 p-5 transition-all hover:border-primary/30 hover:shadow-md dark:border-slate-800/60 dark:bg-slate-900/50"
                     >
-                        <div className="flex items-start gap-4">
+                        <div className="flex items-start gap-3">
                             <div
                                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white shadow-sm"
                                 style={{ backgroundColor: u.avatar_color || '#6366f1' }}
@@ -662,42 +727,76 @@ function UsuariosTab() {
                             <div className="min-w-0 flex-1">
                                 <p className="truncate text-sm font-bold text-slate-900 dark:text-white">{u.full_name}</p>
                                 <p className="truncate text-xs text-slate-500">{u.email}</p>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                                        u.is_active
-                                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                                            : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
-                                    }`}>
-                                        {u.is_active ? 'Activo' : 'Inactivo'}
-                                    </span>
-                                    
-                                </div>
-                                <div className="mt-1 flex flex-col gap-0.5">
-                                    {u.phone && (
-                                        <p className="flex items-center gap-1 text-[10px] text-slate-500">
-                                            <span className="material-symbols-outlined text-[12px] text-emerald-500">phone_iphone</span>
-                                            {u.phone}
-                                        </p>
-                                    )}
-                                    {u.last_login && (
-                                        <p className="text-[10px] text-slate-400">
-                                            Último login: {new Date(u.last_login).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                        </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <span className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">Activo</span>
+                                    {(taskCounts[u.full_name] || 0) > 0 && (
+                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">
+                                            <span className="material-symbols-outlined text-[10px]">task_alt</span>
+                                            {taskCounts[u.full_name]} tareas
+                                        </span>
                                     )}
                                 </div>
+                                {u.phone && (
+                                    <p className="mt-1 flex items-center gap-1 text-[10px] text-slate-500">
+                                        <span className="material-symbols-outlined text-[12px] text-emerald-500">phone_iphone</span>
+                                        {u.phone}
+                                    </p>
+                                )}
+                                {u.last_login && (
+                                    <p className="mt-0.5 text-[10px] text-slate-400">
+                                        Último login: {new Date(u.last_login).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                )}
                             </div>
-                            <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button onClick={e => { e.stopPropagation(); handleToggleActive(u); }}
-                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-amber-500 dark:hover:bg-slate-700"
-                                    title={u.is_active ? 'Desactivar' : 'Activar'}
-                                >
-                                    <span className="material-symbols-outlined text-[18px]">{u.is_active ? 'person_off' : 'person'}</span>
-                                </button>
-                            </div>
+                            <button onClick={e => { e.stopPropagation(); handleToggleActive(u); }}
+                                className="ml-1 shrink-0 rounded-lg p-2 text-slate-300 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-900/20"
+                                title="Dar de baja"
+                            >
+                                <span className="material-symbols-outlined text-[20px]">person_off</span>
+                            </button>
                         </div>
                     </div>
                 ))}
             </div>
+
+            {/* User Cards — Inactive */}
+            {users.some(u => !u.is_active) && (
+                <div className="mt-8">
+                    <p className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">Usuarios Dados de Baja</p>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {users.filter(u => !u.is_active).map(u => (
+                            <div key={u.id} className="rounded-xl border border-slate-200/40 bg-slate-50/50 p-5 dark:border-slate-800/40 dark:bg-slate-900/30">
+                                <div className="flex items-start gap-3">
+                                    <div
+                                        className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-lg font-bold text-white shadow-sm grayscale opacity-50"
+                                        style={{ backgroundColor: u.avatar_color || '#6366f1' }}
+                                    >
+                                        {u.full_name?.charAt(0).toUpperCase() || '?'}
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm font-bold text-slate-400 line-through">{u.full_name}</p>
+                                        <p className="truncate text-xs text-slate-400">{u.email}</p>
+                                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-700 dark:text-slate-400">Dado de baja</span>
+                                            {(taskCounts[u.full_name] || 0) > 0 && (
+                                                <span className="inline-flex items-center gap-0.5 rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-600">
+                                                    ⚠️ {taskCounts[u.full_name]} tareas pendientes
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <button onClick={() => handleToggleActive(u)}
+                                        className="ml-1 shrink-0 rounded-lg p-2 text-slate-300 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/20"
+                                        title="Reactivar usuario"
+                                    >
+                                        <span className="material-symbols-outlined text-[20px]">person_add</span>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

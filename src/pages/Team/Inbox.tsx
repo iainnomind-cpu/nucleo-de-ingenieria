@@ -5,8 +5,7 @@ import {
     MessageMention, Space, Message,
     getInitials, getAvatarColor, timeAgo,
 } from '../../types/teams';
-
-const CURRENT_USER = 'Director';
+import { useAuth } from '../../lib/AuthContext';
 
 interface MentionWithContext extends MessageMention {
     message?: Message;
@@ -14,6 +13,8 @@ interface MentionWithContext extends MessageMention {
 }
 
 export default function Inbox() {
+    const { user } = useAuth();
+    const CURRENT_USER = user?.full_name || 'Usuario';
     const navigate = useNavigate();
     const [mentions, setMentions] = useState<MentionWithContext[]>([]);
     const [loading, setLoading] = useState(true);

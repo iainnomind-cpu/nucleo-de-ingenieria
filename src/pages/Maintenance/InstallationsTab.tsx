@@ -34,7 +34,8 @@ export default function InstallationsTab() {
         static_level: 0,
         dynamic_level: 0,
         flow_rate: 0,
-        bottom_depth: 0
+        bottom_depth: 0,
+        observations: ''
     });
 
     // Associated equipment state for the new installation
@@ -137,6 +138,7 @@ export default function InstallationsTab() {
             dynamic_level: inst.dynamic_level || 0,
             flow_rate: inst.flow_rate || 0,
             bottom_depth: inst.bottom_depth || 0,
+            observations: inst.observations || '',
         });
         if (inst.equipment && inst.equipment.length > 0) {
             setFormEquipment(inst.equipment.map(eq => ({
@@ -230,6 +232,13 @@ export default function InstallationsTab() {
                                     <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{inst.flow_rate ? `${inst.flow_rate} lps` : '-'}</p>
                                 </div>
                             </div>
+                            
+                            {inst.observations && (
+                                <div className="mt-3 rounded bg-amber-50 p-2 dark:bg-amber-900/10">
+                                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-500">Observaciones</p>
+                                    <p className="text-sm text-slate-700 dark:text-slate-300">{inst.observations}</p>
+                                </div>
+                            )}
                             
                             {inst.equipment && inst.equipment.length > 0 && (
                                 <div className="mt-4 border-t border-slate-100 pt-3 dark:border-slate-800">
@@ -345,6 +354,18 @@ export default function InstallationsTab() {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Observaciones Generales */}
+                            <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
+                                <label className={labelClass}>Observaciones Generales</label>
+                                <textarea 
+                                    value={form.observations || ''} 
+                                    onChange={e => setForm({ ...form, observations: e.target.value })} 
+                                    className={inputClass} 
+                                    rows={2} 
+                                    placeholder="Detalles o notas adicionales sobre la instalación o maniobra..." 
+                                />
                             </div>
                             
                             {/* Equipos Section */}

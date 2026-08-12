@@ -70,6 +70,20 @@ export default function ElectricPanelTab() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState<Omit<ElectricPanelRecord, 'id'>>(EMPTY_FORM);
 
+    const renderYesNoSelect = (field: keyof Omit<ElectricPanelRecord, 'id'>) => (
+        <select value={(form as any)[field] || 'NO'} onChange={f(field)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+            <option value="SI">SÍ</option>
+            <option value="NO">NO</option>
+        </select>
+    );
+
+    const renderField = (label: string, field: keyof Omit<ElectricPanelRecord, 'id'>, placeholder?: string) => (
+        <div>
+            <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</label>
+            <input type="text" value={(form as any)[field] || ''} onChange={f(field)} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white" placeholder={placeholder} />
+        </div>
+    );
+
     const f = (field: keyof Omit<ElectricPanelRecord, 'id'>) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
             setForm(prev => ({ ...prev, [field]: e.target.value }));
@@ -245,20 +259,6 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
     const labelClass = "mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider";
     const sectionHeader = "mb-3 flex items-center gap-2 text-sm font-bold text-white bg-blue-700 rounded-lg px-3 py-2 uppercase tracking-wide";
 
-    const YesNoSelect = ({ field }: { field: keyof Omit<ElectricPanelRecord, 'id'> }) => (
-        <select value={(form as any)[field] || 'NO'} onChange={f(field)} className={inputClass}>
-            <option value="SI">SÍ</option>
-            <option value="NO">NO</option>
-        </select>
-    );
-
-    const Field = ({ label, field, placeholder }: { label: string; field: keyof Omit<ElectricPanelRecord, 'id'>; placeholder?: string }) => (
-        <div>
-            <label className={labelClass}>{label}</label>
-            <input type="text" value={(form as any)[field] || ''} onChange={f(field)} className={inputClass} placeholder={placeholder} />
-        </div>
-    );
-
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -266,7 +266,11 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Formato de Cuadro Eléctrico</h2>
                     <p className="text-sm text-slate-500">Registro de transformador, arrancador, motor y bomba.</p>
                 </div>
-                <button onClick={() => { setForm(EMPTY_FORM); setEditingId(null); setShowForm(true); }}
+                <button onClick={() => { 
+                    setForm({ ...EMPTY_FORM, folio: `No. ${(records.length + 1).toString().padStart(4, '0')}` }); 
+                    setEditingId(null); 
+                    setShowForm(true); 
+                }}
                     className="flex items-center gap-2 rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
                     <span className="material-symbols-outlined text-[20px]">add</span>
                     Nuevo Registro
@@ -332,7 +336,7 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                         <form onSubmit={handleSave} className="p-5 space-y-6">
                             {/* Encabezado */}
                             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                                <Field label="Folio" field="folio" />
+                                {renderField('Folio', 'folio')}
                                 <div>
                                     <label className={labelClass}>Cliente</label>
                                     <select value={form.client_id || ''} onChange={f('client_id')} className={inputClass}>
@@ -340,8 +344,8 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                                         {clients.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}
                                     </select>
                                 </div>
-                                <Field label="Lugar (Localidad)" field="location" placeholder="Ej. Cd. Guzmán" />
-                                <Field label="Nombre del Pozo" field="well_name" placeholder="Ej. La Llave 2" />
+                                {renderField('Lugar (Localidad)', 'location', 'Ej. Cd. Guzmán')}
+                                {renderField('Nombre del Pozo', 'well_name', 'Ej. La Llave 2')}
                                 <div>
                                     <label className={labelClass}>Fecha</label>
                                     <input type="date" value={form.record_date || ''} onChange={f('record_date')} className={inputClass} />
@@ -352,14 +356,14 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                             <div>
                                 <p className={sectionHeader}><span className="material-symbols-outlined text-[18px]">transform</span>Transformador</p>
                                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                                    <Field label="Marca" field="trans_brand" />
-                                    <Field label="Capacidad" field="trans_capacity" placeholder="Ej. 112.5 KVA" />
-                                    <Field label="Pararrayos" field="trans_lightning_rods" placeholder="Ej. 5.5 GO" />
-                                    <Field label="Cuchillas" field="trans_switches" />
-                                    <Field label="Aisladores" field="trans_insulators" placeholder="Ej. 5.5 GHS 7" />
-                                    <Field label="Fusibles" field="trans_fuses" placeholder="Ej. 7A, 4A, 4A" />
-                                    <Field label="Dieléctrico" field="trans_dielectric" placeholder="Ej. 1/4 de Vida" />
-                                    <Field label="Calibre de Cable" field="trans_cable_gauge" placeholder="Ej. 3x2/0" />
+                                    {renderField('Marca', 'trans_brand')}
+                                    {renderField('Capacidad', 'trans_capacity', 'Ej. 112.5 KVA')}
+                                    {renderField('Pararrayos', 'trans_lightning_rods', 'Ej. 5.5 GO')}
+                                    {renderField('Cuchillas', 'trans_switches')}
+                                    {renderField('Aisladores', 'trans_insulators', 'Ej. 5.5 GHS 7')}
+                                    {renderField('Fusibles', 'trans_fuses', 'Ej. 7A, 4A, 4A')}
+                                    {renderField('Dieléctrico', 'trans_dielectric', 'Ej. 1/4 de Vida')}
+                                    {renderField('Calibre de Cable', 'trans_cable_gauge', 'Ej. 3x2/0')}
                                 </div>
                             </div>
 
@@ -367,12 +371,12 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                             <div>
                                 <p className={sectionHeader}><span className="material-symbols-outlined text-[18px]">power</span>Arrancador</p>
                                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                                    <Field label="Modelo" field="starter_model" placeholder="Ej. K981" />
-                                    <Field label="Capacidad" field="starter_capacity" placeholder="Ej. 100 HP" />
-                                    <Field label="Protección" field="starter_protection" placeholder="Ej. Bimetálico" />
+                                    {renderField('Modelo', 'starter_model', 'Ej. K981')}
+                                    {renderField('Capacidad', 'starter_capacity', 'Ej. 100 HP')}
+                                    {renderField('Protección', 'starter_protection', 'Ej. Bimetálico')}
                                     <div>
                                         <label className={labelClass}>Canalizado</label>
-                                        <YesNoSelect field="starter_channeled" />
+                                        {renderYesNoSelect('starter_channeled')}
                                     </div>
                                 </div>
                             </div>
@@ -381,21 +385,21 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                             <div>
                                 <p className={sectionHeader}><span className="material-symbols-outlined text-[18px]">settings</span>Motor</p>
                                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-                                    <Field label="Marca" field="motor_brand" />
-                                    <Field label="Potencia" field="motor_power" />
-                                    <Field label="Amperaje" field="motor_amperage" />
-                                    <Field label="Frecuencia" field="motor_frequency" placeholder="Ej. 60 Hz" />
-                                    <Field label="Meggeo" field="motor_meggeo" placeholder="Ej. ff, 19, 30 MΩ" />
-                                    <Field label="Alimentación" field="motor_feed" placeholder="Ej. 440V" />
+                                    {renderField('Marca', 'motor_brand')}
+                                    {renderField('Potencia', 'motor_power')}
+                                    {renderField('Amperaje', 'motor_amperage')}
+                                    {renderField('Frecuencia', 'motor_frequency', 'Ej. 60 Hz')}
+                                    {renderField('Meggeo', 'motor_meggeo', 'Ej. ff, 19, 30 MΩ')}
+                                    {renderField('Alimentación', 'motor_feed', 'Ej. 440V')}
                                     <div>
                                         <label className={labelClass}>Sistema de Tierras</label>
-                                        <YesNoSelect field="motor_ground_system" />
+                                        {renderYesNoSelect('motor_ground_system')}
                                     </div>
                                     <div className="sm:col-span-2">
                                         <label className={labelClass}>Lugar de Aterrizaje</label>
                                         <input type="text" value={form.motor_ground_location || ''} onChange={f('motor_ground_location')} className={inputClass} />
                                     </div>
-                                    <Field label="Calibre de Cable" field="motor_cable_gauge" placeholder="Ej. 3x4 AWG" />
+                                    {renderField('Calibre de Cable', 'motor_cable_gauge', 'Ej. 3x4 AWG')}
                                 </div>
                             </div>
 
@@ -403,22 +407,22 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                             <div>
                                 <p className={sectionHeader}><span className="material-symbols-outlined text-[18px]">water_pump</span>Bomba</p>
                                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
-                                    <Field label="Marca" field="pump_brand" />
-                                    <Field label="Potencia" field="pump_power" />
-                                    <Field label="Modelo" field="pump_model" />
-                                    <Field label="Material" field="pump_material" />
+                                    {renderField('Marca', 'pump_brand')}
+                                    {renderField('Potencia', 'pump_power')}
+                                    {renderField('Modelo', 'pump_model')}
+                                    {renderField('Material', 'pump_material')}
                                     <div>
                                         <label className={labelClass}>¿Reparada?</label>
-                                        <YesNoSelect field="pump_repaired" />
+                                        {renderYesNoSelect('pump_repaired')}
                                     </div>
                                 </div>
                             </div>
 
                             {/* Firmas + Notas */}
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-                                <Field label="Encargado" field="responsible" />
-                                <Field label="Revisó" field="reviewed_by" />
-                                <Field label="Autorizó / Cliente" field="authorized_by" />
+                                {renderField('Encargado', 'responsible')}
+                                {renderField('Revisó', 'reviewed_by')}
+                                {renderField('Autorizó / Cliente', 'authorized_by')}
                                 <div>
                                     <label className={labelClass}>Observaciones</label>
                                     <textarea value={form.notes || ''} onChange={f('notes')} rows={2} className={inputClass} />

@@ -70,6 +70,7 @@ export interface WellInstallation {
     dynamic_level: number | null;
     flow_rate: number | null;
     bottom_depth: number | null;
+    observations: string | null;
     
     created_by: string | null;
     created_at: string;

@@ -78,11 +78,11 @@ export default function PipelineBoard() {
 
                 // ── 1. Crear Tareas Operativas Automáticas ──
 
-                // 6.1 Facturación y Cobranza — Samara
+                // 6.1 Facturación y Cobranza — Ruby
                 await supabase.from('team_tasks').insert({
                     title: `Facturación y Cobranza — ${clientName}`,
                     description: `Oportunidad: ${opp.title}\nValor: ${formatCurrency(opp.estimated_value || 0)}\n\nActividades:\n• Solicitar datos de facturación al cliente\n• Generar y enviar factura\n• Registrar factura en CRM\n• Dar seguimiento a cobranza\n\nCondición clave: El proyecto NO avanza a operación sin anticipo/pago acordado, salvo cliente conocido con relación comercial.`,
-                    assigned_to: 'Samara',
+                    assigned_to: 'Ruby',
                     created_by: 'Sistema',
                     status: 'pending',
                     priority: 'high',
@@ -96,11 +96,11 @@ export default function PipelineBoard() {
                     tags: ['auto', 'facturación', 'cierre-ganado'],
                 });
 
-                // 7.1 Gestión de Materiales — Paulina
+                // 7.1 Gestión de Materiales — Administración
                 await supabase.from('team_tasks').insert({
                     title: `Gestión de Materiales — ${clientName}`,
                     description: `Oportunidad: ${opp.title}\n\nActividades:\n• Revisión de materiales requeridos para el proyecto\n• Validación de inventario\n\nCondicional:\n• SI hay materiales → Preparar\n• SI NO hay → Solicitar autorización a Dirección, generar órdenes de compra, dar seguimiento a entrega`,
-                    assigned_to: 'Paulina',
+                    assigned_to: 'Administración',
                     created_by: 'Sistema',
                     status: 'pending',
                     priority: 'high',
@@ -154,7 +154,7 @@ export default function PipelineBoard() {
                 });
 
                 // ── 2. Notificaciones internas (mensajes en spaces) ──
-                const notifContent = `🎉 **¡VENTA CERRADA — PROYECTO GANADO!**\n\nSe ha ganado la oportunidad: **${opp.title}**\n👤 Cliente: **${clientName}**\n💰 Valor: **${formatCurrency(opp.estimated_value || 0)}**\n📅 Fecha: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}\n\n**Tareas automáticas creadas para:**\n• 📋 Samara — Facturación y Cobranza\n• 📦 Paulina — Gestión de Materiales\n• 🔧 Joel — Preparación Técnica\n• 📅 Alejandro — Programación de Trabajos\n\n_A prepararse para el arranque del proyecto._`;
+                const notifContent = `🎉 **¡VENTA CERRADA — PROYECTO GANADO!**\n\nSe ha ganado la oportunidad: **${opp.title}**\n👤 Cliente: **${clientName}**\n💰 Valor: **${formatCurrency(opp.estimated_value || 0)}**\n📅 Fecha: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}\n\n**Tareas automáticas creadas para:**\n• 📋 Ruby — Facturación y Cobranza\n• 📦 Administración — Gestión de Materiales\n• 🔧 Joel — Preparación Técnica\n• 📅 Alejandro — Programación de Trabajos\n\n_A prepararse para el arranque del proyecto._`;
 
                 // Post to General and Operaciones spaces
                 const { data: spaces } = await supabase.from('spaces').select('id, name').in('name', ['General', 'Operaciones', 'Administración']);
@@ -170,7 +170,7 @@ export default function PipelineBoard() {
                 }
 
                 // ── 3. Crear menciones para notificaciones push internas ──
-                const mentionTargets = ['Joel', 'Samara', 'Paulina', 'Alejandro'];
+                const mentionTargets = ['Joel', 'Ruby', 'Administración', 'Alejandro'];
                 const { data: generalSpace } = await supabase.from('spaces').select('id').eq('name', 'General').single();
                 if (generalSpace) {
                     const { data: sysMsg } = await supabase.from('messages')
@@ -190,8 +190,8 @@ export default function PipelineBoard() {
 
                 // ── 4. Notificaciones push internas (app_notifications) ──
                 const taskAssignments: { user: string; task: string }[] = [
-                    { user: 'Samara', task: 'Facturación y Cobranza' },
-                    { user: 'Paulina', task: 'Gestión de Materiales' },
+                    { user: 'Ruby', task: 'Facturación y Cobranza' },
+                    { user: 'Administración', task: 'Gestión de Materiales' },
                     { user: 'Joel', task: 'Preparación Técnica y Logística' },
                     { user: 'Alejandro', task: 'Programación de Trabajos' },
                 ];
@@ -274,11 +274,10 @@ export default function PipelineBoard() {
                 // ── 5. Notificaciones Externas (WhatsApp y Email) ──
                 const externalTargets = [
                     { name: 'Joel Rincón Cuevas', email: 'joelrincon_nucleoing@hotmail.com', phone: '+523414201583' },
-                    { name: 'Paulina', email: 'paulinasanchez_nucleoing@hotmail.com', phone: '+523123186426' },
-                    { name: 'Samara', email: 'paulinasanchez_nucleoing@hotmail.com', phone: '+523411475608' },
+                    // Eliminadas temporalmente las notificaciones de correo para Finanzas/Admin hasta configurar los correos correctos.
                 ];
 
-                const externalMessage = `🚨 *¡NUEVO PROYECTO GANADO! - Acción Requerida* 🚨\n\n¡Hola equipo!\nSe acaba de cerrar un nuevo proyecto en el CRM y requiere su atención inmediata para iniciar el flujo operativo.\n\n🏢 *Cliente:* ${clientName}\n📋 *Proyecto:* ${opp.title}\n💰 *Valor Estimado:* ${formatCurrency(opp.estimated_value || 0)}\n📅 *Fecha de Cierre:* ${new Date().toLocaleDateString('es-MX')}\n\n*Siguientes Pasos Asignados:*\n💵 *Samara (Finanzas):* Iniciar proceso de facturación y cobranza.\n📦 *Paulina (Administración):* Revisión de materiales e inventario.\n🔧 *Joel (Operaciones):* Validación de equipos, preparación técnica y logística.\n\nPor favor, revisen sus tareas asignadas en el Tablero del ERP para más detalles.\n\n¡Excelente trabajo a todos! 🚀`;
+                const externalMessage = `🚨 *¡NUEVO PROYECTO GANADO! - Acción Requerida* 🚨\n\n¡Hola equipo!\nSe acaba de cerrar un nuevo proyecto en el CRM y requiere su atención inmediata para iniciar el flujo operativo.\n\n🏢 *Cliente:* ${clientName}\n📋 *Proyecto:* ${opp.title}\n💰 *Valor Estimado:* ${formatCurrency(opp.estimated_value || 0)}\n📅 *Fecha de Cierre:* ${new Date().toLocaleDateString('es-MX')}\n\n*Siguientes Pasos Asignados:*\n💵 *Ruby (Finanzas):* Iniciar proceso de facturación y cobranza.\n📦 *Administración:* Revisión de materiales e inventario.\n🔧 *Joel (Operaciones):* Validación de equipos, preparación técnica y logística.\n\nPor favor, revisen sus tareas asignadas en el Tablero del ERP para más detalles.\n\n¡Excelente trabajo a todos! 🚀`;
 
                 externalTargets.forEach(target => {
                     // Enviar WhatsApp (fire and forget)

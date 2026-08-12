@@ -8,9 +8,11 @@ import {
     getInitials, getAvatarColor, timeAgo, parseMentions,
 } from '../../types/teams';
 
-const CURRENT_USER = 'Director';
+import { useAuth } from '../../lib/AuthContext';
 
 export default function SpaceChat() {
+    const { user } = useAuth();
+    const CURRENT_USER = user?.full_name || 'Usuario';
     const { spaceId } = useParams<{ spaceId: string }>();
     const navigate = useNavigate();
     const [spaces, setSpaces] = useState<Space[]>([]);
