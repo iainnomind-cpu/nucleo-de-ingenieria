@@ -11,8 +11,9 @@ import {
     isInsuranceExpiringSoon, getServiceScheduleStatus, calculateEfficiency
 } from '../../../types/fleet';
 import { Project } from '../../../types/projects';
+import FleetIncidentsTab from './FleetIncidentsTab';
 
-type Tab = 'overview' | 'insurances' | 'mileage' | 'fuel' | 'maintenance' | 'services' | 'performance';
+type Tab = 'overview' | 'insurances' | 'mileage' | 'fuel' | 'maintenance' | 'services' | 'incidents' | 'performance';
 
 export default function VehicleDetail() {
     const { id } = useParams<{ id: string }>();
@@ -351,6 +352,7 @@ export default function VehicleDetail() {
                     { key: 'fuel', icon: 'local_gas_station', label: `Combustible (${fuelLogs.length})` },
                     { key: 'maintenance', icon: 'build', label: `Mantenimiento (${maintenance.length})` },
                     { key: 'services', icon: 'event', label: `Agenda (${schedules.length})` },
+                    { key: 'incidents', icon: 'warning', label: 'Incidentes' },
                     { key: 'performance', icon: 'analytics', label: 'Rendimiento' },
                 ].map(t => (
                     <button key={t.key} onClick={() => setTab(t.key as Tab)}
@@ -988,6 +990,10 @@ export default function VehicleDetail() {
             )}
 
             {/* ===== PERFORMANCE TAB ===== */}
+            {tab === 'incidents' && (
+                <FleetIncidentsTab vehicleId={vehicle.id} />
+            )}
+
             {tab === 'performance' && (
                 <div className="space-y-6">
                     {/* KPI Cards */}

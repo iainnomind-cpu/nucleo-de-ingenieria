@@ -48,6 +48,7 @@ import SystemSettings from './pages/Settings/SystemSettings';
 import ClientWellLogPublic from './pages/Maintenance/ClientWellLogPublic';
 import RepairsDashboard from './pages/Repairs/RepairsDashboard';
 import RepairDetail from './pages/Repairs/RepairDetail';
+import ClientRepairTrackingPublic from './pages/Repairs/ClientRepairTrackingPublic';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 
 function ProtectedApp() {
@@ -192,6 +193,7 @@ function App() {
       <Routes>
         {/* Public route — no auth required */}
         <Route path="/well-log/:token" element={<ClientWellLogPublic />} />
+        <Route path="/repair-tracking/:token" element={<ClientRepairTrackingPublic />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         {/* All other routes go through auth */}
         <Route path="*" element={<AuthProvider><ProtectedApp /></AuthProvider>} />

@@ -35,6 +35,7 @@ export default function RepairDetail() {
     const [noteText, setNoteText] = useState('');
     const [editSection, setEditSection] = useState<string | null>(null);
     const [editData, setEditData] = useState<Record<string, any>>({});
+    const [beforePhotos, setBeforePhotos] = useState<PhotoAttachment[]>([]);
     const [afterPhotos, setAfterPhotos] = useState<PhotoAttachment[]>([]);
     const [deliveryPhotos, setDeliveryPhotos] = useState<PhotoAttachment[]>([]);
 
@@ -53,6 +54,8 @@ export default function RepairDetail() {
         if (!rRes.data) { navigate('/repairs'); return; }
         const repairData = rRes.data as EquipmentRepair;
         setRepair(repairData);
+        setBeforePhotos((repairData.photos_before as PhotoAttachment[]) || []);
+        setAfterPhotos((repairData.photos_after as PhotoAttachment[]) || []);
         setDeliveryPhotos((repairData.delivery_photos as PhotoAttachment[]) || []);
         setParts((pRes.data as RepairPart[]) || []);
         setTimeline((tRes.data as RepairTimelineEvent[]) || []);
@@ -163,6 +166,13 @@ export default function RepairDetail() {
         fetchAll();
     };
 
+    const copyClientLink = () => {
+        if (!repair?.access_token) return;
+        const url = `${window.location.origin}/repair-tracking/${repair.access_token}`;
+        navigator.clipboard.writeText(url);
+        alert('Enlace copiado al portapapeles');
+    };
+
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1';
     const sectionClass = 'rounded-xl border border-slate-200/60 bg-white/50 p-5 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50';
@@ -219,7 +229,13 @@ export default function RepairDetail() {
                                 → {REPAIR_STATUS_LABELS[ns]}
                             </button>
                         ))}
-                        <button onClick={() => changeStatus('cancelled')} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-slate-700">Cancelar</button>
+                        {repair.access_token && (
+                            <button onClick={copyClientLink} className="flex items-center gap-1.5 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 hover:bg-sky-100 transition-all dark:border-sky-800/40 dark:bg-sky-900/20 dark:text-sky-400">
+                                <span className="material-symbols-outlined text-[16px]">share</span>
+                                Enlace para Cliente
+                            </button>
+                        )}
+                        <button onClick={() => changeStatus('cancelled')} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-500 dark:border-slate-700 hover:bg-slate-50 transition-all">Cancelar</button>
                     </div>
                 )}
             </div>
@@ -661,29 +677,71 @@ export default function RepairDetail() {
             {/* TAB: Photos */}
             {tab === 'photos' && (
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {/* Antes (Problema) */}
                     <div className={sectionClass}>
-                        <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-red-500 text-[18px]">photo_camera</span>Antes (Problema)</h4>
-                        {repair.photos_before && (repair.photos_before as unknown[]).length > 0
-                            ? <PhotoGallery photos={repair.photos_before as PhotoAttachment[]} />
-                            : <p className="text-sm text-slate-400 py-6 text-center">Sin fotos</p>}
+                        <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-red-500 text-[18px]">photo_camera</span>
+                            Antes (Problema)
+                            {beforePhotos.length > 0 && <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 dark:bg-slate-700">{beforePhotos.length} foto{beforePhotos.length !== 1 ? 's' : ''}</span>}
+                        </h4>
+                        {beforePhotos.length > 0 && (
+                            <div className="mb-3">
+                                <PhotoGallery photos={beforePhotos} />
+                            </div>
+                        )}
+                        <div className={beforePhotos.length > 0 ? 'border-t border-slate-200/60 pt-3 dark:border-slate-700/60' : ''}>
+                            <PhotoUploader
+                                photos={beforePhotos}
+                                onPhotosChange={async (photos) => {
+                                    setBeforePhotos(photos);
+                                    await supabase.from('equipment_repairs').update({ photos_before: photos }).eq('id', repair.id);
+                                }}
+                                folder={`repairs/before/${id}`}
+                                uploaderName="Recepción"
+                                compact
+                            />
+                        </div>
                     </div>
+
+                    {/* Después (Reparado) */}
                     <div className={sectionClass}>
-                        <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[18px]">check_circle</span>Después (Reparado)</h4>
-                        {repair.photos_after && (repair.photos_after as unknown[]).length > 0
-                            ? <PhotoGallery photos={repair.photos_after as PhotoAttachment[]} />
-                            : isActive
-                            ? <PhotoUploader photos={afterPhotos} onPhotosChange={async (photos) => { setAfterPhotos(photos); await supabase.from('equipment_repairs').update({ photos_after: photos }).eq('id', repair.id); }} folder={`repairs/after/${id}`} uploaderName="Técnico" compact />
-                            : <p className="text-sm text-slate-400 py-6 text-center">Sin fotos</p>}
+                        <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                            Después (Reparado)
+                            {afterPhotos.length > 0 && <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-900/30">{afterPhotos.length} foto{afterPhotos.length !== 1 ? 's' : ''}</span>}
+                        </h4>
+                        {afterPhotos.length > 0 && (
+                            <div className="mb-3">
+                                <PhotoGallery photos={afterPhotos} />
+                            </div>
+                        )}
+                        <div className={afterPhotos.length > 0 ? 'border-t border-slate-200/60 pt-3 dark:border-slate-700/60' : ''}>
+                            <PhotoUploader
+                                photos={afterPhotos}
+                                onPhotosChange={async (photos) => {
+                                    setAfterPhotos(photos);
+                                    await supabase.from('equipment_repairs').update({ photos_after: photos }).eq('id', repair.id);
+                                }}
+                                folder={`repairs/after/${id}`}
+                                uploaderName="Técnico"
+                                compact
+                            />
+                        </div>
                     </div>
+
+                    {/* Entrega al Cliente */}
                     <div className={sectionClass}>
                         <h4 className="text-sm font-bold text-lime-700 dark:text-lime-400 mb-3 flex items-center gap-2">
                             <span className="material-symbols-outlined text-lime-600 text-[18px]">assignment_turned_in</span>
                             Evidencia de Entrega al Cliente
+                            {deliveryPhotos.length > 0 && <span className="ml-auto rounded-full bg-lime-100 px-2 py-0.5 text-[10px] font-bold text-lime-600 dark:bg-lime-900/30">{deliveryPhotos.length} foto{deliveryPhotos.length !== 1 ? 's' : ''}</span>}
                         </h4>
-                        {deliveryPhotos.length > 0
-                            ? <PhotoGallery photos={deliveryPhotos} />
-                            : <p className="text-sm text-slate-400 py-4 text-center">Sin fotos de entrega</p>}
-                        <div className="mt-3 border-t border-slate-200/60 pt-3 dark:border-slate-700/60">
+                        {deliveryPhotos.length > 0 && (
+                            <div className="mb-3">
+                                <PhotoGallery photos={deliveryPhotos} />
+                            </div>
+                        )}
+                        <div className={deliveryPhotos.length > 0 ? 'border-t border-slate-200/60 pt-3 dark:border-slate-700/60' : ''}>
                             <PhotoUploader
                                 photos={deliveryPhotos}
                                 onPhotosChange={async (photos) => {
