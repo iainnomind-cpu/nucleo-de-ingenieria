@@ -146,11 +146,11 @@ export default function ClientRepairTrackingPublic() {
                         <div className="relative">
                             <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-100 -translate-y-1/2 rounded-full hidden md:block"></div>
                             
-                            <div className="absolute top-1/2 left-0 h-1 bg-sky-500 -translate-y-1/2 rounded-full hidden md:block transition-all duration-1000" style={{ width: \`\${(currentIndex / (REPAIR_STATUSES.length - 1)) * 100}%\` }}></div>
+                            <div className="absolute top-1/2 left-0 h-1 bg-sky-500 -translate-y-1/2 rounded-full hidden md:block transition-all duration-1000" style={{ width: `${(currentIndex / (REPAIR_STATUSES.length - 1)) * 100}%` }}></div>
                             
                             {/* Vertical Line for Mobile */}
                             <div className="absolute left-6 top-0 bottom-0 w-1 bg-slate-100 rounded-full md:hidden"></div>
-                            <div className="absolute left-6 top-0 w-1 bg-sky-500 rounded-full md:hidden transition-all duration-1000" style={{ height: \`\${(currentIndex / (REPAIR_STATUSES.length - 1)) * 100}%\` }}></div>
+                            <div className="absolute left-6 top-0 w-1 bg-sky-500 rounded-full md:hidden transition-all duration-1000" style={{ height: `${(currentIndex / (REPAIR_STATUSES.length - 1)) * 100}%` }}></div>
 
                             <div className="flex flex-col md:flex-row justify-between relative z-10 gap-6 md:gap-0">
                                 {REPAIR_STATUSES.map((status, idx) => {
@@ -160,11 +160,11 @@ export default function ClientRepairTrackingPublic() {
                                     
                                     return (
                                         <div key={status.key} className="flex md:flex-col items-center gap-4 md:gap-3 text-center w-full md:w-32 relative">
-                                            <div className={\`flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-500 \${colorCls} \${isActive ? 'shadow-lg ring-4 ring-white scale-110' : ''}\`}>
+                                            <div className={'flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-500 ' + colorCls + (isActive ? ' shadow-lg ring-4 ring-white scale-110' : '')}>
                                                 <span className="material-symbols-outlined text-[24px]">{isCompleted ? 'check' : status.icon}</span>
                                             </div>
                                             <div className="text-left md:text-center mt-0 md:mt-2">
-                                                <p className={\`text-xs md:text-sm font-bold transition-all duration-500 \${isCompleted ? 'text-slate-900' : 'text-slate-400'}\`}>
+                                                <p className={'text-xs md:text-sm font-bold transition-all duration-500 ' + (isCompleted ? 'text-slate-900' : 'text-slate-400')}>
                                                     {status.label}
                                                 </p>
                                                 {isActive && (
