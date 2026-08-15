@@ -10,6 +10,7 @@ interface PhotoUploaderProps {
     maxFiles?: number;
     disabled?: boolean;
     compact?: boolean;
+    bucket?: string;
 }
 
 export default function PhotoUploader({
@@ -20,6 +21,7 @@ export default function PhotoUploader({
     maxFiles = MAX_FILES_DEFAULT,
     disabled = false,
     compact = false,
+    bucket,
 }: PhotoUploaderProps) {
     const photos = normalizePhotos(rawPhotos);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +48,9 @@ export default function PhotoUploader({
 
         const { photos: newPhotos, errors: uploadErrors } = await uploadMultiplePhotos(
             toUpload, folder, uploaderName,
-            (completed, total) => setProgress({ completed, total })
+            (completed, total) => setProgress({ completed, total }),
+            undefined,
+            bucket
         );
 
         if (uploadErrors.length > 0) setErrors(uploadErrors);

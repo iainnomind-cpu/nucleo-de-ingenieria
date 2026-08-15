@@ -31,7 +31,7 @@ const SEVERITY_COLORS = {
 };
 
 export default function FleetIncidentsTab({ vehicleId }: { vehicleId: string }) {
-    const { hasPermission } = useAuth();
+    const { user, hasPermission } = useAuth();
     const canEdit = hasPermission('fleet', 'edit');
     const canCreate = hasPermission('fleet', 'create');
     const canDelete = hasPermission('fleet', 'delete');
@@ -145,7 +145,7 @@ export default function FleetIncidentsTab({ vehicleId }: { vehicleId: string }) 
                             )}
                             <div className="md:col-span-2">
                                 <label className={labelClass}>Evidencia Fotográfica</label>
-                                <PhotoUploader photos={photos} onChange={setPhotos} bucket="repairs" folder={`fleet_incidents/${vehicleId}`} />
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} bucket="repairs" folder={`fleet_incidents/${vehicleId}`} uploaderName={user?.full_name || 'Sistema'} />
                             </div>
                         </div>
                         <div className="flex justify-end gap-2 pt-2">

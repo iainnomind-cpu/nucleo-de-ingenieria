@@ -232,10 +232,14 @@ export default function InventoryList() {
         fetchProducts();
     };
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('¿Está seguro de que desea eliminar este producto?')) return;
+    const handleDelete = async (p: InventoryProduct) => {
+        if (!window.confirm(`¿Está seguro de que desea eliminar ${p.name}?`)) return;
         try {
-            await supabase.from('inventory_products').update({ is_active: false }).eq('id', id);
+            if (p.category === 'vehiculos') {
+                await supabase.from('vehicles').update({ status: 'inactive' }).eq('id', p.id);
+            } else {
+                await supabase.from('inventory_products').update({ is_active: false }).eq('id', p.id);
+            }
             fetchProducts();
         } catch (error) {
             alert('Error al intentar eliminar.');
@@ -468,7 +472,7 @@ export default function InventoryList() {
                                                     <span className="material-symbols-outlined text-[18px]">edit</span>
                                                 </button>
                                                 {canDelete && (
-                                                    <button onClick={e => { e.stopPropagation(); handleDelete(p.id); }} title="Eliminar" className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
+                                                    <button onClick={e => { e.stopPropagation(); handleDelete(p); }} title="Eliminar" className="rounded p-1 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20">
                                                         <span className="material-symbols-outlined text-[18px]">delete</span>
                                                     </button>
                                                 )}

@@ -93,7 +93,7 @@ export default function ProjectsList() {
                 {
                     title: `Gestión de Materiales — ${projectNumber}`,
                     description: 'Verificar inventario, generar órdenes de compra, confirmar disponibilidad de materiales.',
-                    assigned_to: 'Paulina',
+                    assigned_to: 'Administración',
                     created_by: 'Sistema',
                     due_date: formattedDueDate,
                     project_id: project.id,
@@ -164,7 +164,7 @@ export default function ProjectsList() {
                 referenceId: project.id,
             });
 
-            alert(`Proyecto creado exitosamente.\n✓ Factura generada${quotedAmount > 0 ? ` por ${formatCurrencyMXN(quotedAmount)}` : ''}\n✓ Space contextual generado\n✓ Tareas asignadas a: Samara, Paulina, Joel, Alejandro`);
+            alert(`Proyecto creado exitosamente.\n✓ Factura generada${quotedAmount > 0 ? ` por ${formatCurrencyMXN(quotedAmount)}` : ''}\n✓ Space contextual generado\n✓ Tareas asignadas a: Ruby, Administración, Joel, Alejandro`);
         }
 
         setShowForm(false);

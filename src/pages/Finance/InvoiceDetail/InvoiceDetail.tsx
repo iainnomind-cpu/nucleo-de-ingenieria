@@ -105,7 +105,7 @@ export default function InvoiceDetail() {
             const { data: spaces } = await supabase.from('spaces')
                 .select('id, name').in('name', ['Operaciones', 'Administración']);
             if (spaces) {
-                const msg = `💰 **PAGO CONFIRMADO — PROYECTO LIBERADO**\n\n📄 Factura: **${invoice.invoice_number}**\n👤 Cliente: **${clientName}**\n💲 Total: **${formatCurrencyFin(invoice.total)}**\n\nEl proyecto está financieramente liberado para avanzar a la fase operativa.\n\n_Tarea de Validación de Cobro asignada a @Samara._`;
+                const msg = `💰 **PAGO CONFIRMADO — PROYECTO LIBERADO**\n\n📄 Factura: **${invoice.invoice_number}**\n👤 Cliente: **${clientName}**\n💲 Total: **${formatCurrencyFin(invoice.total)}**\n\nEl proyecto está financieramente liberado para avanzar a la fase operativa.\n\n_Tarea de Validación de Cobro asignada a @Ruby._`;
                 for (const space of spaces) {
                     await supabase.from('messages').insert({
                         space_id: space.id,
@@ -119,7 +119,7 @@ export default function InvoiceDetail() {
             // Push notifications internas
             await supabase.from('app_notifications').insert([
                 {
-                    user_name: 'Samara',
+                    user_name: 'Ruby',
                     title: '💰 Validación de Cobro',
                     message: `Factura ${invoice.invoice_number} de ${clientName} pagada (${formatCurrencyFin(invoice.total)}). Confirma y registra en CRM.`,
                     type: 'payment',
@@ -206,7 +206,7 @@ export default function InvoiceDetail() {
             const { data: spaces } = await supabase.from('spaces')
                 .select('id, name').in('name', ['Operaciones', 'Administración']);
             if (spaces) {
-                const msg = `💰 **PAGO CONFIRMADO — PROYECTO LIBERADO**\n\n📄 Factura: **${invoice.invoice_number}**\n👤 Cliente: **${clientName}**\n💲 Total: **${formatCurrencyFin(invoice.total)}**\n\nEl proyecto está financieramente liberado para avanzar a la fase operativa.\n\n_Tarea de Validación de Cobro asignada a @Samara._`;
+                const msg = `💰 **PAGO CONFIRMADO — PROYECTO LIBERADO**\n\n📄 Factura: **${invoice.invoice_number}**\n👤 Cliente: **${clientName}**\n💲 Total: **${formatCurrencyFin(invoice.total)}**\n\nEl proyecto está financieramente liberado para avanzar a la fase operativa.\n\n_Tarea de Validación de Cobro asignada a @Ruby._`;
                 for (const space of spaces) {
                     await supabase.from('messages').insert({
                         space_id: space.id,
@@ -220,7 +220,7 @@ export default function InvoiceDetail() {
             // Push notifications internas
             await supabase.from('app_notifications').insert([
                 {
-                    user_name: 'Samara',
+                    user_name: 'Ruby',
                     title: '💰 Validación de Cobro',
                     message: `Factura ${invoice.invoice_number} de ${clientName} marcada como pagada (${formatCurrencyFin(invoice.total)}).`,
                     type: 'payment',
@@ -249,28 +249,28 @@ export default function InvoiceDetail() {
             ]);
         }
 
-        // → M6→M8: Notify Samara when invoice is sent and due date is approaching/overdue
-        if (status === 'sent' && invoice.balance > 0) {
+        // → M6→M8: Notify Ruby when invoice is sent and due date is approaching/overdue
+        if (invoice.status === 'sent' && invoice.due_date && invoice.balance > 0) {
+            const dueDate = new Date(`${invoice.due_date}T12:00:00Z`);
             const today = new Date();
-            const dueDate = new Date(invoice.due_date);
-            const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-            if (daysUntilDue <= 5) {
-                const { data: spaces } = await supabase.from('spaces')
-                    .select('id').ilike('name', '%admin%').limit(1);
-                if (spaces && spaces.length > 0) {
+            const daysUntilDue = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 3600 * 24));
+            
+            if (daysUntilDue <= 3) {
+                // Determine severity and message
+                const { data: adminSpace } = await supabase.from('spaces').select('id').eq('name', 'Administración').single();
+                if (adminSpace) {
                     await supabase.from('messages').insert({
-                        space_id: spaces[0].id,
+                        space_id: adminSpace.id,
                         sender: 'Sistema',
-                        content: `💰 **ALERTA COBRANZA**: La factura **${invoice.invoice_number}** de **${invoice.client?.company_name || 'N/A'}** ${daysUntilDue < 0 ? `está **vencida** hace ${Math.abs(daysUntilDue)} días` : daysUntilDue === 0 ? '**vence hoy**' : `vence en **${daysUntilDue} días**`}.\n\n📋 Monto: **${formatCurrencyFin(invoice.total)}** | Saldo: **${formatCurrencyFin(invoice.balance)}**\n\n👤 @Samara — Se requiere seguimiento de cobranza inmediato.`,
+                        content: `💰 **ALERTA COBRANZA**: La factura **${invoice.invoice_number}** de **${invoice.client?.company_name || 'N/A'}** ${daysUntilDue < 0 ? `está **vencida** hace ${Math.abs(daysUntilDue)} días` : daysUntilDue === 0 ? '**vence hoy**' : `vence en **${daysUntilDue} días**`}.\n\n📋 Monto: **${formatCurrencyFin(invoice.total)}** | Saldo: **${formatCurrencyFin(invoice.balance)}**\n\n👤 @Ruby — Se requiere seguimiento de cobranza inmediato.`,
                         message_type: 'system'
                     });
-
-                    // → M6→M8: Assign task directly to Samara on the board
+                    
+                    // → M6→M8: Assign task directly to Ruby on the board
                     await supabase.from('team_tasks').insert({
-                        title: `Gestionar cobro factura ${invoice.invoice_number}`,
-                        description: `Cobranza de ${invoice.client?.company_name || 'Cliente'} (Saldo: ${formatCurrencyFin(invoice.balance)}). Generada por alerta automática.`,
-                        assigned_to: 'Samara',
+                        title: `Seguimiento de Cobranza Vencida — ${invoice.invoice_number}`,
+                        description: `La factura **${invoice.invoice_number}** ${daysUntilDue < 0 ? 'está vencida' : 'vence pronto'}.\nMonto pendiente: ${formatCurrencyFin(invoice.balance)}\nCliente: ${invoice.client?.company_name || 'N/A'}`,
+                        assigned_to: 'Ruby',
                         created_by: 'Sistema',
                         priority: daysUntilDue < 0 ? 'urgent' : 'high',
                         due_date: new Date(invoice.due_date).toISOString().split('T')[0],

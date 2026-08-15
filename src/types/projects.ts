@@ -217,7 +217,7 @@ export const EXPENSE_TYPE_ICONS: Record<ExpenseType, string> = {
 };
 
 // Team members (Legacy fallback)
-export const TEAM_MEMBERS = ['Samara', 'Paulina', 'Joel', 'Alejandro'];
+export const TEAM_MEMBERS = ['Ruby', 'Administración', 'Joel', 'Alejandro'];
 
 export function formatCurrencyMXN(value: number): string {
     return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(value);

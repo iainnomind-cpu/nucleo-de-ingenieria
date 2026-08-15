@@ -157,7 +157,7 @@ export const TASK_PRIORITY_ICONS: Record<TaskPriority, string> = {
     low: 'south', normal: 'remove', high: 'north', urgent: 'priority_high',
 };
 
-export const TEAM_MEMBERS = ['Director', 'Joel', 'Samara', 'Paulina', 'Alejandro'];
+export const TEAM_MEMBERS = ['Director', 'Joel', 'Ruby', 'Administración', 'Alejandro'];
 
 export const NOTIFICATION_LABELS: Record<NotificationLevel, string> = {
     urgent: 'Solo Urgentes', normal: 'Normal', summary: 'Resumen', muted: 'Silenciado',

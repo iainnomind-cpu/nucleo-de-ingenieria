@@ -261,7 +261,7 @@ export default function ProjectDetail() {
                     name: spaceName,
                     space_type: 'project',
                     description: `Space contextual: ${project.project_number} · ${project.title}`,
-                    members: ['Joel', 'Alejandro', 'Samara', 'Paulina'],
+                    members: ['Joel', 'Alejandro', 'Ruby', 'Administración'],
                     is_archived: false,
                 }).select().single();
                 projectSpaceId = newSpace?.id;
@@ -272,15 +272,15 @@ export default function ProjectDetail() {
                 await supabase.from('messages').insert({
                     space_id: projectSpaceId,
                     sender_id: '12345678-1234-1234-1234-123456789012',
-                    content: `🚀 **INICIO DE PROYECTO (M3→M8)**: El proyecto **${project.project_number}** ha iniciado trabajo en campo.\n\n📋 **${project.title}**\n👤 PM: ${project.project_manager || 'Sin asignar'}\n📍 Equipo: Joel, Alejandro, Samara, Paulina`,
+                    content: `🚀 **INICIO DE PROYECTO (M3→M8)**: El proyecto **${project.project_number}** ha iniciado trabajo en campo.\n\n📋 **${project.title}**\n👤 PM: ${project.project_manager || 'Sin asignar'}\n📍 Equipo: Joel, Alejandro, Ruby, Administración`,
                     message_type: 'text'
                 });
             }
 
             // → M3→M8: Create Board tasks from project checklist items
             const checklistItems = [
-                { field: 'checklist_invoice', title: `Factura previa — ${project.project_number}`, assignee: 'Samara' },
-                { field: 'checklist_materials', title: `Materiales listos — ${project.project_number}`, assignee: 'Paulina' },
+                { field: 'checklist_invoice', title: `Factura previa — ${project.project_number}`, assignee: 'Ruby' },
+                { field: 'checklist_materials', title: `Materiales listos — ${project.project_number}`, assignee: 'Administración' },
                 { field: 'checklist_vehicle', title: `Vehículo preparado — ${project.project_number}`, assignee: 'Joel' },
                 { field: 'checklist_team', title: `Equipo asignado — ${project.project_number}`, assignee: 'Alejandro' },
             ];
@@ -649,7 +649,7 @@ export default function ProjectDetail() {
             payment_method: paymentForm.payment_method,
             reference: paymentForm.reference || null,
             notes: paymentForm.notes || null,
-            received_by: 'Samara',
+            received_by: 'Ruby',
         });
 
         // Update invoice totals
@@ -791,8 +791,8 @@ export default function ProjectDetail() {
                             </div>
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 {([
-                                    { field: 'checklist_invoice' as ChecklistField, label: 'Facturación y Cobranza', icon: 'receipt', responsible: 'Samara' },
-                                    { field: 'checklist_materials' as ChecklistField, label: 'Materiales Listos', icon: 'inventory', responsible: 'Paulina' },
+                                    { field: 'checklist_invoice' as ChecklistField, label: 'Facturación y Cobranza', icon: 'receipt', responsible: 'Ruby' },
+                                    { field: 'checklist_materials' as ChecklistField, label: 'Materiales Listos', icon: 'inventory', responsible: 'Administración' },
                                     { field: 'checklist_vehicle' as ChecklistField, label: 'Equipos Preparados', icon: 'local_shipping', responsible: 'Joel' },
                                     { field: 'checklist_team' as ChecklistField, label: 'Trabajo Programado', icon: 'group', responsible: 'Joel / Alejandro' },
                                 ]).map(item => {
