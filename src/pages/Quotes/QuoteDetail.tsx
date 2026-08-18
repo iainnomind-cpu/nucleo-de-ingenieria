@@ -724,7 +724,7 @@ export default function QuoteDetail() {
     const handleGeneratePDF = async () => {
         const doc = await generatePDFDocument();
         if (doc) {
-            doc.save(`${quote?.quote_number}.pdf`);
+            doc.save(`${quote?.title}.pdf`);
         } else {
             alert('Error generando PDF. Verifica que jspdf esté instalado.');
         }
@@ -744,7 +744,7 @@ export default function QuoteDetail() {
             const doc = await generatePDFDocument();
             if (!doc) throw new Error('No se pudo construir el PDF en memoria');
             const base64Pdf = doc.output('datauristring');
-            const filename = `${quote.quote_number}.pdf`;
+            const filename = `${quote.title}.pdf`;
 
             const promises: Promise<string>[] = [];
 
