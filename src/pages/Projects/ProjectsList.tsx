@@ -19,7 +19,7 @@ export default function ProjectsList() {
     const navigate = useNavigate();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<ProjectStatus | 'all'>('all');
+    const [filter, setFilter] = useState<ProjectStatus | 'all' | 'active' | 'archived'>('active');
     const [search, setSearch] = useState('');
     const [showForm, setShowForm] = useState(false);
 
@@ -30,7 +30,9 @@ export default function ProjectsList() {
     const fetchProjects = useCallback(async () => {
         setLoading(true);
         let q = supabase.from('projects').select('*, client:clients(id, company_name)').order('created_at', { ascending: false });
-        if (filter !== 'all') q = q.eq('status', filter);
+        if (filter === 'active') q = q.in('status', ['pending', 'preparation', 'in_field']);
+        else if (filter === 'archived') q = q.in('status', ['completed', 'invoiced']);
+        else if (filter !== 'all') q = q.eq('status', filter);
         if (search.trim()) q = q.or(`title.ilike.%${search}%,project_number.ilike.%${search}%`);
         const { data } = await q;
         setProjects((data as Project[]) || []);
@@ -243,6 +245,9 @@ export default function ProjectsList() {
                         className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
                 </div>
                 <div className="flex flex-wrap gap-2">
+                    <button onClick={() => setFilter('active')} className={`rounded-full px-3 py-1 text-xs font-semibold ${filter === 'active' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>Activos</button>
+                    <button onClick={() => setFilter('archived')} className={`rounded-full px-3 py-1 text-xs font-semibold ${filter === 'archived' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>Finalizados</button>
+                    <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1 self-center" />
                     <button onClick={() => setFilter('all')} className={`rounded-full px-3 py-1 text-xs font-semibold ${filter === 'all' ? 'bg-primary text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>Todos</button>
                     {STATUS_FLOW.map(s => (
                         <button key={s} onClick={() => setFilter(s)} className={`rounded-full px-3 py-1 text-xs font-semibold ${filter === s ? `${PROJECT_STATUS_COLORS[s].bg} ${PROJECT_STATUS_COLORS[s].text}` : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
