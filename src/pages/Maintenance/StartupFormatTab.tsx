@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import PhotoUploader, { PhotoGallery } from '../../components/PhotoUploader';
+import { PhotoAttachment } from '../../types/photos';
 
 export interface StartupFormatRecord {
     id: string;
@@ -26,6 +28,36 @@ export interface StartupFormatRecord {
     avg_volts?: string;
     avg_amps?: string;
     unbalance_percentage?: string;
+
+    time_logged_2?: string;
+    volts_l1_2?: string;
+    volts_l2_2?: string;
+    volts_l3_2?: string;
+    amp_l1_2?: string;
+    amp_l2_2?: string;
+    amp_l3_2?: string;
+    flow_rate_2?: string;
+    dynamic_level_2?: string;
+    discharge_pressure_2?: string;
+    observations_table_2?: string;
+    avg_volts_2?: string;
+    avg_amps_2?: string;
+    unbalance_percentage_2?: string;
+
+    time_logged_3?: string;
+    volts_l1_3?: string;
+    volts_l2_3?: string;
+    volts_l3_3?: string;
+    amp_l1_3?: string;
+    amp_l2_3?: string;
+    amp_l3_3?: string;
+    flow_rate_3?: string;
+    dynamic_level_3?: string;
+    discharge_pressure_3?: string;
+    observations_table_3?: string;
+    avg_volts_3?: string;
+    avg_amps_3?: string;
+    unbalance_percentage_3?: string;
     
     // Parámetros Eléctricos
     low_voltage?: string;
@@ -49,6 +81,7 @@ export interface StartupFormatRecord {
 
     client?: { id: string; company_name: string };
     created_at?: string;
+    photos?: any[];
 }
 
 const EMPTY_FORM: Omit<StartupFormatRecord, 'id'> = {
@@ -57,9 +90,16 @@ const EMPTY_FORM: Omit<StartupFormatRecord, 'id'> = {
     time_logged: '', volts_l1: '', volts_l2: '', volts_l3: '', amp_l1: '', amp_l2: '', amp_l3: '',
     flow_rate: '', dynamic_level: '', discharge_pressure: '', observations_table: '',
     avg_volts: '', avg_amps: '', unbalance_percentage: '',
+    time_logged_2: '', volts_l1_2: '', volts_l2_2: '', volts_l3_2: '', amp_l1_2: '', amp_l2_2: '', amp_l3_2: '',
+    flow_rate_2: '', dynamic_level_2: '', discharge_pressure_2: '', observations_table_2: '',
+    avg_volts_2: '', avg_amps_2: '', unbalance_percentage_2: '',
+    time_logged_3: '', volts_l1_3: '', volts_l2_3: '', volts_l3_3: '', amp_l1_3: '', amp_l2_3: '', amp_l3_3: '',
+    flow_rate_3: '', dynamic_level_3: '', discharge_pressure_3: '', observations_table_3: '',
+    avg_volts_3: '', avg_amps_3: '', unbalance_percentage_3: '',
     low_voltage: '', high_voltage: '', overload_amps: '', underload_amps: '', phase_unbalance: '',
     motor_power_hp: '', motor_feed_volts: '', motor_frequency_hz: '', motor_nom_amps: '', motor_protection_type: '',
     recommendations: '', received_by: '', reviewed_by: '', authorized_by: '',
+    photos: [],
 };
 
 export default function StartupFormatTab() {
@@ -70,6 +110,7 @@ export default function StartupFormatTab() {
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [photos, setPhotos] = useState<PhotoAttachment[]>([]);
     const [form, setForm] = useState<Omit<StartupFormatRecord, 'id'>>(EMPTY_FORM);
 
     const f = (field: keyof Omit<StartupFormatRecord, 'id'>) =>
@@ -93,17 +134,18 @@ export default function StartupFormatTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const payload = { ...form, client_id: form.client_id || null };
+            const payload = { ...form, client_id: form.client_id || null, photos };
             if (editingId) {
                 const { error } = await supabase.from('startup_formats').update(payload).eq('id', editingId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('startup_formats').insert([{ ...payload, created_by: user?.id }]);
+                const { error } = await supabase.from('startup_formats').insert([{ ...payload, ...(user?.id ? { created_by: user.id } : {}) }]);
                 if (error) throw error;
             }
             setShowForm(false);
             setEditingId(null);
             setForm(EMPTY_FORM);
+            setPhotos([]);
             fetchData();
         } catch (err: any) {
             alert('Error al guardar: ' + err.message);
@@ -115,6 +157,7 @@ export default function StartupFormatTab() {
     const handleEditClick = (rec: StartupFormatRecord) => {
         setEditingId(rec.id);
         setForm({ ...EMPTY_FORM, ...rec, client_id: rec.client_id || '' });
+        setPhotos((rec as any).photos || []);
         setShowForm(true);
     };
 
@@ -210,11 +253,40 @@ export default function StartupFormatTab() {
       <td>${rec.dynamic_level || ''}</td>
       <td>${rec.discharge_pressure || ''}</td>
       <td>${rec.observations_table || ''}</td>
-      <td>
-        V: ${rec.avg_volts || ''}<br/>
-        A: ${rec.avg_amps || ''}
-      </td>
+      <td>V: ${rec.avg_volts || ''}<br/>A: ${rec.avg_amps || ''}</td>
       <td>${rec.unbalance_percentage || ''}</td>
+    </tr>
+    <tr>
+      <td>${rec.record_date || ''}</td>
+      <td>${rec.time_logged_2 || ''}</td>
+      <td>${rec.volts_l1_2 || ''}</td>
+      <td>${rec.volts_l2_2 || ''}</td>
+      <td>${rec.volts_l3_2 || ''}</td>
+      <td>${rec.amp_l1_2 || ''}</td>
+      <td>${rec.amp_l2_2 || ''}</td>
+      <td>${rec.amp_l3_2 || ''}</td>
+      <td>${rec.flow_rate_2 || ''}</td>
+      <td>${rec.dynamic_level_2 || ''}</td>
+      <td>${rec.discharge_pressure_2 || ''}</td>
+      <td>${rec.observations_table_2 || ''}</td>
+      <td>V: ${rec.avg_volts_2 || ''}<br/>A: ${rec.avg_amps_2 || ''}</td>
+      <td>${rec.unbalance_percentage_2 || ''}</td>
+    </tr>
+    <tr>
+      <td>${rec.record_date || ''}</td>
+      <td>${rec.time_logged_3 || ''}</td>
+      <td>${rec.volts_l1_3 || ''}</td>
+      <td>${rec.volts_l2_3 || ''}</td>
+      <td>${rec.volts_l3_3 || ''}</td>
+      <td>${rec.amp_l1_3 || ''}</td>
+      <td>${rec.amp_l2_3 || ''}</td>
+      <td>${rec.amp_l3_3 || ''}</td>
+      <td>${rec.flow_rate_3 || ''}</td>
+      <td>${rec.dynamic_level_3 || ''}</td>
+      <td>${rec.discharge_pressure_3 || ''}</td>
+      <td>${rec.observations_table_3 || ''}</td>
+      <td>V: ${rec.avg_volts_3 || ''}<br/>A: ${rec.avg_amps_3 || ''}</td>
+      <td>${rec.unbalance_percentage_3 || ''}</td>
     </tr>
   </tbody>
 </table>
@@ -332,6 +404,11 @@ export default function StartupFormatTab() {
                                 <div><p className="text-slate-400">Amps Prom.</p><p className="font-medium text-slate-700 dark:text-slate-300">{rec.avg_amps || '-'}</p></div>
                                 <div><p className="text-slate-400">Desbalance</p><p className="font-medium text-slate-700 dark:text-slate-300">{rec.unbalance_percentage || '-'}</p></div>
                             </div>
+                            {rec.photos && rec.photos.length > 0 && (
+                                <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                    <PhotoGallery photos={rec.photos} />
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
@@ -368,25 +445,35 @@ export default function StartupFormatTab() {
                             </div>
 
                             <p className={sectionHeader}><span className="material-symbols-outlined text-[18px]">table</span>Tabla Principal</p>
-                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
-                                {renderField('Fecha', 'record_date', '', 'date')}
-                                {renderField('Hora', 'time_logged', '', 'time')}
-                                {renderField('Volts (L1-L2)', 'volts_l1')}
-                                {renderField('Volts (L2-L3)', 'volts_l2')}
-                                {renderField('Volts (L1-L3)', 'volts_l3')}
-                                {renderField('Amp (L1)', 'amp_l1')}
-                                {renderField('Amp (L2)', 'amp_l2')}
-                                {renderField('Amp (L3)', 'amp_l3')}
-                                {renderField('Caudal', 'flow_rate')}
-                                {renderField('N. Dinámico (N.D.)', 'dynamic_level')}
-                                {renderField('P. Descarga (P.D.)', 'discharge_pressure')}
-                                {renderField('Promedio Volts', 'avg_volts')}
-                                {renderField('Promedio Amps', 'avg_amps')}
-                                {renderField('% Desbalance', 'unbalance_percentage')}
-                                <div className="sm:col-span-2">
-                                    {renderField('Observaciones (Tabla)', 'observations_table')}
+                            
+                            {[
+                                { title: '① Medición 1', suffix: '' },
+                                { title: '② Medición 2', suffix: '_2' },
+                                { title: '③ Medición 3', suffix: '_3' },
+                            ].map((row, idx) => (
+                                <div key={idx} className="mb-8 border border-slate-200 dark:border-slate-800 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/50">
+                                    <p className="text-sm font-bold text-emerald-700 dark:text-emerald-500 mb-3 uppercase tracking-wide">{row.title}</p>
+                                    <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                                        {idx === 0 && renderField('Fecha', 'record_date', '', 'date')}
+                                        {renderField('Hora', `time_logged${row.suffix}` as any, '', 'time')}
+                                        {renderField('Volts (L1-L2)', `volts_l1${row.suffix}` as any)}
+                                        {renderField('Volts (L2-L3)', `volts_l2${row.suffix}` as any)}
+                                        {renderField('Volts (L1-L3)', `volts_l3${row.suffix}` as any)}
+                                        {renderField('Amp (L1)', `amp_l1${row.suffix}` as any)}
+                                        {renderField('Amp (L2)', `amp_l2${row.suffix}` as any)}
+                                        {renderField('Amp (L3)', `amp_l3${row.suffix}` as any)}
+                                        {renderField('Caudal', `flow_rate${row.suffix}` as any)}
+                                        {renderField('N.D.', `dynamic_level${row.suffix}` as any)}
+                                        {renderField('P.D.', `discharge_pressure${row.suffix}` as any)}
+                                        {renderField('Promedio Volts', `avg_volts${row.suffix}` as any)}
+                                        {renderField('Promedio Amps', `avg_amps${row.suffix}` as any)}
+                                        {renderField('% Desbalance', `unbalance_percentage${row.suffix}` as any)}
+                                        <div className="sm:col-span-2">
+                                            {renderField('Observaciones (Tabla)', `observations_table${row.suffix}` as any)}
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            ))}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div>
@@ -424,6 +511,11 @@ export default function StartupFormatTab() {
                                 {renderField('Recibió Cliente', 'received_by')}
                                 {renderField('Revisó', 'reviewed_by')}
                                 {renderField('Autorizó Encargado', 'authorized_by')}
+                            </div>
+
+                            <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
+                                <label className={labelClass}>Fotografías del Formato de Arranque</label>
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`startup-formats/${editingId || 'new'}`} uploaderName={user?.full_name || 'Técnico'} />
                             </div>
 
                             <div className="mt-8 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">

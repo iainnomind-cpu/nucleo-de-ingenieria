@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/AuthContext';
+import PhotoUploader, { PhotoGallery } from '../../components/PhotoUploader';
+import { PhotoAttachment } from '../../types/photos';
 
 interface ElectricPanelRecord {
     id: string;
@@ -68,6 +70,7 @@ export default function ElectricPanelTab() {
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [photos, setPhotos] = useState<PhotoAttachment[]>([]);
     const [form, setForm] = useState<Omit<ElectricPanelRecord, 'id'>>(EMPTY_FORM);
 
     const renderYesNoSelect = (field: keyof Omit<ElectricPanelRecord, 'id'>) => (
@@ -105,17 +108,18 @@ export default function ElectricPanelTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const payload = { ...form, client_id: form.client_id || null };
+            const payload = { ...form, client_id: form.client_id || null, photos };
             if (editingId) {
                 const { error } = await supabase.from('electric_panel_records').update(payload).eq('id', editingId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('electric_panel_records').insert([{ ...payload, created_by: user?.id }]);
+                const { error } = await supabase.from('electric_panel_records').insert([{ ...payload, ...(user?.id ? { created_by: user.id } : {}) }]);
                 if (error) throw error;
             }
             setShowForm(false);
             setEditingId(null);
             setForm(EMPTY_FORM);
+            setPhotos([]);
             fetchData();
         } catch (err: any) {
             alert('Error al guardar: ' + err.message);
@@ -127,6 +131,7 @@ export default function ElectricPanelTab() {
     const handleEditClick = (rec: ElectricPanelRecord) => {
         setEditingId(rec.id);
         setForm({ ...EMPTY_FORM, ...rec, client_id: rec.client_id || '' });
+        setPhotos((rec as any).photos || []);
         setShowForm(true);
     };
 
@@ -427,6 +432,11 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                                     <label className={labelClass}>Observaciones</label>
                                     <textarea value={form.notes || ''} onChange={f('notes')} rows={2} className={inputClass} />
                                 </div>
+                            </div>
+
+                            <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
+                                <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">Fotografías del Cuadro Eléctrico</label>
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`electric-panels/${editingId || 'new'}`} uploaderName={user?.full_name || 'Técnico'} />
                             </div>
 
                             <div className="flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">

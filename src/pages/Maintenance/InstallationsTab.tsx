@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { WellInstallation, InstalledEquipment, EquipmentType, EQUIPMENT_TYPE_LABELS } from '../../types/maintenance';
 import { useAuth } from '../../lib/AuthContext';
+import PhotoUploader, { PhotoGallery } from '../../components/PhotoUploader';
+import { PhotoAttachment } from '../../types/photos';
 
 export default function InstallationsTab() {
     const { user } = useAuth();
@@ -11,6 +13,7 @@ export default function InstallationsTab() {
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [photos, setPhotos] = useState<PhotoAttachment[]>([]);
     
     // Form state
     const [form, setForm] = useState<Partial<WellInstallation>>({
@@ -73,12 +76,14 @@ export default function InstallationsTab() {
                 // UPDATE existing installation
                 const { error: instErr } = await supabase.from('well_installations').update({
                     ...form,
+                    photos,
                 }).eq('id', editingId);
                 if (instErr) throw instErr;
             } else {
                 // INSERT new installation
                 const { data: newInst, error: instErr } = await supabase.from('well_installations').insert([{
                     ...form,
+                    photos,
                     created_by: user?.id
                 }]).select().single();
                 
@@ -151,6 +156,7 @@ export default function InstallationsTab() {
         } else {
             setFormEquipment([{ name: 'Bomba Principal', equipment_type: 'bomba', brand: '', model: '' }]);
         }
+        setPhotos((inst as any).photos || []);
         setShowForm(true);
     };
 
@@ -251,6 +257,11 @@ export default function InstallationsTab() {
                                             </span>
                                         ))}
                                     </div>
+                                </div>
+                            )}
+                            {(inst as any).photos && (inst as any).photos.length > 0 && (
+                                <div className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
+                                    <PhotoGallery photos={(inst as any).photos} />
                                 </div>
                             )}
                         </div>
@@ -400,6 +411,11 @@ export default function InstallationsTab() {
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+
+                            <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
+                                <label className={labelClass}>Fotografías de la Instalación</label>
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`installations/${editingId || 'new'}`} uploaderName={user?.full_name || 'Técnico'} />
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">

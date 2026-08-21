@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { WellInstallation, InstalledEquipment, EquipmentType, EQUIPMENT_TYPE_LABELS } from '../../types/maintenance';
 import { useAuth } from '../../lib/AuthContext';
+import PhotoUploader, { PhotoGallery } from '../../components/PhotoUploader';
+import { PhotoAttachment } from '../../types/photos';
 
 interface WellUninstallation extends Omit<WellInstallation, 'equipment'> {
     reason?: string;
@@ -18,6 +20,7 @@ export default function UninstallationsTab() {
     const [saving, setSaving] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [printId, setPrintId] = useState<string | null>(null);
+    const [photos, setPhotos] = useState<PhotoAttachment[]>([]);
 
     const [form, setForm] = useState<Partial<WellUninstallation>>({
         folio: '',
@@ -93,13 +96,14 @@ export default function UninstallationsTab() {
                 bottom_depth: form.bottom_depth,
                 reason: form.reason,
                 notes: form.notes,
+                photos,
             };
 
             if (editingId) {
                 const { error } = await supabase.from('well_uninstallations').update(payload).eq('id', editingId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('well_uninstallations').insert([{ ...payload, created_by: user?.id }]);
+                const { error } = await supabase.from('well_uninstallations').insert([{ ...payload, ...(user?.id ? { created_by: user.id } : {}) }]);
                 if (error) throw error;
             }
             setShowForm(false);
@@ -168,6 +172,7 @@ export default function UninstallationsTab() {
             reason: rec.reason || '',
             notes: rec.notes || '',
         });
+        setPhotos((rec as any).photos || []);
         setShowForm(true);
     };
 
@@ -425,6 +430,11 @@ export default function UninstallationsTab() {
                                         <textarea value={form.notes || ''} onChange={e => setForm({ ...form, notes: e.target.value })} rows={3} className={inputClass} />
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
+                                <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">Fotografías de la Desinstalación</label>
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`uninstallations/${editingId || 'new'}`} uploaderName={user?.full_name || 'Técnico'} />
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
