@@ -71,9 +71,11 @@ export default function VideoRecordingTab() {
             };
 
             if (form.id) {
-                await supabase.from('video_recordings').update(payload).eq('id', form.id);
+                const { error } = await supabase.from('video_recordings').update(payload).eq('id', form.id);
+                if (error) throw error;
             } else {
-                await supabase.from('video_recordings').insert(payload);
+                const { error } = await supabase.from('video_recordings').insert(payload);
+                if (error) throw error;
             }
 
             setShowForm(false);
