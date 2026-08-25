@@ -56,6 +56,8 @@ export default function QuoteBuilder() {
     const [calculatingDistance, setCalculatingDistance] = useState(false);
     const [showInvPicker, setShowInvPicker] = useState(false);
     const [invSearch, setInvSearch] = useState('');
+    const [showNewSvcModal, setShowNewSvcModal] = useState(false);
+    const [newSvcForm, setNewSvcForm] = useState({ name: '', description: '', base_price: '', unit: 'servicio', category: 'mano_de_obra' });
 
     // Quote header
     const [clientId, setClientId] = useState(initialClientId);
@@ -192,6 +194,55 @@ export default function QuoteBuilder() {
             setCalculatingDistance(false);
         });
     }, [clientId, clients]);
+
+    // Save a manual line item to service_catalog so it's reusable in future quotes
+    const saveItemToCatalog = async (item: LineItem) => {
+        if (!item.description.trim()) { alert('El concepto no tiene descripción.'); return; }
+        const name = item.description.trim();
+        const { data: existing } = await supabase.from('service_catalog').select('id').eq('name', name).single();
+        if (existing) {
+            alert(`El servicio "${name}" ya existe en el catálogo.`);
+            return;
+        }
+        const { error } = await supabase.from('service_catalog').insert({
+            name,
+            description: name,
+            base_price: item.unit_price || 0,
+            unit: item.unit || 'servicio',
+            category: 'mano_de_obra',
+            is_active: true,
+        });
+        if (error) { alert('Error al guardar en catálogo: ' + error.message); return; }
+        alert(`✅ "${name}" guardado en el catálogo de servicios.`);
+        // Refresh services list
+        supabase.from('service_catalog').select('*').eq('is_active', true).order('name').then(({ data }) => setServices(data || []));
+        // Mark item as catalog type
+        setItems(prev => prev.map(i => i.tempId === item.tempId ? { ...i, source: 'catalog' as const } : i));
+    };
+
+    // Create brand-new service from the New Service modal
+    const handleCreateNewService = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newSvcForm.name.trim()) { alert('El nombre del servicio es requerido.'); return; }
+        const { data, error } = await supabase.from('service_catalog').insert({
+            name: newSvcForm.name.trim(),
+            description: newSvcForm.description.trim() || newSvcForm.name.trim(),
+            base_price: parseFloat(newSvcForm.base_price) || 0,
+            unit: newSvcForm.unit,
+            category: newSvcForm.category,
+            is_active: true,
+        }).select().single();
+        if (error) { alert('Error: ' + error.message); return; }
+        alert(`✅ Servicio "${newSvcForm.name}" creado en el catálogo.`);
+        setShowNewSvcModal(false);
+        setNewSvcForm({ name: '', description: '', base_price: '', unit: 'servicio', category: 'mano_de_obra' });
+        // Refresh services list and optionally add to quote
+        const { data: newServices } = await supabase.from('service_catalog').select('*').eq('is_active', true).order('name');
+        setServices(newServices || []);
+        if (data && confirm(`¿Agregar "${data.name}" a esta cotización también?`)) {
+            addItem(data as ServiceCatalogItem);
+        }
+    };
 
     const addItem = async (service?: ServiceCatalogItem) => {
         let maxStock: number | null = null;
@@ -612,6 +663,12 @@ export default function QuoteBuilder() {
                                     <option value="">+ Del catálogo</option>
                                     {services.map(s => <option key={s.id} value={s.id}>{s.name} — {formatCurrency(s.base_price)}</option>)}
                                 </select>
+                                <button onClick={() => setShowNewSvcModal(true)}
+                                    className="flex items-center gap-1 rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-100 dark:border-violet-700 dark:bg-violet-900/20 dark:text-violet-400 transition-colors"
+                                    title="Dar de alta un nuevo servicio en el catálogo">
+                                    <span className="material-symbols-outlined text-[16px]">add_circle</span>
+                                    Nuevo Servicio
+                                </button>
                                 <button onClick={() => setShowInvPicker(true)}
                                     className="flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400 transition-colors">
                                     <span className="material-symbols-outlined text-[16px]">inventory_2</span>
@@ -722,6 +779,13 @@ export default function QuoteBuilder() {
                                             </div>
                                             <input value={item.description} onChange={e => updateItem(item.tempId, 'description', e.target.value)}
                                                 placeholder="Descripción del concepto" className="flex-1 min-w-0 rounded border border-slate-200 px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                                            {item.source === 'manual' && item.description.trim() && (
+                                                <button onClick={() => saveItemToCatalog(item)}
+                                                    className="shrink-0 rounded p-1.5 text-violet-400 hover:text-violet-600 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition-colors"
+                                                    title="Guardar este servicio en el catálogo para usarlo en futuras cotizaciones">
+                                                    <span className="material-symbols-outlined text-[18px]">bookmark_add</span>
+                                                </button>
+                                            )}
                                             <button onClick={() => removeItem(item.tempId)} className="shrink-0 rounded p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors" title="Eliminar">
                                                 <span className="material-symbols-outlined text-[18px]">delete</span>
                                             </button>
@@ -930,6 +994,87 @@ export default function QuoteBuilder() {
                     </div>
                 </div>
             </div>
+
+            {/* ─── New Service Modal ─── */}
+            {showNewSvcModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+                    <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl dark:bg-slate-900">
+                        <div className="flex items-center justify-between border-b border-slate-100 p-5 dark:border-slate-800">
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow">
+                                    <span className="material-symbols-outlined text-white text-[20px]">add_circle</span>
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900 dark:text-white">Nuevo Servicio en Catálogo</h3>
+                                    <p className="text-xs text-slate-500">Quedará disponible en todas las cotizaciones futuras</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowNewSvcModal(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800">
+                                <span className="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                        </div>
+                        <form onSubmit={handleCreateNewService} className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Nombre del Servicio *</label>
+                                <input required value={newSvcForm.name} onChange={e => setNewSvcForm({ ...newSvcForm, name: e.target.value })}
+                                    placeholder="Ej. Rehabilitación de pozo profundo"
+                                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Descripción</label>
+                                <textarea value={newSvcForm.description} onChange={e => setNewSvcForm({ ...newSvcForm, description: e.target.value })}
+                                    rows={2} placeholder="Descripción opcional del servicio..."
+                                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none resize-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Precio Base (MXN)</label>
+                                    <input type="number" step="0.01" min="0" value={newSvcForm.base_price} onChange={e => setNewSvcForm({ ...newSvcForm, base_price: e.target.value })}
+                                        placeholder="0.00"
+                                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Unidad</label>
+                                    <select value={newSvcForm.unit} onChange={e => setNewSvcForm({ ...newSvcForm, unit: e.target.value })}
+                                        className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                                        <option value="servicio">Servicio</option>
+                                        <option value="pieza">Pieza</option>
+                                        <option value="metro">Metro</option>
+                                        <option value="litro">Litro</option>
+                                        <option value="kg">Kilogramo</option>
+                                        <option value="hora">Hora</option>
+                                        <option value="dia">Día</option>
+                                        <option value="lote">Lote</option>
+                                        <option value="juego">Juego</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Categoría</label>
+                                <select value={newSvcForm.category} onChange={e => setNewSvcForm({ ...newSvcForm, category: e.target.value })}
+                                    className="w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white">
+                                    <option value="mano_de_obra">Mano de Obra</option>
+                                    <option value="equipo">Equipo / Herramienta</option>
+                                    <option value="material">Material</option>
+                                    <option value="transporte">Transporte / Logística</option>
+                                    <option value="supervision">Supervisión / Ingeniería</option>
+                                    <option value="otro">Otro</option>
+                                </select>
+                            </div>
+                            <div className="flex justify-end gap-3 pt-2">
+                                <button type="button" onClick={() => setShowNewSvcModal(false)}
+                                    className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                                    Cancelar
+                                </button>
+                                <button type="submit"
+                                    className="rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow hover:from-violet-700 hover:to-purple-700">
+                                    Guardar Servicio
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
