@@ -53,10 +53,14 @@ export default function VideoRecordingTab() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!form.equipment_id) {
+            alert('Por favor selecciona un equipo o pozo antes de guardar.');
+            return;
+        }
         setSaving(true);
         try {
             const payload = {
-                equipment_id: form.equipment_id || null,
+                equipment_id: form.equipment_id,
                 recording_date: form.recording_date,
                 recorded_by: form.recorded_by || null,
                 grid_depth: form.grid_depth ? parseFloat(form.grid_depth) : null,
@@ -161,9 +165,9 @@ export default function VideoRecordingTab() {
                         <form onSubmit={handleSave}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label className={labelClass}>Equipo / Pozo</label>
-                                    <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} className={inputClass}>
-                                        <option value="">Sin equipo / General</option>
+                                    <label className={labelClass}>Equipo / Pozo <span className="text-red-500">*</span></label>
+                                    <select required value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} className={inputClass}>
+                                        <option value="">— Selecciona un equipo o pozo —</option>
                                         {equipment.map(eq => (
                                             <option key={eq.id} value={eq.id}>
                                                 {eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {(eq as any).client?.company_name ? `(${(eq as any).client.company_name})` : ''}
