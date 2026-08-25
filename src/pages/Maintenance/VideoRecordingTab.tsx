@@ -53,14 +53,11 @@ export default function VideoRecordingTab() {
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.equipment_id) {
-            alert('Por favor selecciona un equipo o pozo antes de guardar.');
-            return;
-        }
         setSaving(true);
         try {
             const payload = {
-                equipment_id: form.equipment_id,
+                equipment_id: form.equipment_id || null,
+                manual_well_info: (form as any).manual_well_info || null,
                 recording_date: form.recording_date,
                 recorded_by: form.recorded_by || null,
                 grid_depth: form.grid_depth ? parseFloat(form.grid_depth) : null,
@@ -165,9 +162,9 @@ export default function VideoRecordingTab() {
                         <form onSubmit={handleSave}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label className={labelClass}>Equipo / Pozo <span className="text-red-500">*</span></label>
-                                    <select required value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} className={inputClass}>
-                                        <option value="">— Selecciona un equipo o pozo —</option>
+                                    <label className={labelClass}>Equipo / Pozo (Seleccionar del inventario)</label>
+                                    <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} className={inputClass}>
+                                        <option value="">— Ninguno (Manual) —</option>
                                         {equipment.map(eq => (
                                             <option key={eq.id} value={eq.id}>
                                                 {eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {(eq as any).client?.company_name ? `(${(eq as any).client.company_name})` : ''}
@@ -175,6 +172,13 @@ export default function VideoRecordingTab() {
                                         ))}
                                     </select>
                                 </div>
+                                {!form.equipment_id && (
+                                    <div className="md:col-span-2">
+                                        <label className={labelClass}>Información de Pozo y Cliente (Manual)</label>
+                                        <input type="text" value={(form as any).manual_well_info || ''} onChange={e => setForm({ ...form, manual_well_info: e.target.value } as any)} 
+                                            placeholder="Ej. Pozo de agua 2 - Cliente XYZ..." className={inputClass} />
+                                    </div>
+                                )}
                                 <div>
                                     <label className={labelClass}>Fecha de Grabación *</label>
                                     <input type="date" value={form.recording_date} onChange={e => setForm({ ...form, recording_date: e.target.value })} required className={inputClass} />
@@ -219,7 +223,7 @@ export default function VideoRecordingTab() {
 
                             <div className="md:col-span-2 mt-4">
                                 <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">Fotografías / Imágenes del Videoregistro</label>
-                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`video-recordings/${form.equipment_id || 'new'}`} uploaderName={form.recorded_by || 'Técnico'} />
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`video-recordings/${form.equipment_id || 'manual'}`} uploaderName={form.recorded_by || 'Técnico'} />
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3">
@@ -246,6 +250,7 @@ export default function VideoRecordingTab() {
                 <div className="space-y-4">
                     {filteredVideos.map(v => {
                         const eq = v.equipment as any;
+                        const manualInfo = (v as any).manual_well_info;
                         return (
                             <div key={v.id} className="rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start">
@@ -259,9 +264,15 @@ export default function VideoRecordingTab() {
                                                     {new Date(v.recording_date + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                                 </p>
                                                 <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-                                                    {eq?.well_name && <span>{eq.well_name}</span>}
-                                                    {eq?.name && <><span>·</span><span className="font-medium text-slate-600 dark:text-slate-300">{eq.name}</span></>}
-                                                    {eq?.client?.company_name && <><span>·</span><span>{eq.client.company_name}</span></>}
+                                                    {manualInfo ? (
+                                                        <span className="font-medium text-slate-600 dark:text-slate-300">{(v as any).manual_well_info}</span>
+                                                    ) : (
+                                                        <>
+                                                            {eq?.well_name && <span>{eq.well_name}</span>}
+                                                            {eq?.name && <><span>·</span><span className="font-medium text-slate-600 dark:text-slate-300">{eq.name}</span></>}
+                                                            {eq?.client?.company_name && <><span>·</span><span>{eq.client.company_name}</span></>}
+                                                        </>
+                                                    )}
                                                     {v.recorded_by && <><span>·</span><span>Operador: {v.recorded_by}</span></>}
                                                 </div>
                                             </div>
