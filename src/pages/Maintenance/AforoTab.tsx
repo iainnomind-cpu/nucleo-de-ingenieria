@@ -129,14 +129,15 @@ export default function AforoTab() {
         setSaving(true);
         try {
             let recordId = editingId;
-            const payload = { ...form, client_id: form.client_id || null };
+            const { created_by: _cb, ...formWithoutCreatedBy } = form as any;
+            const payload = { ...formWithoutCreatedBy, client_id: form.client_id || null };
 
             if (editingId) {
                 const { error } = await supabase.from('aforo_records').update(payload).eq('id', editingId);
                 if (error) throw error;
                 await supabase.from('aforo_measurements').delete().eq('aforo_id', editingId);
             } else {
-                const { data, error } = await supabase.from('aforo_records').insert([{ ...payload, created_by: user?.id }]).select().single();
+                const { data, error } = await supabase.from('aforo_records').insert([{ ...payload, ...(user?.id ? { created_by: user.id } : {}) }]).select().single();
                 if (error) throw error;
                 recordId = data.id;
             }

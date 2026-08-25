@@ -134,12 +134,23 @@ export default function StartupFormatTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const payload = { ...form, client_id: form.client_id || null, photos };
+            // Strip any created_by that might be in form (from editing an existing record)
+            const { created_by: _cb, ...formWithoutCreatedBy } = form as any;
+            const payload = {
+                ...formWithoutCreatedBy,
+                client_id: form.client_id || null,
+                photos,
+            };
+
             if (editingId) {
                 const { error } = await supabase.from('startup_formats').update(payload).eq('id', editingId);
                 if (error) throw error;
             } else {
-                const { error } = await supabase.from('startup_formats').insert([{ ...payload, ...(user?.id ? { created_by: user.id } : {}) }]);
+                const insertPayload = {
+                    ...payload,
+                    ...(user?.id ? { created_by: user.id } : {}),
+                };
+                const { error } = await supabase.from('startup_formats').insert([insertPayload]);
                 if (error) throw error;
             }
             setShowForm(false);

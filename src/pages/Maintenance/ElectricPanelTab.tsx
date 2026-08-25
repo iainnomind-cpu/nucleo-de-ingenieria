@@ -108,7 +108,8 @@ export default function ElectricPanelTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const payload = { ...form, client_id: form.client_id || null, photos };
+            const { created_by: _cb, ...formWithoutCreatedBy } = form as any;
+            const payload = { ...formWithoutCreatedBy, client_id: form.client_id || null, photos };
             if (editingId) {
                 const { error } = await supabase.from('electric_panel_records').update(payload).eq('id', editingId);
                 if (error) throw error;
