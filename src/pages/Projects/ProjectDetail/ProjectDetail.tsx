@@ -327,118 +327,132 @@ export default function ProjectDetail() {
 
     const handleCompleteProject = async () => {
         if (!project) return;
-        const actual_end = new Date().toISOString().split('T')[0];
+        
+        try {
+            const actual_end = new Date().toISOString().split('T')[0];
 
-        let uploadedSignatureUrl = signatureUrl;
-        if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
-            const dataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
-            try {
-                const res = await fetch(dataUrl);
-                const blob = await res.blob();
-                const file = new File([blob], `signature_${Date.now()}.png`, { type: 'image/png' });
-                
-                const path = `signatures/${project.id}_${Date.now()}.png`;
-                const { error } = await supabase.storage.from('photos').upload(path, file);
-                if (!error) {
-                    const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
-                    uploadedSignatureUrl = urlData.publicUrl;
+            let uploadedSignatureUrl = signatureUrl;
+            if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
+                const dataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png');
+                try {
+                    const res = await fetch(dataUrl);
+                    const blob = await res.blob();
+                    const file = new File([blob], `signature_${Date.now()}.png`, { type: 'image/png' });
+                    
+                    const path = `signatures/${project.id}_${Date.now()}.png`;
+                    const { error } = await supabase.storage.from('photos').upload(path, file);
+                    if (!error) {
+                        const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+                        uploadedSignatureUrl = urlData.publicUrl;
+                    }
+                } catch (err) {
+                    console.error("Error al guardar la firma", err);
                 }
-            } catch (err) {
-                console.error("Error al guardar la firma", err);
             }
-        }
 
-        // M5: Equipment & Maintenance Schedules (Automatic)
-        if (project.client_id && selectedEqTypes.length > 0) {
-            let count = 0;
-            for (const eqType of selectedEqTypes) {
-                const eqLabel = EQUIPMENT_TYPE_LABELS[eqType] || eqType;
-                const { data: eqData } = await supabase.from('installed_equipment').insert({
-                    client_id: project.client_id,
-                    project_id: project.id,
-                    name: `${eqLabel} — ${project.title}`,
-                    equipment_type: eqType,
-                    location: project.location || project.title,
-                    installation_date: actual_end,
-                    status: 'active',
-                    notes: `Instalado en proyecto ${project.project_number}`,
-                }).select().single();
-
-                if (eqData) {
-                    const frequency = EQUIPMENT_MAINTENANCE_RULES[eqType] || 12;
-                    const nextDate = new Date();
-                    nextDate.setMonth(nextDate.getMonth() + frequency);
-                    await supabase.from('maintenance_schedules').insert({
-                        equipment_id: eqData.id,
+            // M5: Equipment & Maintenance Schedules (Automatic)
+            if (project.client_id && selectedEqTypes.length > 0) {
+                let count = 0;
+                for (const eqType of selectedEqTypes) {
+                    const eqLabel = EQUIPMENT_TYPE_LABELS[eqType] || eqType;
+                    const { data: eqData } = await supabase.from('installed_equipment').insert({
                         client_id: project.client_id,
-                        title: `Revisión General — ${eqLabel} (${project.client?.company_name || 'Cliente'})`,
-                        description: `Mantenimiento preventivo automático — Proyecto ${project.project_number}`,
-                        service_type: 'revision_general',
-                        frequency_months: frequency,
-                        last_service_date: actual_end,
-                        next_service_date: nextDate.toISOString().split('T')[0],
-                        assigned_to: project.project_manager || 'Joel',
-                        status: 'scheduled',
-                    });
-                    count++;
+                        project_id: project.id,
+                        name: `${eqLabel} — ${project.title}`,
+                        equipment_type: eqType,
+                        location: project.location || project.title,
+                        installation_date: actual_end,
+                        status: 'active',
+                        notes: `Instalado en proyecto ${project.project_number}`,
+                    }).select().single();
+
+                    if (eqData) {
+                        const frequency = EQUIPMENT_MAINTENANCE_RULES[eqType] || 12;
+                        const nextDate = new Date();
+                        nextDate.setMonth(nextDate.getMonth() + frequency);
+                        await supabase.from('maintenance_schedules').insert({
+                            equipment_id: eqData.id,
+                            client_id: project.client_id,
+                            title: `Revisión General — ${eqLabel} (${project.client?.company_name || 'Cliente'})`,
+                            description: `Mantenimiento preventivo automático — Proyecto ${project.project_number}`,
+                            service_type: 'revision_general',
+                            frequency_months: frequency,
+                            last_service_date: actual_end,
+                            next_service_date: nextDate.toISOString().split('T')[0],
+                            assigned_to: project.project_manager || 'Joel',
+                            status: 'scheduled',
+                        });
+                        count++;
+                    }
+                }
+                alert(`✅ ${count} equipo(s) instalados y mantenimiento preventivo programado.`);
+            }
+
+            // → M6: Generate pending invoice
+            if (project.client_id && project.quoted_amount > 0) {
+                // Check if invoice already exists
+                const { data: existingInv } = await supabase.from('invoices').select('id').eq('invoice_number', `F-${project.project_number.replace('PRY-', '')}`).single();
+                
+                if (!existingInv) {
+                    const { data: invData, error: invError } = await supabase.from('invoices').insert({
+                        client_id: project.client_id,
+                        project_id: project.id,
+                        invoice_number: `F-${project.project_number.replace('PRY-', '')}`,
+                        issue_date: actual_end,
+                        due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                        subtotal: project.quoted_amount / 1.16,
+                        tax_amount: project.quoted_amount - (project.quoted_amount / 1.16),
+                        total: project.quoted_amount,
+                        amount_paid: 0,
+                        balance: project.quoted_amount,
+                        status: 'pending',
+                        currency: 'MXN',
+                        notes: `Factura por proyecto completado: ${project.project_number}`
+                    }).select().single();
+                    if (invData) alert(`Generada factura pendiente: ${invData.invoice_number} (M6)`);
                 }
             }
-            alert(`✅ ${count} equipo(s) instalados y mantenimiento preventivo programado.`);
-        }
 
-        // → M6: Generate pending invoice
-        if (project.client_id && project.quoted_amount > 0) {
-            const { data: invData } = await supabase.from('invoices').insert({
-                client_id: project.client_id,
-                project_id: project.id,
-                invoice_number: `F-${project.project_number.replace('PRY-', '')}`,
-                issue_date: actual_end,
-                due_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                subtotal: project.quoted_amount / 1.16,
-                tax_amount: project.quoted_amount - (project.quoted_amount / 1.16),
-                total: project.quoted_amount,
-                amount_paid: 0,
-                balance: project.quoted_amount,
-                status: 'pending',
-                currency: 'MXN',
-                notes: `Factura por proyecto completado: ${project.project_number}`
-            }).select().single();
-            if (invData) alert(`Generada factura pendiente: ${invData.invoice_number} (M6)`);
-        }
+            // → M8: Notify Project Space (find space by project title snippet)
+            if (project.title) {
+                const { data: spaces } = await supabase.from('spaces')
+                    .select('id').ilike('name', `%${project.title.substring(0, 20)}%`).limit(1);
+                if (spaces && spaces.length > 0) {
+                    await supabase.from('messages').insert({
+                        space_id: spaces[0].id,
+                        sender_id: '12345678-1234-1234-1234-123456789012', // System or Admin
+                        content: `🎉 ¡El proyecto **${project.project_number}** ha sido marcado como COMPLETADO!`,
+                        message_type: 'text'
+                    });
+                }
+            }
 
-        // → M8: Notify Project Space (find space by project title snippet)
-        const { data: spaces } = await supabase.from('spaces')
-            .select('id').ilike('name', `%${project.title.substring(0, 20)}%`).limit(1);
-        if (spaces && spaces.length > 0) {
-            await supabase.from('messages').insert({
-                space_id: spaces[0].id,
-                sender_id: '12345678-1234-1234-1234-123456789012', // System or Admin
-                content: `🎉 ¡El proyecto **${project.project_number}** ha sido marcado como COMPLETADO!`,
-                message_type: 'text'
+            const { error: updateError } = await supabase.from('projects').update({ status: 'completed', actual_end, client_signature_url: uploadedSignatureUrl }).eq('id', project.id);
+            if (updateError) throw new Error(updateError.message);
+
+            // → M9: WhatsApp automation trigger
+            triggerWaAutomation({
+                module: 'projects',
+                event: 'status_change',
+                condition: { new_status: 'completed' },
+                record: {
+                    title: project.title,
+                    project_number: project.project_number,
+                    client_name: project.client?.company_name || '',
+                    status_label: PROJECT_STATUS_LABELS.completed,
+                    project_manager: project.project_manager || '',
+                    start_date: project.start_date ? new Date(project.start_date).toLocaleDateString('es-MX') : 'Sin fecha',
+                    actual_end: actual_end ? new Date(actual_end).toLocaleDateString('es-MX') : 'Completado',
+                },
+                referenceId: project.id,
             });
+
+            setShowCompletionModal(false);
+            fetchAll();
+        } catch (error: any) {
+            console.error("Error finalizing project:", error);
+            alert(`Error al finalizar el proyecto: ${error.message || 'Desconocido'}`);
         }
-
-        await supabase.from('projects').update({ status: 'completed', actual_end, client_signature_url: uploadedSignatureUrl }).eq('id', project.id);
-
-        // → M9: WhatsApp automation trigger
-        triggerWaAutomation({
-            module: 'projects',
-            event: 'status_change',
-            condition: { new_status: 'completed' },
-            record: {
-                title: project.title,
-                project_number: project.project_number,
-                client_name: project.client?.company_name || '',
-                status_label: PROJECT_STATUS_LABELS.completed,
-                project_manager: project.project_manager || '',
-                start_date: project.start_date ? new Date(project.start_date).toLocaleDateString('es-MX') : 'Sin fecha',
-                actual_end: actual_end ? new Date(actual_end).toLocaleDateString('es-MX') : 'Completado',
-            },
-            referenceId: project.id,
-        });
-
-        setShowCompletionModal(false);
-        fetchAll();
     };
 
     // Add task
@@ -745,6 +759,25 @@ export default function ProjectDetail() {
                             </div>
                         );
                     })}
+
+                    <button 
+                        onClick={async () => {
+                            if (confirm(`¿Estás seguro que deseas eliminar el proyecto ${project.project_number}? Esta acción es irreversible y eliminará tareas y registros asociados.`)) {
+                                const { error } = await supabase.from('projects').delete().eq('id', project.id);
+                                if (error) {
+                                    alert('Error al eliminar proyecto: ' + error.message);
+                                } else {
+                                    alert('Proyecto eliminado exitosamente.');
+                                    navigate('/projects');
+                                }
+                            }
+                        }}
+                        className="ml-2 flex items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-900/30 dark:bg-slate-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                        title="Eliminar Proyecto"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                        <span className="hidden sm:inline">Eliminar</span>
+                    </button>
                 </div>
             </div>
 
