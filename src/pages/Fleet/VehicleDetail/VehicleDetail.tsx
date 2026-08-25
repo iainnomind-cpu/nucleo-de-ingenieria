@@ -163,6 +163,10 @@ export default function VehicleDetail() {
                 });
                 if (error) throw error;
             }
+
+            if (end > (vehicle?.current_mileage || 0)) {
+                await supabase.from('vehicles').update({ current_mileage: end }).eq('id', id);
+            }
             setShowMilForm(false);
             setMilForm({ date: new Date().toISOString().split('T')[0] });
             setEditingMilId(null);
@@ -206,6 +210,11 @@ export default function VehicleDetail() {
         } else {
             await supabase.from('vehicle_fuel_logs').insert({ ...fuelForm, vehicle_id: id });
         }
+
+        const odo = parseFloat(fuelForm.odometer as any) || 0;
+        if (odo > (vehicle?.current_mileage || 0)) {
+            await supabase.from('vehicles').update({ current_mileage: odo }).eq('id', id);
+        }
         setShowFuelForm(false);
         setFuelForm({ date: new Date().toISOString().split('T')[0], odometer: vehicle?.current_mileage || 0, fuel_liters: 0, cost: 0 });
         setEditingFuelId(null);
@@ -238,6 +247,11 @@ export default function VehicleDetail() {
             await supabase.from('vehicle_maintenance').update(updateData).eq('id', editingMntId);
         } else {
             await supabase.from('vehicle_maintenance').insert({ ...mntForm, vehicle_id: id });
+        }
+
+        const odo = parseFloat(mntForm.odometer_reading as any) || 0;
+        if (odo > (vehicle?.current_mileage || 0)) {
+            await supabase.from('vehicles').update({ current_mileage: odo }).eq('id', id);
         }
         setShowMntForm(false);
         setMntForm({ service_date: new Date().toISOString().split('T')[0], cost: 0, odometer_reading: vehicle?.current_mileage || 0 });
