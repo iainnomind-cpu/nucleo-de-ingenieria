@@ -78,11 +78,11 @@ export default function PipelineBoard() {
 
                 // ── 1. Crear Tareas Operativas Automáticas ──
 
-                // 6.1 Facturación y Cobranza — Ruby
+                // 6.1 Facturación y Cobranza
                 await supabase.from('team_tasks').insert({
                     title: `Facturación y Cobranza — ${clientName}`,
                     description: `Oportunidad: ${opp.title}\nValor: ${formatCurrency(opp.estimated_value || 0)}\n\nActividades:\n• Solicitar datos de facturación al cliente\n• Generar y enviar factura\n• Registrar factura en CRM\n• Dar seguimiento a cobranza\n\nCondición clave: El proyecto NO avanza a operación sin anticipo/pago acordado, salvo cliente conocido con relación comercial.`,
-                    assigned_to: 'Ruby',
+                    assigned_to: 'Facturación y Cobranza',
                     created_by: 'Sistema',
                     status: 'pending',
                     priority: 'high',
@@ -96,11 +96,11 @@ export default function PipelineBoard() {
                     tags: ['auto', 'facturación', 'cierre-ganado'],
                 });
 
-                // 7.1 Gestión de Materiales — Administración
+                // 7.1 Gestión de Materiales — Almacén
                 await supabase.from('team_tasks').insert({
                     title: `Gestión de Materiales — ${clientName}`,
                     description: `Oportunidad: ${opp.title}\n\nActividades:\n• Revisión de materiales requeridos para el proyecto\n• Validación de inventario\n\nCondicional:\n• SI hay materiales → Preparar\n• SI NO hay → Solicitar autorización a Dirección, generar órdenes de compra, dar seguimiento a entrega`,
-                    assigned_to: 'Administración',
+                    assigned_to: 'Almacén y Compras',
                     created_by: 'Sistema',
                     status: 'pending',
                     priority: 'high',
@@ -114,11 +114,11 @@ export default function PipelineBoard() {
                     tags: ['auto', 'materiales', 'cierre-ganado'],
                 });
 
-                // 7.2 Preparación Técnica y Logística — Joel
+                // 7.2 Preparación Técnica y Logística — Ingeniería
                 await supabase.from('team_tasks').insert({
                     title: `Preparación Técnica y Logística — ${clientName}`,
                     description: `Oportunidad: ${opp.title}\n\nActividades:\n• Validar disponibilidad de equipos\n• Revisar estado operativo\n• Identificar faltantes técnicos\n• Coordinar logística de ejecución`,
-                    assigned_to: 'Joel',
+                    assigned_to: 'Ingeniería',
                     created_by: 'Sistema',
                     status: 'pending',
                     priority: 'high',
@@ -132,11 +132,11 @@ export default function PipelineBoard() {
                     tags: ['auto', 'logística', 'cierre-ganado'],
                 });
 
-                // 8. Programación de Trabajos — Joel & Alejandro
+                // 8. Programación de Trabajos — Operaciones
                 await supabase.from('team_tasks').insert({
                     title: `Programación de Trabajos — ${clientName}`,
-                    description: `Oportunidad: ${opp.title}\nResponsables: Joel Rincón & Alejandro Bernal\n\nActividades:\n• Programación de fechas\n• Asignación de personal\n• Coordinación de maniobras\n\nCondición de cierre:\n• Facturación realizada\n• Cobranza validada\n• Materiales listos\n• Equipos preparados\n• Trabajo programado\n\nResultado: Proyecto listo para ejecución`,
-                    assigned_to: 'Alejandro',
+                    description: `Oportunidad: ${opp.title}\n\nActividades:\n• Programación de fechas\n• Asignación de personal\n• Coordinación de maniobras\n\nCondición de cierre:\n• Facturación realizada\n• Cobranza validada\n• Materiales listos\n• Equipos preparados\n• Trabajo programado\n\nResultado: Proyecto listo para ejecución`,
+                    assigned_to: 'Operaciones',
                     created_by: 'Sistema',
                     status: 'pending',
                     priority: 'normal',
@@ -154,7 +154,7 @@ export default function PipelineBoard() {
                 });
 
                 // ── 2. Notificaciones internas (mensajes en spaces) ──
-                const notifContent = `🎉 **¡VENTA CERRADA — PROYECTO GANADO!**\n\nSe ha ganado la oportunidad: **${opp.title}**\n👤 Cliente: **${clientName}**\n💰 Valor: **${formatCurrency(opp.estimated_value || 0)}**\n📅 Fecha: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}\n\n**Tareas automáticas creadas para:**\n• 📋 Ruby — Facturación y Cobranza\n• 📦 Administración — Gestión de Materiales\n• 🔧 Joel — Preparación Técnica\n• 📅 Alejandro — Programación de Trabajos\n\n_A prepararse para el arranque del proyecto._`;
+                const notifContent = `🎉 **¡VENTA CERRADA — PROYECTO GANADO!**\n\nSe ha ganado la oportunidad: **${opp.title}**\n👤 Cliente: **${clientName}**\n💰 Valor: **${formatCurrency(opp.estimated_value || 0)}**\n📅 Fecha: ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' })}\n\n**Tareas automáticas creadas para:**\n• 📋 Facturación y Cobranza\n• 📦 Almacén y Compras — Gestión de Materiales\n• 🔧 Ingeniería — Preparación Técnica\n• 📅 Operaciones — Programación de Trabajos\n\n_A prepararse para el arranque del proyecto._`;
 
                 // Post to General and Operaciones spaces
                 const { data: spaces } = await supabase.from('spaces').select('id, name').in('name', ['General', 'Operaciones', 'Administración']);

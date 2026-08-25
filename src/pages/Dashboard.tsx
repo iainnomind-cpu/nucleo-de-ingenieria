@@ -299,7 +299,7 @@ export default function Dashboard() {
       const recentInvoices = invoices.slice(0, 5).map(i => ({ id: i.id, invoice_number: i.invoice_number, total: i.total, status: i.status, client_name: i.client?.company_name || '—' }));
       const recentProjects = projects.slice(0, 5).map((p: { id: string; project_number: string; title: string; status: string; project_type: string }) => ({ id: p.id, project_number: p.project_number, title: p.title, status: p.status, project_type: p.project_type }));
 
-      const teamNames = ['Ruby', 'Administración', 'Joel', 'Alejandro'];
+      const teamNames = ['Joel', 'Ruby', 'Administración', 'Operaciones', 'Ingeniería', 'Almacén y Compras', 'Facturación y Cobranza'];
       const teamStats = teamNames.map(name => {
         const assigned = tasks.filter((t: { assigned_to: string | null }) => t.assigned_to?.toLowerCase().includes(name.toLowerCase())).length;
         const completed = tasks.filter((t: { assigned_to: string | null; status: string }) => t.assigned_to?.toLowerCase().includes(name.toLowerCase()) && t.status === 'completed').length;

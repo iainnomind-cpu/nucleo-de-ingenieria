@@ -88,7 +88,7 @@ export default function InvoiceDetail() {
             await supabase.from('team_tasks').insert({
                 title: `Validación de Cobro — ${invoice.invoice_number}`,
                 description: `Factura: ${invoice.invoice_number}\nCliente: ${clientName}\nMonto Total: ${formatCurrencyFin(invoice.total)}\n\nActividades:\n• Confirmar pago (anticipo o total según condiciones)\n• Registrar pago en CRM\n\nEl proyecto queda LIBERADO para avanzar a operación.`,
-                assigned_to: 'Samara',
+                assigned_to: 'Facturación y Cobranza',
                 created_by: 'Sistema',
                 status: 'pending',
                 priority: 'high',
@@ -189,7 +189,7 @@ export default function InvoiceDetail() {
             await supabase.from('team_tasks').insert({
                 title: `Validación de Cobro — ${invoice.invoice_number}`,
                 description: `Factura: ${invoice.invoice_number}\nCliente: ${clientName}\nMonto Total: ${formatCurrencyFin(invoice.total)}\n\nActividades:\n• Confirmar pago (anticipo o total según condiciones)\n• Registrar pago en CRM\n\nEl proyecto queda LIBERADO para avanzar a operación.`,
-                assigned_to: 'Samara',
+                assigned_to: 'Facturación y Cobranza',
                 created_by: 'Sistema',
                 status: 'pending',
                 priority: 'high',

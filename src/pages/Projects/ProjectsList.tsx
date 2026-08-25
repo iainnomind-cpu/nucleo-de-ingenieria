@@ -77,49 +77,53 @@ export default function ProjectsList() {
             }).select().single();
 
             // → M8: Checklist pre-trabajo como tareas asignadas con fecha límite
-            const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 3); // Due in 3 days
-            const formattedDueDate = dueDate.toISOString().split('T')[0];
-
+            const formattedDueDate = new Date().toISOString().split('T')[0];
             const tasksToInsert = [
                 {
+                    project_id: project.id,
                     title: `Facturación y Cobranza — ${projectNumber}`,
                     description: 'Solicitar datos de facturación al cliente, generar factura, registrar en CRM y dar seguimiento a cobranza.',
-                    assigned_to: 'Samara',
+                    assigned_to: 'Facturación y Cobranza',
                     created_by: 'Sistema',
                     due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high' as const,
-                    tags: ['facturación', 'cobranza'],
+                    status: 'pending' as TaskStatus,
+                    priority: 'high' as TaskPriority,
+                    tags: ['auto', 'facturación'],
+                    checklist: JSON.stringify([{ text: 'Recibir constancia y datos', done: false }, { text: 'Emitir factura y enviar al cliente', done: false }, { text: 'Validar pago de anticipo', done: false }]),
                 },
                 {
+                    project_id: project.id,
                     title: `Gestión de Materiales — ${projectNumber}`,
-                    description: 'Verificar inventario, generar órdenes de compra, confirmar disponibilidad de materiales.',
-                    assigned_to: 'Administración',
+                    description: 'Revisión de materiales requeridos para el proyecto. Validación de inventario. Preparar materiales o solicitar órdenes de compra.',
+                    assigned_to: 'Almacén y Compras',
                     created_by: 'Sistema',
                     due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high' as const,
-                    tags: ['materiales', 'inventario'],
+                    status: 'pending' as TaskStatus,
+                    priority: 'high' as TaskPriority,
+                    tags: ['auto', 'materiales'],
+                    checklist: JSON.stringify([{ text: 'Revisión de materiales requeridos', done: false }, { text: 'Validación de inventario', done: false }, { text: 'Preparar materiales o generar orden de compra', done: false }, { text: 'Confirmar entrega de materiales', done: false }]),
                 },
                 {
-                    title: `Preparación Técnica y Logística — ${projectNumber}`,
-                    description: 'Revisar vehículos, herramienta pesada, asignar flotilla al proyecto.',
-                    assigned_to: 'Joel',
+                    project_id: project.id,
+                    title: `Preparación Técnica — ${projectNumber}`,
+                    description: 'Revisar manuales, planos o especificaciones. Confirmar herramientas y equipo necesario para la instalación/mantenimiento.',
+                    assigned_to: 'Ingeniería',
                     created_by: 'Sistema',
                     due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high' as const,
-                    tags: ['logística', 'vehículos'],
+                    status: 'pending' as TaskStatus,
+                    priority: 'normal' as TaskPriority,
+                    tags: ['auto', 'técnico'],
+                    checklist: JSON.stringify([{ text: 'Revisar requerimientos técnicos', done: false }, { text: 'Lista de herramientas preparada', done: false }]),
                 },
                 {
+                    project_id: project.id,
                     title: `Programación de Trabajos — ${projectNumber}`,
                     description: 'Asignar cuadrilla, hospedaje, viáticos y programar tiempos de ejecución.',
-                    assigned_to: 'Alejandro',
+                    assigned_to: 'Operaciones',
                     created_by: 'Sistema',
                     due_date: formattedDueDate,
-                    project_id: project.id,
-                    priority: 'high' as const,
+                    status: 'pending' as TaskStatus,
+                    priority: 'high' as TaskPriority,
                     tags: ['cuadrilla', 'programación'],
                 }
             ];
@@ -166,7 +170,7 @@ export default function ProjectsList() {
                 referenceId: project.id,
             });
 
-            alert(`Proyecto creado exitosamente.\n✓ Factura generada${quotedAmount > 0 ? ` por ${formatCurrencyMXN(quotedAmount)}` : ''}\n✓ Space contextual generado\n✓ Tareas asignadas a: Ruby, Administración, Joel, Alejandro`);
+            alert(`Proyecto creado exitosamente.\n✓ Factura generada${quotedAmount > 0 ? ` por ${formatCurrencyMXN(quotedAmount)}` : ''}\n✓ Space contextual generado\n✓ Tareas asignadas a las áreas: Facturación, Almacén, Ingeniería, Operaciones`);
         }
 
         setShowForm(false);
