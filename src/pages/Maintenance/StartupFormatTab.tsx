@@ -146,11 +146,9 @@ export default function StartupFormatTab() {
                 const { error } = await supabase.from('startup_formats').update(payload).eq('id', editingId);
                 if (error) throw error;
             } else {
-                const insertPayload = {
-                    ...payload,
-                    ...(user?.id ? { created_by: user.id } : {}),
-                };
-                const { error } = await supabase.from('startup_formats').insert([insertPayload]);
+                // We omit created_by entirely because the database table references auth.users 
+                // instead of app_users by mistake, causing FK violations on insert.
+                const { error } = await supabase.from('startup_formats').insert([payload]);
                 if (error) throw error;
             }
             setShowForm(false);
