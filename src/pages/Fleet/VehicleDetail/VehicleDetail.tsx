@@ -164,8 +164,13 @@ export default function VehicleDetail() {
                 if (error) throw error;
             }
 
-            if (end > (vehicle?.current_mileage || 0)) {
-                await supabase.from('vehicles').update({ current_mileage: end }).eq('id', id);
+            // Always fetch current DB value and update if new end is higher
+            if (end > 0) {
+                const { data: freshVehicle } = await supabase.from('vehicles').select('current_mileage').eq('id', id).single();
+                const dbMileage = (freshVehicle as any)?.current_mileage || 0;
+                if (end > dbMileage) {
+                    await supabase.from('vehicles').update({ current_mileage: end }).eq('id', id);
+                }
             }
             setShowMilForm(false);
             setMilForm({ date: new Date().toISOString().split('T')[0] });
@@ -212,8 +217,12 @@ export default function VehicleDetail() {
         }
 
         const odo = parseFloat(fuelForm.odometer as any) || 0;
-        if (odo > (vehicle?.current_mileage || 0)) {
-            await supabase.from('vehicles').update({ current_mileage: odo }).eq('id', id);
+        if (odo > 0) {
+            const { data: freshVehicle } = await supabase.from('vehicles').select('current_mileage').eq('id', id).single();
+            const dbMileage = (freshVehicle as any)?.current_mileage || 0;
+            if (odo > dbMileage) {
+                await supabase.from('vehicles').update({ current_mileage: odo }).eq('id', id);
+            }
         }
         setShowFuelForm(false);
         setFuelForm({ date: new Date().toISOString().split('T')[0], odometer: vehicle?.current_mileage || 0, fuel_liters: 0, cost: 0 });
@@ -250,8 +259,12 @@ export default function VehicleDetail() {
         }
 
         const odo = parseFloat(mntForm.odometer_reading as any) || 0;
-        if (odo > (vehicle?.current_mileage || 0)) {
-            await supabase.from('vehicles').update({ current_mileage: odo }).eq('id', id);
+        if (odo > 0) {
+            const { data: freshVehicle } = await supabase.from('vehicles').select('current_mileage').eq('id', id).single();
+            const dbMileage = (freshVehicle as any)?.current_mileage || 0;
+            if (odo > dbMileage) {
+                await supabase.from('vehicles').update({ current_mileage: odo }).eq('id', id);
+            }
         }
         setShowMntForm(false);
         setMntForm({ service_date: new Date().toISOString().split('T')[0], cost: 0, odometer_reading: vehicle?.current_mileage || 0 });
@@ -700,7 +713,8 @@ export default function VehicleDetail() {
                                         <th className="px-4 py-3 font-semibold text-slate-500">Fecha</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Tipo de Servicio</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500">Taller / Proveedor</th>
-                                        <th className="px-4 py-3 font-semibold text-slate-500">Proyecto Ref.</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-right">Odómetro</th>
+                                        <th className="px-4 py-3 font-semibold text-slate-500 text-right">Próx. Servicio KM</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-right">Costo</th>
                                         <th className="px-4 py-3 font-semibold text-slate-500 text-right"></th>
                                     </tr>
@@ -711,10 +725,8 @@ export default function VehicleDetail() {
                                             <td className="px-4 py-3 whitespace-nowrap text-slate-600 dark:text-slate-400">{new Date(m.service_date + 'T12:00:00').toLocaleDateString('es-MX')}</td>
                                             <td className="px-4 py-3 font-medium text-slate-900 dark:text-white">{m.service_type}</td>
                                             <td className="px-4 py-3 text-slate-700 dark:text-slate-300">{m.provider || '—'}</td>
-                                            <td className="px-4 py-3 text-xs text-slate-500">
-                                                {/* @ts-ignore */}
-                                                {m.project ? <span className="font-mono text-red-500 font-bold">{m.project.project_number}</span> : '—'}
-                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-xs text-slate-600 dark:text-slate-300">{m.odometer_reading ? m.odometer_reading.toLocaleString() + ' km' : '—'}</td>
+                                            <td className="px-4 py-3 text-right font-mono text-xs text-amber-600">{m.next_service_mileage ? m.next_service_mileage.toLocaleString() + ' km' : '—'}</td>
                                             <td className="px-4 py-3 text-right font-bold text-amber-600">{formatCurrency(m.cost)}</td>
                                             <td className="px-4 py-3 text-right">
                                                 {(canEdit || canDelete) && (
