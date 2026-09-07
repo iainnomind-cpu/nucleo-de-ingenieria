@@ -250,6 +250,11 @@ export default function InventoryList() {
     const lowStock = products.filter(p => getStockStatus(p) === 'low').length;
     const outOfStock = products.filter(p => getStockStatus(p) === 'out' || getStockStatus(p) === 'critical').length;
     const totalValue = products.reduce((s, p) => s + ((Number(p.current_stock) || 0) * (Number(p.unit_cost) || 0)), 0);
+    const restockCost = products.reduce((s, p) => {
+        const deficit = (p.min_stock || 0) - (p.current_stock || 0);
+        if (deficit > 0) return s + (deficit * (p.unit_cost || 0));
+        return s;
+    }, 0);
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5';
@@ -280,17 +285,18 @@ export default function InventoryList() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 {[
                     { label: 'Productos', value: totalProducts.toString(), icon: 'inventory_2', color: 'from-sky-500 to-cyan-500' },
                     { label: 'Stock Bajo', value: lowStock.toString(), icon: 'warning', color: 'from-amber-500 to-orange-500' },
                     { label: 'Agotados', value: outOfStock.toString(), icon: 'error', color: 'from-red-500 to-rose-500' },
                     { label: 'Valor Inventario', value: formatCurrencyInv(totalValue), icon: 'account_balance', color: 'from-emerald-500 to-teal-500' },
+                    { label: 'Costo a Resurtir', value: formatCurrencyInv(restockCost), icon: 'request_quote', color: 'from-purple-500 to-fuchsia-500' },
                 ].map(k => (
                     <div key={k.label} className="group relative overflow-hidden rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
                         <div className="flex items-center justify-between">
-                            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{k.label}</p><p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{k.value}</p></div>
-                            <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${k.color} shadow-lg`}><span className="material-symbols-outlined text-white text-[24px]">{k.icon}</span></div>
+                            <div><p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{k.label}</p><p className="mt-1 text-xl font-bold text-slate-900 dark:text-white">{k.value}</p></div>
+                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${k.color} shadow-lg`}><span className="material-symbols-outlined text-white text-[20px]">{k.icon}</span></div>
                         </div>
                         <div className={`absolute bottom-0 left-0 h-1 w-full bg-gradient-to-r ${k.color} opacity-60`} />
                     </div>
@@ -368,6 +374,13 @@ export default function InventoryList() {
                         )}
                         <div><label className={labelClass}>{form.category === 'vehiculos' ? 'Costo de Adquisición' : 'Costo Unitario'}</label><input type="number" step="0.01" value={form.unit_cost} onChange={e => setForm({ ...form, unit_cost: e.target.value })} className={inputClass} /></div>
                     </div>
+                    {form.category !== 'vehiculos' && (
+                        <div className="grid grid-cols-1 gap-4 mt-4 md:grid-cols-3">
+                            <div><label className={labelClass}>Proveedor Sugerido</label><input value={form.supplier} onChange={e => setForm({ ...form, supplier: e.target.value })} className={inputClass} placeholder="Nombre del proveedor" /></div>
+                            <div><label className={labelClass}>Ubicación (Pasillo/Estante)</label><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} className={inputClass} placeholder="Ej. Pasillo A, Estante 3" /></div>
+                            <div><label className={labelClass}>Descripción o Detalles</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="Detalles técnicos adicionales" /></div>
+                        </div>
+                    )}
                     <div className="mt-4 flex gap-2">
                         <button type="submit" disabled={saving} className="rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white">{saving ? 'Guardando...' : 'Guardar'}</button>
                         <button type="button" onClick={() => setShowForm(false)} className="rounded-lg border border-slate-200 px-5 py-2.5 text-sm text-slate-500 dark:border-slate-700">Cancelar</button>
