@@ -38,6 +38,7 @@ export default function InventoryList() {
     const [editing, setEditing] = useState<InventoryProduct | null>(null);
     const [saving, setSaving] = useState(false);
     const [showMovement, setShowMovement] = useState<InventoryProduct | null>(null);
+    const [suppliersDb, setSuppliersDb] = useState<{name: string}[]>([]);
     const { hasPermission } = useAuth();
     const canDelete = hasPermission('inventory', 'delete');
 
@@ -90,12 +91,14 @@ export default function InventoryList() {
         if (filterArea !== 'all') q = q.eq('area', filterArea);
         if (search.trim()) q = q.or(`name.ilike.%${search}%,code.ilike.%${search}%`);
         
-        const [invRes, vehRes] = await Promise.all([
+        const [invRes, vehRes, supRes] = await Promise.all([
             q,
-            supabase.from('vehicles').select('*').in('status', ['active', 'maintenance'])
+            supabase.from('vehicles').select('*').in('status', ['active', 'maintenance']),
+            supabase.from('suppliers').select('name').eq('is_active', true).order('name')
         ]);
 
         if (invRes.error) { console.error(invRes.error); setLoading(false); return; }
+        if (supRes.data) setSuppliersDb(supRes.data);
         
         let filtered = (invRes.data as InventoryProduct[]) || [];
         
@@ -279,6 +282,9 @@ export default function InventoryList() {
                     <button onClick={() => navigate('/inventory/purchases')} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                         <span className="material-symbols-outlined text-[18px]">shopping_cart</span>Compras
                     </button>
+                    <button onClick={() => navigate('/inventory/suppliers')} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                        <span className="material-symbols-outlined text-[18px]">storefront</span>Proveedores
+                    </button>
                     <button onClick={openCreateForm} className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 transition-all">
                         <span className="material-symbols-outlined text-[20px]">add</span>Nuevo Producto
                     </button>
@@ -376,7 +382,13 @@ export default function InventoryList() {
                     </div>
                     {form.category !== 'vehiculos' && (
                         <div className="grid grid-cols-1 gap-4 mt-4 md:grid-cols-3">
-                            <div><label className={labelClass}>Proveedor Sugerido</label><input value={form.supplier} onChange={e => setForm({ ...form, supplier: e.target.value })} className={inputClass} placeholder="Nombre del proveedor" /></div>
+                            <div>
+                                <label className={labelClass}>Proveedor Sugerido</label>
+                                <input list="suppliers-list" value={form.supplier} onChange={e => setForm({ ...form, supplier: e.target.value })} className={inputClass} placeholder="Nombre del proveedor" />
+                                <datalist id="suppliers-list">
+                                    {suppliersDb.map((s, idx) => <option key={idx} value={s.name} />)}
+                                </datalist>
+                            </div>
                             <div><label className={labelClass}>Ubicación (Pasillo/Estante)</label><input value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} className={inputClass} placeholder="Ej. Pasillo A, Estante 3" /></div>
                             <div><label className={labelClass}>Descripción o Detalles</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="Detalles técnicos adicionales" /></div>
                         </div>

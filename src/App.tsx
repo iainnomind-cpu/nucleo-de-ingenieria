@@ -16,6 +16,7 @@ import ProjectsList from './pages/Projects/ProjectsList';
 import ProjectDetail from './pages/Projects/ProjectDetail/ProjectDetail';
 import InventoryList from './pages/Inventory/InventoryList';
 import PurchaseList from './pages/Inventory/PurchaseList';
+import SuppliersList from './pages/Inventory/SuppliersList';
 import ConsumptionReport from './pages/Inventory/ConsumptionReport';
 import MonthlyExitsReport from './pages/Inventory/MonthlyExitsReport';
 import MonthlyEntriesReport from './pages/Inventory/MonthlyEntriesReport';
@@ -108,6 +109,7 @@ function ProtectedApp() {
             <>
               <Route path="/inventory" element={<InventoryList />} />
               <Route path="/inventory/purchases" element={<PurchaseList />} />
+              <Route path="/inventory/suppliers" element={<SuppliersList />} />
               <Route path="/inventory/consumption" element={<ConsumptionReport />} />
               <Route path="/inventory/monthly-entries" element={<MonthlyEntriesReport />} />
               <Route path="/inventory/monthly-exits" element={<MonthlyExitsReport />} />
