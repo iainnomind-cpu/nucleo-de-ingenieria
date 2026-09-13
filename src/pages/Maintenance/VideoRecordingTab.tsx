@@ -104,9 +104,16 @@ export default function VideoRecordingTab() {
             ademe_material: v.ademe_material || '',
             ademe_diameter: v.ademe_diameter || '',
             slot_type: v.slot_type || '',
-        });
+            manual_well_info: (v as any).manual_well_info || '',
+        } as any);
         setPhotos((v as any).photos || []);
         setShowForm(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('¿Eliminar este registro de videograbación?')) return;
+        await supabase.from('video_recordings').delete().eq('id', id);
+        fetchData();
     };
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
@@ -162,9 +169,14 @@ export default function VideoRecordingTab() {
                         <form onSubmit={handleSave}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label className={labelClass}>Equipo / Pozo (Seleccionar del inventario)</label>
+                                    <label className={labelClass}>Información del Pozo / Cliente (Manual)</label>
+                                    <input type="text" value={(form as any).manual_well_info || ''} onChange={e => setForm({ ...form, manual_well_info: e.target.value } as any)} 
+                                        placeholder="Ej. Pozo de agua 2 - Cliente XYZ..." className={inputClass} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className={labelClass}>Vincular a Equipo del Sistema (Opcional)</label>
                                     <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} className={inputClass}>
-                                        <option value="">— Ninguno (Manual) —</option>
+                                        <option value="">— Ninguno —</option>
                                         {equipment.map(eq => (
                                             <option key={eq.id} value={eq.id}>
                                                 {eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {(eq as any).client?.company_name ? `(${(eq as any).client.company_name})` : ''}
@@ -172,13 +184,6 @@ export default function VideoRecordingTab() {
                                         ))}
                                     </select>
                                 </div>
-                                {!form.equipment_id && (
-                                    <div className="md:col-span-2">
-                                        <label className={labelClass}>Información de Pozo y Cliente (Manual)</label>
-                                        <input type="text" value={(form as any).manual_well_info || ''} onChange={e => setForm({ ...form, manual_well_info: e.target.value } as any)} 
-                                            placeholder="Ej. Pozo de agua 2 - Cliente XYZ..." className={inputClass} />
-                                    </div>
-                                )}
                                 <div>
                                     <label className={labelClass}>Fecha de Grabación *</label>
                                     <input type="date" value={form.recording_date} onChange={e => setForm({ ...form, recording_date: e.target.value })} required className={inputClass} />

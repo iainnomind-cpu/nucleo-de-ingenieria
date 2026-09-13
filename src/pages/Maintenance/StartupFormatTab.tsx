@@ -134,10 +134,10 @@ export default function StartupFormatTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            // Strip any created_by that might be in form (from editing an existing record)
-            const { created_by: _cb, ...formWithoutCreatedBy } = form as any;
+            // Strip any join/relational fields that might be in form (from editing an existing record)
+            const { created_by: _cb, client: _cl, ...formWithoutRelations } = form as any;
             const payload = {
-                ...formWithoutCreatedBy,
+                ...formWithoutRelations,
                 client_id: form.client_id || null,
                 photos,
             };
@@ -161,6 +161,12 @@ export default function StartupFormatTab() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('¿Eliminar este registro de arranque?')) return;
+        await supabase.from('startup_formats').delete().eq('id', id);
+        fetchData();
     };
 
     const handleEditClick = (rec: StartupFormatRecord) => {
@@ -404,6 +410,9 @@ export default function StartupFormatTab() {
                                     </button>
                                     <button onClick={() => handleEditClick(rec)} className="rounded-lg p-1.5 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar">
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <button onClick={() => handleDelete(rec.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title="Eliminar">
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </div>
                             </div>

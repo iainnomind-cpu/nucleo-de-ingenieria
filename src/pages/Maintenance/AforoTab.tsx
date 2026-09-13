@@ -129,15 +129,15 @@ export default function AforoTab() {
         setSaving(true);
         try {
             let recordId = editingId;
-            const { created_by: _cb, ...formWithoutCreatedBy } = form as any;
-            const payload = { ...formWithoutCreatedBy, client_id: form.client_id || null };
+            const { created_by: _cb, client: _cl, measurements: _ms, ...cleanForm } = form as any;
+            const payload = { ...cleanForm, client_id: form.client_id || null };
 
             if (editingId) {
                 const { error } = await supabase.from('aforo_records').update(payload).eq('id', editingId);
                 if (error) throw error;
                 await supabase.from('aforo_measurements').delete().eq('aforo_id', editingId);
             } else {
-                const { data, error } = await supabase.from('aforo_records').insert([{ ...payload, ...(user?.id ? { created_by: user.id } : {}) }]).select().single();
+                const { data, error } = await supabase.from('aforo_records').insert([payload]).select().single();
                 if (error) throw error;
                 recordId = data.id;
             }
@@ -163,6 +163,13 @@ export default function AforoTab() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('¿Eliminar este registro de aforo?')) return;
+        await supabase.from('aforo_measurements').delete().eq('aforo_id', id);
+        await supabase.from('aforo_records').delete().eq('id', id);
+        fetchData();
     };
 
     const handleEditClick = (rec: AforoRecord) => {
@@ -345,6 +352,9 @@ export default function AforoTab() {
                                     </button>
                                     <button onClick={() => handleEditClick(rec)} className="rounded-lg p-1.5 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar">
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <button onClick={() => handleDelete(rec.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title="Eliminar">
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </div>
                             </div>

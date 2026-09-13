@@ -427,7 +427,10 @@ export default function ProjectDetail() {
                 }
             }
 
-            const { error: updateError } = await supabase.from('projects').update({ status: 'completed', actual_end, client_signature_url: uploadedSignatureUrl }).eq('id', project.id);
+            const updatePayload: any = { status: 'completed', actual_end };
+            if (uploadedSignatureUrl) updatePayload.client_signature_url = uploadedSignatureUrl;
+            
+            const { error: updateError } = await supabase.from('projects').update(updatePayload).eq('id', project.id);
             if (updateError) throw new Error(updateError.message);
 
             // → M9: WhatsApp automation trigger

@@ -108,8 +108,8 @@ export default function ElectricPanelTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const { created_by: _cb, ...formWithoutCreatedBy } = form as any;
-            const payload = { ...formWithoutCreatedBy, client_id: form.client_id || null, photos };
+            const { created_by: _cb, client: _cl, ...formWithoutRelations } = form as any;
+            const payload = { ...formWithoutRelations, client_id: form.client_id || null, photos };
             if (editingId) {
                 const { error } = await supabase.from('electric_panel_records').update(payload).eq('id', editingId);
                 if (error) throw error;
@@ -127,6 +127,12 @@ export default function ElectricPanelTab() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('¿Eliminar este registro de cuadro eléctrico?')) return;
+        await supabase.from('electric_panel_records').delete().eq('id', id);
+        fetchData();
     };
 
     const handleEditClick = (rec: ElectricPanelRecord) => {
@@ -311,6 +317,9 @@ ${rec.notes ? `<div style="margin-top:8px;"><strong style="font-size:9px;">OBSER
                                     </button>
                                     <button onClick={() => handleEditClick(rec)} className="rounded-lg p-1.5 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar">
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <button onClick={() => handleDelete(rec.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title="Eliminar">
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </div>
                             </div>
