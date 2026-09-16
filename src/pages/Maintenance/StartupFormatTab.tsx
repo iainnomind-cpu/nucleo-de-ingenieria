@@ -374,6 +374,7 @@ export default function StartupFormatTab() {
                 <button onClick={() => { 
                     setForm({ ...EMPTY_FORM, folio: `No. ${(records.length + 1).toString().padStart(4, '0')}` }); 
                     setEditingId(null); 
+                    setPhotos([]);
                     setShowForm(true); 
                 }}
                     className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">
@@ -533,11 +534,11 @@ export default function StartupFormatTab() {
 
                             <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
                                 <label className={labelClass}>Fotografías del Formato de Arranque</label>
-                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`startup-formats/${editingId || 'new'}`} uploaderName={user?.full_name || 'Técnico'} />
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`startup-formats/${editingId || 'new-' + Date.now()}`} uploaderName={user?.full_name || 'Técnico'} />
                             </div>
 
                             <div className="mt-8 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
-                                <button type="button" onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="button" onClick={() => { setShowForm(false); setPhotos([]); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
                                 <button type="submit" disabled={saving} className="rounded-lg bg-emerald-600 px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-emerald-700">
                                     {saving ? 'Guardando...' : (editingId ? 'Guardar Cambios' : 'Guardar Formato de Arranque')}
                                 </button>

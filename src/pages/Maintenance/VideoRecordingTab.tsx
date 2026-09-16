@@ -6,7 +6,9 @@ import { PhotoAttachment } from '../../types/photos';
 
 const emptyForm = {
     id: '',
-    equipment_id: '',
+    client_id: '',
+    well_name: '',
+    address: '',
     recording_date: new Date().toISOString().split('T')[0],
     recorded_by: '',
     grid_depth: '',
@@ -23,29 +25,28 @@ const emptyForm = {
 type VideoForm = typeof emptyForm;
 
 export default function VideoRecordingTab() {
-    const [videos, setVideos] = useState<(VideoRecording & { equipment?: InstalledEquipment })[]>([]);
-    const [equipment, setEquipment] = useState<InstalledEquipment[]>([]);
+    const [videos, setVideos] = useState<(VideoRecording & { client?: { company_name: string } })[]>([]);
+    const [clients, setClients] = useState<{id: string, company_name: string}[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [filterEquip, setFilterEquip] = useState('');
     const [form, setForm] = useState<VideoForm>(emptyForm);
     const [photos, setPhotos] = useState<PhotoAttachment[]>([]);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const [vRes, eRes] = await Promise.all([
+        const [vRes, cRes] = await Promise.all([
             supabase
                 .from('video_recordings')
-                .select('*, equipment:installed_equipment(id, name, well_name, equipment_type, client:clients(company_name))')
+                .select('*, client:clients(company_name)')
                 .order('recording_date', { ascending: false }),
             supabase
-                .from('installed_equipment')
-                .select('id, name, well_name, equipment_type, client:clients(company_name)')
-                .order('name'),
+                .from('clients')
+                .select('id, company_name')
+                .order('company_name'),
         ]);
         setVideos((vRes.data as any[]) || []);
-        setEquipment((eRes.data as InstalledEquipment[]) || []);
+        setClients((cRes.data as any[]) || []);
         setLoading(false);
     }, []);
 
@@ -56,8 +57,9 @@ export default function VideoRecordingTab() {
         setSaving(true);
         try {
             const payload = {
-                equipment_id: form.equipment_id || null,
-                manual_well_info: (form as any).manual_well_info || null,
+                client_id: form.client_id || null,
+                well_name: form.well_name || null,
+                address: form.address || null,
                 recording_date: form.recording_date,
                 recorded_by: form.recorded_by || null,
                 grid_depth: form.grid_depth ? parseFloat(form.grid_depth) : null,
@@ -90,10 +92,12 @@ export default function VideoRecordingTab() {
         }
     };
 
-    const handleEdit = (v: VideoRecording) => {
+    const handleEdit = (v: any) => {
         setForm({
             id: v.id,
-            equipment_id: v.equipment_id || '',
+            client_id: v.client_id || '',
+            well_name: v.well_name || v.manual_well_info || '',
+            address: v.address || '',
             recording_date: v.recording_date,
             recorded_by: v.recorded_by || '',
             grid_depth: v.grid_depth?.toString() || '',
@@ -104,7 +108,6 @@ export default function VideoRecordingTab() {
             ademe_material: v.ademe_material || '',
             ademe_diameter: v.ademe_diameter || '',
             slot_type: v.slot_type || '',
-            manual_well_info: (v as any).manual_well_info || '',
         } as any);
         setPhotos((v as any).photos || []);
         setShowForm(true);
@@ -119,7 +122,7 @@ export default function VideoRecordingTab() {
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm outline-none transition-all placeholder:text-slate-400 focus:border-primary focus:ring-2 focus:ring-primary/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5';
 
-    const filteredVideos = filterEquip ? videos.filter(v => v.equipment_id === filterEquip) : videos;
+    const filteredVideos = videos;
 
     return (
         <div className="space-y-6">
@@ -130,20 +133,8 @@ export default function VideoRecordingTab() {
                     <p className="text-sm text-slate-500">Registros de videograbación de pozos y equipos.</p>
                 </div>
                 <div className="flex gap-2">
-                    <select
-                        value={filterEquip}
-                        onChange={e => setFilterEquip(e.target.value)}
-                        className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300"
-                    >
-                        <option value="">Todos los equipos</option>
-                        {equipment.map(eq => (
-                            <option key={eq.id} value={eq.id}>
-                                {eq.well_name ? `${eq.well_name} — ` : ''}{eq.name}
-                            </option>
-                        ))}
-                    </select>
                     <button
-                        onClick={() => { setForm(emptyForm); setShowForm(true); }}
+                        onClick={() => { setForm(emptyForm); setPhotos([]); setShowForm(true); }}
                         className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-sm font-semibold text-white shadow-md"
                     >
                         <span className="material-symbols-outlined text-[18px]">videocam</span>
@@ -169,20 +160,23 @@ export default function VideoRecordingTab() {
                         <form onSubmit={handleSave}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2">
-                                    <label className={labelClass}>Información del Pozo / Cliente (Manual)</label>
-                                    <input type="text" value={(form as any).manual_well_info || ''} onChange={e => setForm({ ...form, manual_well_info: e.target.value } as any)} 
-                                        placeholder="Ej. Pozo de agua 2 - Cliente XYZ..." className={inputClass} />
-                                </div>
-                                <div className="md:col-span-2">
-                                    <label className={labelClass}>Vincular a Equipo del Sistema (Opcional)</label>
-                                    <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} className={inputClass}>
+                                    <label className={labelClass}>Cliente del Sistema (Opcional)</label>
+                                    <select value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className={inputClass}>
                                         <option value="">— Ninguno —</option>
-                                        {equipment.map(eq => (
-                                            <option key={eq.id} value={eq.id}>
-                                                {eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {(eq as any).client?.company_name ? `(${(eq as any).client.company_name})` : ''}
-                                            </option>
+                                        {clients.map(c => (
+                                            <option key={c.id} value={c.id}>{c.company_name}</option>
                                         ))}
                                     </select>
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className={labelClass}>Nombre del Pozo</label>
+                                    <input type="text" value={form.well_name} onChange={e => setForm({ ...form, well_name: e.target.value })} 
+                                        placeholder="Ej. Pozo La Llave 2" className={inputClass} />
+                                </div>
+                                <div className="md:col-span-2">
+                                    <label className={labelClass}>Domicilio</label>
+                                    <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} 
+                                        placeholder="Domicilio o ubicación" className={inputClass} />
                                 </div>
                                 <div>
                                     <label className={labelClass}>Fecha de Grabación *</label>
@@ -228,7 +222,7 @@ export default function VideoRecordingTab() {
 
                             <div className="md:col-span-2 mt-4">
                                 <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">Fotografías / Imágenes del Videoregistro</label>
-                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`video-recordings/${form.equipment_id || 'manual'}`} uploaderName={form.recorded_by || 'Técnico'} />
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`video-recordings/${form.id || 'new-' + Date.now()}`} uploaderName={form.recorded_by || 'Técnico'} />
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3">
@@ -253,9 +247,7 @@ export default function VideoRecordingTab() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {filteredVideos.map(v => {
-                        const eq = v.equipment as any;
-                        const manualInfo = (v as any).manual_well_info;
+                    {filteredVideos.map((v: any) => {
                         return (
                             <div key={v.id} className="rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl dark:border-slate-800/60 dark:bg-slate-900/50">
                                 <div className="flex flex-col gap-3 md:flex-row md:items-start">
@@ -269,24 +261,25 @@ export default function VideoRecordingTab() {
                                                     {new Date(v.recording_date + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                                                 </p>
                                                 <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
-                                                    {manualInfo ? (
-                                                        <span className="font-medium text-slate-600 dark:text-slate-300">{(v as any).manual_well_info}</span>
-                                                    ) : (
-                                                        <>
-                                                            {eq?.well_name && <span>{eq.well_name}</span>}
-                                                            {eq?.name && <><span>·</span><span className="font-medium text-slate-600 dark:text-slate-300">{eq.name}</span></>}
-                                                            {eq?.client?.company_name && <><span>·</span><span>{eq.client.company_name}</span></>}
-                                                        </>
-                                                    )}
+                                                    {v.client?.company_name && <span className="font-medium text-slate-600 dark:text-slate-300">{v.client.company_name}</span>}
+                                                    {v.client?.company_name && (v.well_name || v.manual_well_info) && <span>·</span>}
+                                                    {(v.well_name || v.manual_well_info) && <span>{v.well_name || v.manual_well_info}</span>}
+                                                    {v.address && <><span>·</span><span>{v.address}</span></>}
                                                     {v.recorded_by && <><span>·</span><span>Operador: {v.recorded_by}</span></>}
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 shrink-0">
+                                            <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                                                 <button
                                                     onClick={() => handleEdit(v)}
                                                     className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
                                                 >
                                                     <span className="material-symbols-outlined text-[14px]">edit</span>Editar
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(v.id)}
+                                                    className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-rose-600 hover:bg-rose-100 dark:bg-slate-800 dark:text-rose-400 dark:hover:bg-rose-900/30"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">delete</span>
                                                 </button>
                                                 {v.video_url && (
                                                     <a href={v.video_url} target="_blank" rel="noopener noreferrer"

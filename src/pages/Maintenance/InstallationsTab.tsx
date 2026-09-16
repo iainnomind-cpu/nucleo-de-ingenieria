@@ -41,10 +41,30 @@ export default function InstallationsTab() {
         observations: ''
     });
 
-    // Associated equipment state for the new installation
-    const [formEquipment, setFormEquipment] = useState<Partial<InstalledEquipment>[]>([
-        { name: 'Bomba Principal', equipment_type: 'bomba', brand: '', model: '' }
-    ]);
+    const EMPTY_FORM: Partial<WellInstallation> = {
+        folio: '',
+        installation_date: new Date().toISOString().split('T')[0],
+        client_id: '',
+        location: '',
+        ademe_diameter: '',
+        ademe_material: '',
+        pipe_diameter: '',
+        pipe_length: '',
+        pipe_segments: 0,
+        valv_check: 0,
+        cable_gauge: '',
+        motor_hp: '',
+        pump_model: '',
+        starter_system: '',
+        protection_type: '',
+        has_ground: false,
+        ground_location: '',
+        static_level: 0,
+        dynamic_level: 0,
+        flow_rate: 0,
+        bottom_depth: 0,
+        observations: ''
+    };
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -54,15 +74,8 @@ export default function InstallationsTab() {
         ]);
         setInstallations(instRes.data || []);
         setClients(cliRes.data || []);
-        
-        // Auto-generate folio if none exists
-        if (!form.folio && instRes.data) {
-            const num = (instRes.data.length + 1).toString().padStart(4, '0');
-            setForm(prev => ({ ...prev, folio: `No. ${num}` }));
-        }
-        
         setLoading(false);
-    }, [form.folio]);
+    }, []);
 
     useEffect(() => {
         fetchData();
@@ -72,51 +85,31 @@ export default function InstallationsTab() {
         e.preventDefault();
         setSaving(true);
         try {
+            const { client: _cl, equipment: _eq, ...cleanForm } = form as any;
             if (editingId) {
-                // UPDATE existing installation
-                const { error: instErr } = await supabase.from('well_installations').update({
-                    ...form,
-                    photos,
-                }).eq('id', editingId);
+                const { error: instErr } = await supabase.from('well_installations').update({ ...cleanForm, photos }).eq('id', editingId);
                 if (instErr) throw instErr;
             } else {
-                // INSERT new installation
-                const { data: newInst, error: instErr } = await supabase.from('well_installations').insert([{
-                    ...form,
-                    photos,
-                    created_by: user?.id
-                }]).select().single();
-                
+                const { error: instErr } = await supabase.from('well_installations').insert([{ ...cleanForm, photos, created_by: user?.id }]).select().single();
                 if (instErr) throw instErr;
-
-                // Insert associated equipment
-                if (newInst && formEquipment.length > 0) {
-                    const equipmentToInsert = formEquipment.map(eq => ({
-                        client_id: form.client_id || null,
-                        name: eq.name || 'Equipo',
-                        equipment_type: eq.equipment_type || 'otro',
-                        brand: eq.brand || null,
-                        model: eq.model || null,
-                        serial_number: eq.serial_number || null,
-                        well_name: form.location || null,
-                        installation_date: form.installation_date,
-                        location: form.location || null,
-                        status: 'active',
-                        installation_id: newInst.id
-                    }));
-                    const { error: eqErr } = await supabase.from('installed_equipment').insert(equipmentToInsert);
-                    if (eqErr) throw eqErr;
-                }
             }
 
             setShowForm(false);
             setEditingId(null);
+            setForm(EMPTY_FORM);
+            setPhotos([]);
             fetchData();
         } catch (error: any) {
             alert('Error al guardar maniobra: ' + error.message);
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('¿Eliminar este registro de instalación?')) return;
+        await supabase.from('well_installations').delete().eq('id', id);
+        fetchData();
     };
 
     const handleEditClick = (inst: WellInstallation) => {
@@ -184,7 +177,7 @@ export default function InstallationsTab() {
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Registro de Maniobras / Instalaciones</h2>
                     <p className="text-sm text-slate-500">Historial de formatos de maniobras y equipos vinculados.</p>
                 </div>
-                <button onClick={() => setShowForm(true)} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark">
+                <button onClick={() => { setForm(EMPTY_FORM); setPhotos([]); setEditingId(null); setShowForm(true); }} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark">
                     <span className="material-symbols-outlined text-[20px]">add</span>
                     Nueva Instalación
                 </button>
@@ -216,6 +209,9 @@ export default function InstallationsTab() {
                                     </span>
                                     <button onClick={() => handleEditClick(inst)} className="rounded-lg p-1.5 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar instalación">
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <button onClick={() => handleDelete(inst.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title="Eliminar">
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </div>
                             </div>
@@ -379,49 +375,34 @@ export default function InstallationsTab() {
                                 />
                             </div>
                             
-                            {/* Equipos Section */}
-                            <div className="mt-8 rounded-xl border border-primary/20 bg-primary/5 p-5">
-                                <div className="flex items-center justify-between mb-4">
+                            {/* Tramo Extra (Manual) */}
+                            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
+                                <h3 className="font-bold text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[18px]">straighten</span>
+                                    Tramo Extra Manual
+                                </h3>
+                                <p className="text-xs text-slate-500 mb-3">Para tramos especiales como cabezal u otros que miden menos que un tramo estándar.</p>
+                                <div className="grid grid-cols-2 gap-4">
                                     <div>
-                                        <h3 className="font-bold text-primary">Equipos Vinculados (+EQUIPO)</h3>
-                                        <p className="text-xs text-slate-500">Agrega los equipos (motor, bomba, arrancador) que pertenecen a esta instalación para que queden registrados en el inventario general.</p>
+                                        <label className={labelClass}>Descripción del Tramo Extra</label>
+                                        <input type="text" value={(form as any).extra_pipe_desc || ''} onChange={e => setForm({ ...form, extra_pipe_desc: e.target.value } as any)} className={inputClass} placeholder="Ej. Cabezal, tramo reducido..." />
                                     </div>
-                                    <button type="button" onClick={addEquipmentField} className="rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-primary shadow-sm border border-primary/20 hover:bg-primary hover:text-white transition-colors">
-                                        + Agregar Equipo
-                                    </button>
-                                </div>
-                                
-                                <div className="space-y-3">
-                                    {formEquipment.map((eq, i) => (
-                                        <div key={i} className="flex flex-col sm:flex-row gap-3 items-center bg-white p-3 rounded-lg border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
-                                            <div className="flex-1 min-w-[150px]">
-                                                <input type="text" placeholder="Nombre (ej. Motor Principal)" value={eq.name} onChange={e => updateEquipmentField(i, 'name', e.target.value)} className={inputClass} required />
-                                            </div>
-                                            <div className="flex-1 min-w-[150px]">
-                                                <select value={eq.equipment_type} onChange={e => updateEquipmentField(i, 'equipment_type', e.target.value)} className={inputClass}>
-                                                    {Object.entries(EQUIPMENT_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-                                                </select>
-                                            </div>
-                                            <div className="flex-1 min-w-[100px]">
-                                                <input type="text" placeholder="Marca" value={eq.brand || ''} onChange={e => updateEquipmentField(i, 'brand', e.target.value)} className={inputClass} />
-                                            </div>
-                                            <button type="button" onClick={() => removeEquipmentField(i)} className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg">
-                                                <span className="material-symbols-outlined text-[20px]">delete</span>
-                                            </button>
-                                        </div>
-                                    ))}
+                                    <div>
+                                        <label className={labelClass}>Longitud Extra (m)</label>
+                                        <input type="number" step="0.01" value={(form as any).extra_pipe_length || ''} onChange={e => setForm({ ...form, extra_pipe_length: e.target.value } as any)} className={inputClass} placeholder="Ej. 0.60" />
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
                                 <label className={labelClass}>Fotografías de la Instalación</label>
-                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`installations/${editingId || 'new'}`} uploaderName={user?.full_name || 'Técnico'} />
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`installations/${editingId || 'new-' + Date.now()}`} uploaderName={user?.full_name || 'Técnico'} />
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
-                                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm(EMPTY_FORM); setPhotos([]); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
                                 <button type="submit" disabled={saving} className="rounded-lg bg-primary px-6 py-2 text-sm font-semibold text-white shadow-md hover:bg-primary-dark">
-                                    {saving ? 'Guardando...' : (editingId ? 'Guardar Cambios' : 'Guardar Maniobra e Inventario')}
+                                    {saving ? 'Guardando...' : (editingId ? 'Guardar Cambios' : 'Guardar Maniobra')}
                                 </button>
                             </div>
                         </form>

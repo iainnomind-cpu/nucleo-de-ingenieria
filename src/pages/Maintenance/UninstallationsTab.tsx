@@ -109,6 +109,7 @@ export default function UninstallationsTab() {
             setShowForm(false);
             setEditingId(null);
             resetForm();
+            setPhotos([]);
             fetchData();
         } catch (error: any) {
             alert('Error al guardar desinstalación: ' + error.message);
@@ -149,7 +150,7 @@ export default function UninstallationsTab() {
         setEditingId(rec.id);
         setForm({
             folio: rec.folio,
-            installation_date: rec.installation_date,
+            installation_date: (rec as any).uninstallation_date || rec.installation_date || new Date().toISOString().split('T')[0],
             client_id: rec.client_id || '',
             location: rec.location || '',
             ademe_diameter: rec.ademe_diameter || '',
@@ -174,6 +175,12 @@ export default function UninstallationsTab() {
         });
         setPhotos((rec as any).photos || []);
         setShowForm(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if (!window.confirm('¿Eliminar este registro de desinstalación?')) return;
+        await supabase.from('well_uninstallations').delete().eq('id', id);
+        fetchData();
     };
 
     const handlePrint = (rec: WellUninstallation) => {
@@ -275,7 +282,7 @@ export default function UninstallationsTab() {
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Registro de Desinstalaciones</h2>
                     <p className="text-sm text-slate-500">Historial de formatos de desinstalación de equipos.</p>
                 </div>
-                <button onClick={() => setShowForm(true)} className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">
+                <button onClick={() => { resetForm(); setPhotos([]); setEditingId(null); setShowForm(true); }} className="flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700">
                     <span className="material-symbols-outlined text-[20px]">add</span>
                     Nueva Desinstalación
                 </button>
@@ -304,13 +311,16 @@ export default function UninstallationsTab() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <span className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 dark:bg-rose-900/20 dark:text-rose-400">
-                                        {rec.installation_date}
+                                        {(rec as any).uninstallation_date || rec.installation_date || '-'}
                                     </span>
                                     <button onClick={() => handlePrint(rec)} disabled={printId === rec.id} className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600" title="Imprimir">
                                         <span className="material-symbols-outlined text-[18px]">print</span>
                                     </button>
                                     <button onClick={() => handleEditClick(rec)} className="rounded-lg p-1.5 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar">
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
+                                    </button>
+                                    <button onClick={() => handleDelete(rec.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500" title="Eliminar">
+                                        <span className="material-symbols-outlined text-[18px]">delete</span>
                                     </button>
                                 </div>
                             </div>
@@ -432,9 +442,30 @@ export default function UninstallationsTab() {
                                 </div>
                             </div>
 
+                            {/* Tramo Extra (Manual) */}
+                            <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
+                                <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-4 dark:border-amber-900/30 dark:bg-amber-900/10">
+                                    <h3 className="font-bold text-amber-700 dark:text-amber-400 mb-3 flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-[18px]">straighten</span>
+                                        Tramo Extra Manual
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mb-3">Para tramos especiales como cabezal u otros que miden menos que un tramo estándar.</p>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={labelClass}>Descripción del Tramo Extra</label>
+                                            <input type="text" value={(form as any).extra_pipe_desc || ''} onChange={e => setForm({ ...form, extra_pipe_desc: e.target.value } as any)} className={inputClass} placeholder="Ej. Cabezal, tramo reducido..." />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Longitud Extra (m)</label>
+                                            <input type="number" step="0.01" value={(form as any).extra_pipe_length || ''} onChange={e => setForm({ ...form, extra_pipe_length: e.target.value } as any)} className={inputClass} placeholder="Ej. 0.60" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="mt-6 border-t border-slate-100 pt-5 dark:border-slate-800">
                                 <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">Fotografías de la Desinstalación</label>
-                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`uninstallations/${editingId || 'new'}`} uploaderName={user?.full_name || 'Técnico'} />
+                                <PhotoUploader photos={photos} onPhotosChange={setPhotos} folder={`uninstallations/${editingId || 'new-' + Date.now()}`} uploaderName={user?.full_name || 'Técnico'} />
                             </div>
 
                             <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-5 dark:border-slate-800">
