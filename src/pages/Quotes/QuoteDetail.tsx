@@ -334,10 +334,22 @@ export default function QuoteDetail() {
     const handleConvertToProject = async (hasPayment = false) => {
         if (!quote) return;
 
-        // Generate Project Number
+        // Generate Project Number — find highest existing number to avoid duplicates
         const year = new Date().getFullYear();
-        const { count: totalProj } = await supabase.from('projects').select('*', { count: 'exact', head: true });
-        const projectNumber = `PRY-${year}-${String((totalProj || 0) + 1).padStart(4, '0')}`;
+        const yearPrefix = `PRY-${year}-`;
+        const { data: existingProjects } = await supabase
+            .from('projects')
+            .select('project_number')
+            .like('project_number', `${yearPrefix}%`)
+            .order('project_number', { ascending: false })
+            .limit(1);
+        
+        let nextNum = 1;
+        if (existingProjects && existingProjects.length > 0) {
+            const lastNum = parseInt(existingProjects[0].project_number.replace(yearPrefix, ''), 10);
+            if (!isNaN(lastNum)) nextNum = lastNum + 1;
+        }
+        const projectNumber = `${yearPrefix}${String(nextNum).padStart(4, '0')}`;
 
         // → M3: Auto-create Project
         const { data: project, error: projErr } = await supabase.from('projects').insert({
