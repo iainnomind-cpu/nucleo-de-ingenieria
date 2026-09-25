@@ -143,7 +143,63 @@ export default function InstallationsTab() {
         setShowForm(true);
     };
 
-
+    const handlePrint = (inst: WellInstallation) => {
+        const clientName = inst.client?.company_name || 'Sin Cliente';
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+        const content = `<!DOCTYPE html><html><head><title>Instalación ${inst.folio || ''}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 30px; color: #333; }
+                h1 { font-size: 20px; border-bottom: 2px solid #0066cc; padding-bottom: 8px; color: #0066cc; }
+                .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+                .header .folio { font-size: 24px; font-weight: bold; color: #0066cc; }
+                .grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+                .field { background: #f8f9fa; padding: 8px 12px; border-radius: 6px; border-left: 3px solid #0066cc; }
+                .field .label { font-size: 10px; text-transform: uppercase; color: #888; font-weight: bold; letter-spacing: 0.5px; }
+                .field .value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+                .obs { background: #fffbeb; padding: 12px; border-radius: 6px; border-left: 3px solid #f59e0b; margin-top: 12px; }
+                .photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+                .photos img { width: 120px; height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
+                @media print { body { padding: 15px; } }
+            </style></head><body>
+            <div class="header">
+                <div><div class="folio">${inst.folio || 'S/F'}</div><div style="font-size:12px;color:#666">Formato de Maniobra / Instalación</div></div>
+                <div style="text-align:right"><div style="font-weight:bold">${clientName}</div><div style="font-size:12px;color:#666">${inst.installation_date || ''}</div></div>
+            </div>
+            <h1>Datos Generales</h1>
+            <div class="grid">
+                <div class="field"><div class="label">Ubicación</div><div class="value">${inst.location || '-'}</div></div>
+                <div class="field"><div class="label">Ademe Diámetro</div><div class="value">${inst.ademe_diameter || '-'}</div></div>
+                <div class="field"><div class="label">Ademe Material</div><div class="value">${inst.ademe_material || '-'}</div></div>
+                <div class="field"><div class="label">Motor / HP</div><div class="value">${inst.motor_hp || '-'}</div></div>
+            </div>
+            <h1>Tubería y Equipos</h1>
+            <div class="grid">
+                <div class="field"><div class="label">Diámetro Tubería</div><div class="value">${inst.pipe_diameter || '-'}</div></div>
+                <div class="field"><div class="label">Longitud</div><div class="value">${inst.pipe_length || '-'}</div></div>
+                <div class="field"><div class="label">Tramos</div><div class="value">${inst.pipe_segments || '-'}</div></div>
+                <div class="field"><div class="label">Válvula Check</div><div class="value">${inst.valv_check || '-'}</div></div>
+                <div class="field"><div class="label">Calibre Cable</div><div class="value">${inst.cable_gauge || '-'}</div></div>
+                <div class="field"><div class="label">Modelo Bomba</div><div class="value">${inst.pump_model || '-'}</div></div>
+                <div class="field"><div class="label">Sist. Arranque</div><div class="value">${inst.starter_system || '-'}</div></div>
+                <div class="field"><div class="label">Protección</div><div class="value">${inst.protection_type || '-'}</div></div>
+            </div>
+            <h1>Niveles y Mediciones</h1>
+            <div class="grid">
+                <div class="field"><div class="label">Nivel Estático</div><div class="value">${inst.static_level ? inst.static_level + ' m' : '-'}</div></div>
+                <div class="field"><div class="label">Nivel Dinámico</div><div class="value">${inst.dynamic_level ? inst.dynamic_level + ' m' : '-'}</div></div>
+                <div class="field"><div class="label">Gasto</div><div class="value">${inst.flow_rate ? inst.flow_rate + ' lps' : '-'}</div></div>
+                <div class="field"><div class="label">Prof. Fondo</div><div class="value">${inst.bottom_depth ? inst.bottom_depth + ' m' : '-'}</div></div>
+                <div class="field"><div class="label">Tierra Física</div><div class="value">${inst.has_ground ? 'Sí' : 'No'} ${inst.ground_location ? '(' + inst.ground_location + ')' : ''}</div></div>
+            </div>
+            ${inst.observations ? `<div class="obs"><strong>Observaciones:</strong> ${inst.observations}</div>` : ''}
+            ${(inst as any).photos && (inst as any).photos.length > 0 ? `<h1>Fotografías</h1><div class="photos">${(inst as any).photos.map((p: any) => `<img src="${p.url}" />`).join('')}</div>` : ''}
+        </body></html>`;
+        printWindow.document.write(content);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); }, 500);
+    };
 
     const inputClass = "w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white";
     const labelClass = "mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider";
@@ -191,6 +247,9 @@ export default function InstallationsTab() {
                                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                                         {inst.installation_date}
                                     </span>
+                                    <button onClick={() => handlePrint(inst)} className="rounded-lg p-1.5 text-slate-400 hover:bg-sky-50 hover:text-sky-500" title="Imprimir">
+                                        <span className="material-symbols-outlined text-[18px]">print</span>
+                                    </button>
                                     <button onClick={() => handleEditClick(inst)} className="rounded-lg p-1.5 text-slate-400 hover:bg-primary/10 hover:text-primary" title="Editar instalación">
                                         <span className="material-symbols-outlined text-[18px]">edit</span>
                                     </button>

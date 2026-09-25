@@ -340,9 +340,9 @@ export default function ProjectDetail() {
                     const file = new File([blob], `signature_${Date.now()}.png`, { type: 'image/png' });
                     
                     const path = `signatures/${project.id}_${Date.now()}.png`;
-                    const { error } = await supabase.storage.from('photos').upload(path, file, { upsert: true });
+                    const { error } = await supabase.storage.from('evidence-photos').upload(path, file, { upsert: true });
                     if (!error) {
-                        const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+                        const { data: urlData } = supabase.storage.from('evidence-photos').getPublicUrl(path);
                         uploadedSignatureUrl = urlData.publicUrl;
                     } else {
                         console.warn('No se pudo subir firma:', error.message);
@@ -691,9 +691,9 @@ export default function ProjectDetail() {
         const file = e.target.files[0];
         const path = `signatures/${project.id}_${Date.now()}.${file.name.split('.').pop()}`;
         try {
-            const { error } = await supabase.storage.from('photos').upload(path, file, { upsert: true });
+            const { error } = await supabase.storage.from('evidence-photos').upload(path, file, { upsert: true });
             if (error) { alert('Error subiendo imagen: ' + error.message); return; }
-            const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+            const { data: urlData } = supabase.storage.from('evidence-photos').getPublicUrl(path);
             setSignatureUrl(urlData.publicUrl);
             alert('✅ Imagen cargada correctamente');
         } catch (err: any) {
@@ -1963,40 +1963,57 @@ export default function ProjectDetail() {
                             })}
                         </div>
                         
-                        {/* Client Signature */}
+                        {/* Client Signature / Evidence */}
                         <div className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
-                            <div className="flex items-center justify-between mb-2">
-                                <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                    <span className="material-symbols-outlined text-[18px] text-primary">draw</span>
-                                    Firma del Cliente (Cierre Técnico)
-                                </h4>
-                                <button type="button" onClick={() => sigCanvas.current?.clear()} className="text-[10px] text-slate-400 hover:text-slate-600 underline">Borrar</button>
-                            </div>
-                            <p className="text-xs text-slate-400 mb-3">El cliente debe firmar de conformidad en el recuadro blanco.</p>
-                            
-                            <div className="w-full rounded-lg border-2 border-dashed border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900 overflow-hidden">
-                                <SignatureCanvas 
-                                    ref={sigCanvas} 
-                                    penColor="black" 
-                                    canvasProps={{ className: "w-full h-[150px]", style: { width: '100%', height: '150px' } }} 
-                                />
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-[18px] text-primary">verified</span>
+                                Firma / Evidencia de Cierre
+                            </h4>
+
+                            {/* Option 1: Signature Canvas */}
+                            <div className="mb-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                                        <span className="material-symbols-outlined text-[14px] text-primary">draw</span>
+                                        Opción 1: Firma Digital
+                                    </p>
+                                    <button type="button" onClick={() => sigCanvas.current?.clear()} className="text-[10px] text-slate-400 hover:text-slate-600 underline">Borrar</button>
+                                </div>
+                                <div className="w-full rounded-lg border-2 border-dashed border-slate-300 bg-white dark:border-slate-600 dark:bg-slate-900 overflow-hidden">
+                                    <SignatureCanvas 
+                                        ref={sigCanvas} 
+                                        penColor="black" 
+                                        canvasProps={{ className: "w-full h-[120px]", style: { width: '100%', height: '120px' } }} 
+                                    />
+                                </div>
                             </div>
 
-                            <div className="mt-3 flex items-center justify-center">
-                                <span className="text-[10px] text-slate-400">O también puedes:</span>
+                            {/* Divider */}
+                            <div className="flex items-center gap-3 my-3">
+                                <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
+                                <span className="text-xs font-bold text-slate-400">O</span>
+                                <div className="flex-1 border-t border-slate-200 dark:border-slate-700"></div>
                             </div>
-                            <div className="mt-2 flex items-center gap-3 justify-center">
-                                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2 text-xs font-semibold text-primary hover:bg-primary/10 transition-all">
-                                    <span className="material-symbols-outlined text-[16px]">upload</span>
-                                    {signatureUrl ? 'Cambiar Foto de Firma' : 'Subir Foto de Firma'}
-                                    <input type="file" accept="image/*,.pdf" className="hidden" onChange={handleSignatureUpload} />
-                                </label>
-                                {signatureUrl && (
-                                    <div className="flex items-center gap-2">
-                                        <img src={signatureUrl} alt="Firma" className="h-8 rounded border border-slate-200 dark:border-slate-700" />
-                                        <span className="text-[10px] text-emerald-600 font-bold">✓ Cargada</span>
-                                    </div>
-                                )}
+
+                            {/* Option 2: Upload Image */}
+                            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 dark:bg-primary/10">
+                                <p className="text-xs font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mb-2">
+                                    <span className="material-symbols-outlined text-[14px] text-primary">photo_camera</span>
+                                    Opción 2: Subir Foto o Imagen
+                                </p>
+                                <div className="flex items-center gap-3">
+                                    <label className="flex-1 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-primary/40 bg-white px-4 py-3 text-sm font-semibold text-primary hover:bg-primary/5 hover:border-primary transition-all dark:bg-slate-900 dark:hover:bg-slate-800">
+                                        <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                                        {signatureUrl ? 'Cambiar Imagen' : 'Seleccionar Imagen'}
+                                        <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleSignatureUpload} />
+                                    </label>
+                                    {signatureUrl && (
+                                        <div className="flex flex-col items-center gap-1">
+                                            <img src={signatureUrl} alt="Evidencia" className="h-14 w-14 rounded-lg border border-slate-200 dark:border-slate-700 object-cover" />
+                                            <span className="text-[10px] text-emerald-600 font-bold">✓ Cargada</span>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
                         </div> {/* End of scrollable area */}
