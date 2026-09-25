@@ -6,6 +6,7 @@ import { PhotoAttachment } from '../../types/photos';
 
 const emptyForm = {
     id: '',
+    folio: '',
     client_id: '',
     well_name: '',
     address: '',
@@ -57,6 +58,7 @@ export default function VideoRecordingTab() {
         setSaving(true);
         try {
             const payload = {
+                folio: form.folio || null,
                 client_id: form.client_id || null,
                 well_name: form.well_name || null,
                 address: form.address || null,
@@ -95,6 +97,7 @@ export default function VideoRecordingTab() {
     const handleEdit = (v: any) => {
         setForm({
             id: v.id,
+            folio: v.folio || '',
             client_id: v.client_id || '',
             well_name: v.well_name || v.manual_well_info || '',
             address: v.address || '',
@@ -111,6 +114,55 @@ export default function VideoRecordingTab() {
         } as any);
         setPhotos((v as any).photos || []);
         setShowForm(true);
+    };
+
+    const handlePrint = (v: any) => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const content = `
+            <html>
+                <head>
+                    <title>Videograbación ${v.folio || ''}</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
+                        h1 { color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 10px; }
+                        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+                        .field { margin-bottom: 15px; }
+                        .label { font-weight: bold; color: #64748b; font-size: 12px; text-transform: uppercase; }
+                        .value { font-size: 16px; margin-top: 4px; }
+                        .section-title { background: #f1f5f9; padding: 10px; margin-top: 30px; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Reporte de Videograbación ${v.folio ? `- ${v.folio}` : ''}</h1>
+                    <div class="grid">
+                        <div class="field"><div class="label">Fecha</div><div class="value">${v.recording_date}</div></div>
+                        <div class="field"><div class="label">Cliente</div><div class="value">${v.client?.company_name || 'N/A'}</div></div>
+                        <div class="field"><div class="label">Pozo</div><div class="value">${v.well_name || 'N/A'}</div></div>
+                        <div class="field"><div class="label">Operador</div><div class="value">${v.recorded_by || 'N/A'}</div></div>
+                    </div>
+                    <div class="section-title">Detalles Técnicos</div>
+                    <div class="grid">
+                        <div class="field"><div class="label">Material Ademe</div><div class="value">${v.ademe_material || '-'}</div></div>
+                        <div class="field"><div class="label">Diámetro Ademe</div><div class="value">${v.ademe_diameter || '-'}</div></div>
+                        <div class="field"><div class="label">Tipo Ranuras</div><div class="value">${v.slot_type || '-'}</div></div>
+                        <div class="field"><div class="label">Prof. Rejillas</div><div class="value">${v.grid_depth || '-'} m</div></div>
+                        <div class="field"><div class="label">Nivel Estático</div><div class="value">${v.static_level || '-'} m</div></div>
+                        <div class="field"><div class="label">Prof. Fondo</div><div class="value">${v.bottom_depth || '-'} m</div></div>
+                    </div>
+                    ${v.casing_observations ? `
+                    <div class="section-title">Observaciones</div>
+                    <div class="field" style="margin-top:10px;"><div class="value">${v.casing_observations}</div></div>
+                    ` : ''}
+                </body>
+            </html>
+        `;
+
+        printWindow.document.write(content);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); }, 500);
     };
 
     const handleDelete = async (id: string) => {
@@ -134,7 +186,12 @@ export default function VideoRecordingTab() {
                 </div>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => { setForm(emptyForm); setPhotos([]); setShowForm(true); }}
+                        onClick={() => { 
+                            const num = (videos.length + 1).toString().padStart(4, '0');
+                            setForm({ ...emptyForm, folio: `VID-${num}` }); 
+                            setPhotos([]); 
+                            setShowForm(true); 
+                        }}
                         className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-primary to-primary-dark px-4 py-2 text-sm font-semibold text-white shadow-md"
                     >
                         <span className="material-symbols-outlined text-[18px]">videocam</span>
@@ -159,6 +216,17 @@ export default function VideoRecordingTab() {
 
                         <form onSubmit={handleSave}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className="md:col-span-2 flex gap-4">
+                                    <div className="flex-1">
+                                        <label className={labelClass}>Folio</label>
+                                        <input type="text" value={form.folio || ''} onChange={e => setForm({ ...form, folio: e.target.value })} 
+                                            placeholder="Ej. VID-0001" className={inputClass} required />
+                                    </div>
+                                    <div className="flex-1">
+                                        <label className={labelClass}>Fecha de Grabación *</label>
+                                        <input type="date" value={form.recording_date} onChange={e => setForm({ ...form, recording_date: e.target.value })} required className={inputClass} />
+                                    </div>
+                                </div>
                                 <div className="md:col-span-2">
                                     <label className={labelClass}>Cliente del Sistema (Opcional)</label>
                                     <select value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className={inputClass}>
@@ -178,10 +246,7 @@ export default function VideoRecordingTab() {
                                     <input type="text" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} 
                                         placeholder="Domicilio o ubicación" className={inputClass} />
                                 </div>
-                                <div>
-                                    <label className={labelClass}>Fecha de Grabación *</label>
-                                    <input type="date" value={form.recording_date} onChange={e => setForm({ ...form, recording_date: e.target.value })} required className={inputClass} />
-                                </div>
+
                                 <div>
                                     <label className={labelClass}>Registrado por</label>
                                     <input value={form.recorded_by} onChange={e => setForm({ ...form, recorded_by: e.target.value })} placeholder="Nombre del operador" className={inputClass} />
@@ -257,8 +322,9 @@ export default function VideoRecordingTab() {
                                     <div className="flex-1 space-y-3">
                                         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                                             <div>
-                                                <p className="font-bold text-sm text-slate-900 dark:text-white">
-                                                    {new Date(v.recording_date + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                                <p className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                                                    {v.folio && <span className="text-primary">{v.folio}</span>}
+                                                    <span>{new Date(v.recording_date + 'T00:00:00').toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</span>
                                                 </p>
                                                 <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
                                                     {v.client?.company_name && <span className="font-medium text-slate-600 dark:text-slate-300">{v.client.company_name}</span>}
@@ -269,6 +335,12 @@ export default function VideoRecordingTab() {
                                                 </div>
                                             </div>
                                             <div className="flex gap-2 shrink-0 flex-wrap justify-end">
+                                                <button
+                                                    onClick={() => handlePrint(v)}
+                                                    className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+                                                >
+                                                    <span className="material-symbols-outlined text-[14px]">print</span>Imprimir
+                                                </button>
                                                 <button
                                                     onClick={() => handleEdit(v)}
                                                     className="flex items-center gap-1 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"

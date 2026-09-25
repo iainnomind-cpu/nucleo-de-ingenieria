@@ -138,34 +138,12 @@ export default function InstallationsTab() {
             bottom_depth: inst.bottom_depth || 0,
             observations: inst.observations || '',
         });
-        if (inst.equipment && inst.equipment.length > 0) {
-            setFormEquipment(inst.equipment.map(eq => ({
-                name: eq.name,
-                equipment_type: eq.equipment_type,
-                brand: eq.brand || '',
-                model: eq.model || '',
-                serial_number: eq.serial_number || '',
-            })));
-        } else {
-            setFormEquipment([{ name: 'Bomba Principal', equipment_type: 'bomba', brand: '', model: '' }]);
-        }
+
         setPhotos((inst as any).photos || []);
         setShowForm(true);
     };
 
-    const addEquipmentField = () => {
-        setFormEquipment([...formEquipment, { name: '', equipment_type: 'motor', brand: '', model: '' }]);
-    };
-    
-    const updateEquipmentField = (index: number, field: string, value: string) => {
-        const updated = [...formEquipment];
-        updated[index] = { ...updated[index], [field]: value };
-        setFormEquipment(updated);
-    };
-    
-    const removeEquipmentField = (index: number) => {
-        setFormEquipment(formEquipment.filter((_, i) => i !== index));
-    };
+
 
     const inputClass = "w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm text-slate-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-slate-700 dark:bg-slate-900 dark:text-white";
     const labelClass = "mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider";
@@ -177,7 +155,13 @@ export default function InstallationsTab() {
                     <h2 className="text-xl font-bold text-slate-900 dark:text-white">Registro de Maniobras / Instalaciones</h2>
                     <p className="text-sm text-slate-500">Historial de formatos de maniobras y equipos vinculados.</p>
                 </div>
-                <button onClick={() => { setForm(EMPTY_FORM); setPhotos([]); setEditingId(null); setShowForm(true); }} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark">
+                <button onClick={() => { 
+                    const num = (installations.length + 1).toString().padStart(4, '0');
+                    setForm({ ...EMPTY_FORM, folio: `INS-${num}` }); 
+                    setPhotos([]); 
+                    setEditingId(null); 
+                    setShowForm(true); 
+                }} className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark">
                     <span className="material-symbols-outlined text-[20px]">add</span>
                     Nueva Instalación
                 </button>

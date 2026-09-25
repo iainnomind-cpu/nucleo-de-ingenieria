@@ -340,10 +340,12 @@ export default function ProjectDetail() {
                     const file = new File([blob], `signature_${Date.now()}.png`, { type: 'image/png' });
                     
                     const path = `signatures/${project.id}_${Date.now()}.png`;
-                    const { error } = await supabase.storage.from('photos').upload(path, file);
+                    const { error } = await supabase.storage.from('photos').upload(path, file, { upsert: true });
                     if (!error) {
                         const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
                         uploadedSignatureUrl = urlData.publicUrl;
+                    } else {
+                        console.warn('No se pudo subir firma:', error.message);
                     }
                 } catch (err) {
                     console.error("Error al guardar la firma", err);
@@ -688,10 +690,15 @@ export default function ProjectDetail() {
         if (!project || !e.target.files?.[0]) return;
         const file = e.target.files[0];
         const path = `signatures/${project.id}_${Date.now()}.${file.name.split('.').pop()}`;
-        const { error } = await supabase.storage.from('photos').upload(path, file);
-        if (error) { alert('Error subiendo firma: ' + error.message); return; }
-        const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
-        setSignatureUrl(urlData.publicUrl);
+        try {
+            const { error } = await supabase.storage.from('photos').upload(path, file, { upsert: true });
+            if (error) { alert('Error subiendo imagen: ' + error.message); return; }
+            const { data: urlData } = supabase.storage.from('photos').getPublicUrl(path);
+            setSignatureUrl(urlData.publicUrl);
+            alert('✅ Imagen cargada correctamente');
+        } catch (err: any) {
+            alert('Error al subir la imagen: ' + (err?.message || 'Desconocido'));
+        }
     };
 
     // KPIs & Financials

@@ -46,25 +46,28 @@ export default function MaintenanceDashboard() {
     // Schedule form
     const [schForm, setSchForm] = useState({
         equipment_id: '', service_type: 'revision_general' as ServiceType, title: '', next_service_date: '',
-        assigned_to: '', alert_days_before: '15', departure_time: '', description: ''
+        assigned_to: '', alert_days_before: '15', departure_time: '', description: '', client_id: '', project_id: ''
     });
 
     const [clients, setClients] = useState<{ id: string; company_name: string }[]>([]);
+    const [projects, setProjects] = useState<{ id: string; project_number: string; title: string }[]>([]);
 
     const fetchAll = useCallback(async () => {
         setLoading(true);
-        const [eqRes, schRes, warRes, clRes, proRes] = await Promise.all([
+        const [eqRes, schRes, warRes, clRes, proRes, projRes] = await Promise.all([
             supabase.from('installed_equipment').select('*, client:clients(id, company_name)').order('well_name').order('name'),
             supabase.from('maintenance_schedules').select('*, equipment:installed_equipment(id, name, well_name), client:clients(id, company_name)').order('next_service_date'),
             supabase.from('equipment_warranties').select('*, equipment:installed_equipment(id, name, well_name)').order('end_date'),
             supabase.from('clients').select('id, company_name').order('company_name'),
             supabase.from('proactive_maintenance_alerts').select('*').in('alert_status', ['pending', 'notified', 'wa_sent']).order('days_overdue', { ascending: false }),
+            supabase.from('projects').select('id, project_number, title').in('status', ['pending', 'preparation', 'in_field']).order('created_at', { ascending: false }),
         ]);
         setEquipment((eqRes.data as InstalledEquipment[]) || []);
         setSchedules((schRes.data as MaintenanceSchedule[]) || []);
         setWarranties(warRes.data || []);
         setClients(clRes.data || []);
         setProactiveAlerts((proRes.data as ProactiveMaintenanceAlert[]) || []);
+        setProjects(projRes.data || []);
         setLoading(false);
     }, []);
 
@@ -102,7 +105,7 @@ export default function MaintenanceDashboard() {
         if (editingScheduleId) {
             // UPDATE existing schedule
             await supabase.from('maintenance_schedules').update({
-                equipment_id: schForm.equipment_id || null, client_id: eq?.client_id || null,
+                equipment_id: schForm.equipment_id || null, client_id: schForm.client_id || eq?.client_id || null,
                 service_type: schForm.service_type, title: schForm.title || SERVICE_TYPE_LABELS[schForm.service_type],
                 description: schForm.description || null,
                 next_service_date: schForm.next_service_date, assigned_to: schForm.assigned_to || null,
@@ -112,7 +115,7 @@ export default function MaintenanceDashboard() {
         } else {
             // INSERT new schedule
             const res = await supabase.from('maintenance_schedules').insert({
-                equipment_id: schForm.equipment_id || null, client_id: eq?.client_id || null,
+                equipment_id: schForm.equipment_id || null, client_id: schForm.client_id || eq?.client_id || null,
                 service_type: schForm.service_type, title: schForm.title || SERVICE_TYPE_LABELS[schForm.service_type],
                 description: schForm.description || null,
                 frequency_months: SERVICE_FREQUENCY[schForm.service_type] || 12,
@@ -139,7 +142,7 @@ export default function MaintenanceDashboard() {
 
         setShowScheduleForm(false);
         setEditingScheduleId(null);
-        setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '' });
+        setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '', client_id: '', project_id: '' });
         fetchAll();
     };
 
@@ -154,6 +157,8 @@ export default function MaintenanceDashboard() {
             alert_days_before: String(s.alert_days_before || 15),
             departure_time: s.departure_time || '',
             description: s.description || '',
+            client_id: s.client_id || '',
+            project_id: '',
         });
         setShowScheduleForm(true);
     };
@@ -366,7 +371,7 @@ export default function MaintenanceDashboard() {
                                 <span className="material-symbols-outlined text-primary text-[22px]">calendar_add_on</span>
                                 {editingScheduleId ? 'Editar Programación' : 'Programar Actividad del Día'}
                             </h3>
-                            <button onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '' }); }} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"><span className="material-symbols-outlined text-[20px]">close</span></button>
+                            <button onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '', client_id: '', project_id: '' }); }} className="rounded-full p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"><span className="material-symbols-outlined text-[20px]">close</span></button>
                         </div>
                         {schForm.next_service_date && (
                             <div className="mb-4 flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2.5 dark:bg-primary/20">
@@ -379,6 +384,8 @@ export default function MaintenanceDashboard() {
                         <form onSubmit={handleAddSchedule}>
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="md:col-span-2"><label className={labelClass}>Equipo (Opcional para actividades generales)</label><select value={schForm.equipment_id} onChange={e => setSchForm({ ...schForm, equipment_id: e.target.value })} className={inputClass}><option value="">Sin equipo / Actividad general</option>{equipment.map(eq => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}</select></div>
+                                <div><label className={labelClass}>Cliente</label><select value={schForm.client_id} onChange={e => setSchForm({ ...schForm, client_id: e.target.value })} className={inputClass}><option value="">— Seleccionar Cliente —</option>{clients.map(c => <option key={c.id} value={c.id}>{c.company_name}</option>)}</select></div>
+                                <div><label className={labelClass}>Proyecto / Trabajo Aprobado</label><select value={schForm.project_id} onChange={e => setSchForm({ ...schForm, project_id: e.target.value })} className={inputClass}><option value="">— Ninguno —</option>{projects.map(p => <option key={p.id} value={p.id}>{p.project_number} — {p.title}</option>)}</select></div>
                                 <div><label className={labelClass}>Tipo Servicio</label><select value={schForm.service_type} onChange={e => setSchForm({ ...schForm, service_type: e.target.value as ServiceType, title: SERVICE_TYPE_LABELS[e.target.value as ServiceType] })} className={inputClass}>{(Object.keys(SERVICE_TYPE_LABELS) as ServiceType[]).map(t => <option key={t} value={t}>{SERVICE_TYPE_LABELS[t]}</option>)}</select></div>
                                 <div><label className={labelClass}>Próxima Fecha *</label><input type="date" value={schForm.next_service_date} onChange={e => setSchForm({ ...schForm, next_service_date: e.target.value })} required className={inputClass} /></div>
                                 <div><label className={labelClass}>Título (opcional)</label><input value={schForm.title} onChange={e => setSchForm({ ...schForm, title: e.target.value })} placeholder="Se auto-genera del tipo de servicio" className={inputClass} /></div>
@@ -387,7 +394,7 @@ export default function MaintenanceDashboard() {
                                 <div className="md:col-span-2"><label className={labelClass}>¿Qué harán? (Detalles)</label><textarea value={schForm.description} onChange={e => setSchForm({ ...schForm, description: e.target.value })} placeholder="Actividades a realizar..." rows={2} className={inputClass} /></div>
                             </div>
                             <div className="mt-6 flex justify-end gap-3">
-                                <button type="button" onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '' }); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">Cancelar</button>
+                                <button type="button" onClick={() => { setShowScheduleForm(false); setEditingScheduleId(null); setSchForm({ equipment_id: '', service_type: 'revision_general', title: '', next_service_date: '', assigned_to: '', alert_days_before: '15', departure_time: '', description: '', client_id: '', project_id: '' }); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">Cancelar</button>
                                 <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">{editingScheduleId ? 'Guardar Cambios' : 'Programar Actividad'}</button>
                             </div>
                         </form>
@@ -745,6 +752,10 @@ export default function MaintenanceDashboard() {
                                                             next_service_date: '',
                                                             assigned_to: '',
                                                             alert_days_before: '15',
+                                                            departure_time: '',
+                                                            description: '',
+                                                            client_id: pa.client_id || '',
+                                                            project_id: '',
                                                         });
                                                         setShowScheduleForm(true);
                                                         supabase.from('proactive_maintenance_alerts').update({

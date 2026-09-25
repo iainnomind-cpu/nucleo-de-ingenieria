@@ -190,7 +190,8 @@ export default function PhotoUploader({
                             {/* Remove button */}
                             {!disabled && (
                                 <button
-                                    onClick={e => { e.stopPropagation(); handleRemove(idx); }}
+                                    type="button"
+                                    onClick={e => { e.preventDefault(); e.stopPropagation(); handleRemove(idx); }}
                                     className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500/90 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
                                 >
                                     <span className="material-symbols-outlined text-[12px]">close</span>

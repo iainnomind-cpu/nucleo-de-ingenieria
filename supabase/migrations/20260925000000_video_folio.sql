@@ -1,0 +1,1 @@
+ALTER TABLE video_recordings ADD COLUMN IF NOT EXISTS folio VARCHAR(50);
