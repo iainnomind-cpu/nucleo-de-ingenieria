@@ -231,13 +231,17 @@ export default function AforoTab() {
 </style>
 </head><body>
 <div class="header">
-  <div>
-    <div class="company">NÚCLEO DE INGENIERÍA APLICADA</div>
-    <div style="font-size:8px;color:#555;">Instalación, Mantenimiento Eléctrico, Asesoría Hidráulica<br/>Aforos, Equipos, Pozos Profundos — 341.137.8262</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <img src="${window.location.origin}/logo.png" style="height:45px;" />
+    <div>
+      <div class="company">NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA</div>
+      <div style="font-size:7px;color:#555;max-width:300px;">Equipamiento y rehabilitación de pozos profundos, instalaciones eléctricas en media tensión y baja tensión, mantenimiento hidráulico y eléctrico, asesoría de proyectos hidráulicos y eléctricos, aforos, videograbación de pozos, reparación de equipos de bombeo y variadores, maniobras.</div>
+    </div>
   </div>
   <div style="text-align:right">
     <div class="folio">${rec.folio || ''}</div>
     <div style="font-size:9px;font-weight:bold;color:#555;">FORMATO DE AFORO — ${rec.duration_hours}H</div>
+    <div style="font-size:8px;color:#555;">341.137.8262 · 341.137.3268</div>
   </div>
 </div>
 

@@ -214,9 +214,12 @@ export default function StartupFormatTab() {
 </style>
 </head><body>
 <div class="header">
-  <div>
-    <div class="company-name">NÚCLEO DE INGENIERÍA APLICADA</div>
-    <div class="company-sub">Instalación, Mantenimiento Eléctrico, Asesoría acerca de Proyectos Hidráulicos, Aforos, Equipos, Rehabilitación y Pozos Profundos</div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <img src="${window.location.origin}/logo.png" style="height:50px;" />
+    <div>
+      <div class="company-name">NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA</div>
+      <div class="company-sub">Equipamiento y rehabilitación de pozos profundos, instalaciones eléctricas en media tensión y baja tensión, mantenimiento hidráulico y eléctrico, asesoría de proyectos hidráulicos y eléctricos, aforos, videograbación de pozos, reparación de equipos de bombeo y variadores, maniobras.</div>
+    </div>
   </div>
   <div class="logo-area">341.137.8262<br/>341.137.3268</div>
 </div>

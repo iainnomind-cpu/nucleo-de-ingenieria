@@ -162,9 +162,21 @@ export default function InstallationsTab() {
                 .photos img { width: 120px; height: 90px; object-fit: cover; border-radius: 6px; border: 1px solid #ddd; }
                 @media print { body { padding: 15px; } }
             </style></head><body>
-            <div class="header">
-                <div><div class="folio">${inst.folio || 'S/F'}</div><div style="font-size:12px;color:#666">Formato de Maniobra / Instalación</div></div>
-                <div style="text-align:right"><div style="font-weight:bold">${clientName}</div><div style="font-size:12px;color:#666">${inst.installation_date || ''}</div></div>
+            <div class="header" style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0066cc;padding-bottom:10px;margin-bottom:16px;">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <img src="${window.location.origin}/logo.png" style="height:50px;" />
+                    <div>
+                        <div style="font-weight:bold;font-size:13px;color:#0066cc;">NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA</div>
+                        <div style="font-size:7px;color:#555;max-width:320px;">Equipamiento y rehabilitación de pozos profundos, instalaciones eléctricas en media tensión y baja tensión, mantenimiento hidráulico y eléctrico, asesoría de proyectos hidráulicos y eléctricos, aforos, videograbación de pozos, reparación de equipos de bombeo y variadores, maniobras.</div>
+                        <div style="font-size:8px;color:#555;margin-top:2px;">341.137.8262 · 341.137.3268</div>
+                    </div>
+                </div>
+                <div style="text-align:right">
+                    <div class="folio" style="font-size:18px;font-weight:bold;color:#0066cc;">${inst.folio || 'S/F'}</div>
+                    <div style="font-size:10px;color:#555;">Formato de Maniobra / Instalación</div>
+                    <div style="font-weight:bold;font-size:11px;">${clientName}</div>
+                    <div style="font-size:11px;color:#666;">${inst.installation_date || ''}</div>
+                </div>
             </div>
             <h1>Datos Generales</h1>
             <div class="grid">

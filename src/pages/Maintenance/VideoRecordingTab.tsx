@@ -135,6 +135,14 @@ export default function VideoRecordingTab() {
                     </style>
                 </head>
                 <body>
+                    <div style="display:flex;align-items:center;gap:12px;border-bottom:2px solid #1e3a8a;padding-bottom:10px;margin-bottom:20px;">
+                        <img src="${window.location.origin}/logo.png" style="height:50px;" />
+                        <div>
+                            <div style="font-weight:bold;font-size:14px;color:#1e3a8a;">NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA</div>
+                            <div style="font-size:8px;color:#555;max-width:400px;">Equipamiento y rehabilitación de pozos profundos, instalaciones eléctricas en media tensión y baja tensión, mantenimiento hidráulico y eléctrico, asesoría de proyectos hidráulicos y eléctricos, aforos, videograbación de pozos, reparación de equipos de bombeo y variadores, maniobras.</div>
+                            <div style="font-size:9px;color:#555;margin-top:2px;">341.137.8262 · 341.137.3268</div>
+                        </div>
+                    </div>
                     <h1>Reporte de Videograbación ${v.folio ? `- ${v.folio}` : ''}</h1>
                     <div class="grid">
                         <div class="field"><div class="label">Fecha</div><div class="value">${v.recording_date}</div></div>
