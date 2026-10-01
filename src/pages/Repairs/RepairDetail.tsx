@@ -38,17 +38,18 @@ export default function RepairDetail() {
     const [beforePhotos, setBeforePhotos] = useState<PhotoAttachment[]>([]);
     const [afterPhotos, setAfterPhotos] = useState<PhotoAttachment[]>([]);
     const [deliveryPhotos, setDeliveryPhotos] = useState<PhotoAttachment[]>([]);
+    const [shippingPhotos, setShippingPhotos] = useState<PhotoAttachment[]>([]);
 
     const fetchAll = useCallback(async () => {
         if (!id) return;
         setLoading(true);
         const [rRes, pRes, tRes, cRes, wRes, eqRes, cliRes] = await Promise.all([
-            supabase.from('equipment_repairs').select('*, equipment:installed_equipment(id, name, well_name, equipment_type, brand, model, serial_number), client:clients(id, company_name)').eq('id', id).single(),
+            supabase.from('equipment_repairs').select('*, equipment:installed_equipment(id, name, well_name, equipment_type, brand, model, serial_number), client:clients(id, company_name, phone, email)').eq('id', id).single(),
             supabase.from('repair_parts').select('*').eq('repair_id', id).order('created_at'),
             supabase.from('repair_timeline').select('*').eq('repair_id', id).order('created_at', { ascending: false }),
             supabase.from('shipping_carriers').select('*').order('name'),
             supabase.from('external_workshops').select('*').order('name'),
-            supabase.from('installed_equipment').select('id, name, well_name, equipment_type, client_id, client:clients(id, company_name)'),
+            supabase.from('installed_equipment').select('id, name, well_name, equipment_type, client_id, client:clients(id, company_name, phone, email)'),
             supabase.from('clients').select('id, company_name').order('company_name'),
         ]);
         if (!rRes.data) { navigate('/repairs'); return; }
@@ -57,6 +58,7 @@ export default function RepairDetail() {
         setBeforePhotos((repairData.photos_before as PhotoAttachment[]) || []);
         setAfterPhotos((repairData.photos_after as PhotoAttachment[]) || []);
         setDeliveryPhotos((repairData.delivery_photos as PhotoAttachment[]) || []);
+        setShippingPhotos((repairData.shipping_guide_photos as PhotoAttachment[]) || []);
         setParts((pRes.data as RepairPart[]) || []);
         setTimeline((tRes.data as RepairTimelineEvent[]) || []);
         setCarriers((cRes.data as ShippingCarrier[]) || []);
