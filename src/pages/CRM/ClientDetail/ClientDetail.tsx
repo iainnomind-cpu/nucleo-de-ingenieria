@@ -359,14 +359,20 @@ export default function ClientDetail() {
                             </div>
                         </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {/* Portal Publico */}
+                        <a href={`/client-portal/${id}`} target="_blank" rel="noreferrer"
+                            className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700">
+                            <span className="material-symbols-outlined text-[18px]">public</span>
+                            Portal del Cliente
+                        </a>
                         {/* M2: Quick action - Generate Quote */}
                         <button onClick={handleCreateQuote}
                             className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-500/20 transition-all hover:shadow-lg">
                             <span className="material-symbols-outlined text-[18px]">request_quote</span>
                             Cotizar
                         </button>
-                        <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-6 ml-2">
                             <div className="text-center">
                                 <p className="text-xs font-semibold uppercase text-slate-400">Score</p>
                                 <p className="text-2xl font-bold text-slate-900 dark:text-white">

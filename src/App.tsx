@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+﻿import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/AuthContext';
 import Login from './pages/Auth/Login';
 import Sidebar from './components/Sidebar';
@@ -47,6 +47,7 @@ import DirectSend from './pages/WhatsApp/DirectSend';
 import WhatsAppRules from './pages/WhatsApp/WhatsAppRules';
 import SystemSettings from './pages/Settings/SystemSettings';
 import ClientWellLogPublic from './pages/Maintenance/ClientWellLogPublic';
+import ClientPortalPublic from './pages/CRM/ClientPortalPublic';
 import RepairsDashboard from './pages/Repairs/RepairsDashboard';
 import RepairDetail from './pages/Repairs/RepairDetail';
 import ClientRepairTrackingPublic from './pages/Repairs/ClientRepairTrackingPublic';
@@ -152,7 +153,7 @@ function ProtectedApp() {
           {hasPermission('tasks', 'view') && (
             <Route path="/tasks" element={<TasksDashboard />} />
           )}
-          {/* M8: Equipos & Comunicación */}
+          {/* M8: Equipos & ComunicaciÃ³n */}
           {hasPermission('team', 'view') && (
             <>
               <Route path="/team" element={<SpaceChat />} />
@@ -176,7 +177,7 @@ function ProtectedApp() {
               <Route path="/whatsapp/rules" element={<WhatsAppRules />} />
             </>
           )}
-          {/* Configuración del Sistema */}
+          {/* ConfiguraciÃ³n del Sistema */}
           {hasPermission('settings', 'view') && (
             <Route path="/settings" element={<SystemSettings />} />
           )}
@@ -193,8 +194,8 @@ function App() {
   return (
     <Router>
       <Routes>
-        {/* Public route — no auth required */}
-        <Route path="/well-log/:token" element={<ClientWellLogPublic />} />
+        {/* Public route â€” no auth required */}
+        <Route path="/client-portal/:clientId" element={<ClientPortalPublic />} />`n          <Route path="/well-log/:token" element={<ClientWellLogPublic />} />
         <Route path="/repair-tracking/:token" element={<ClientRepairTrackingPublic />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         {/* All other routes go through auth */}
