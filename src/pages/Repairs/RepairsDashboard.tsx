@@ -74,7 +74,7 @@ export default function RepairsDashboard() {
         setLoading(true);
         const [rRes, eRes, wRes, cRes, cliRes, weRes] = await Promise.all([
             supabase.from('equipment_repairs').select('*, equipment:installed_equipment(id, name, well_name, equipment_type, brand, model, serial_number), client:clients(id, company_name, phone, email)').order('report_date', { ascending: false }),
-            supabase.from('installed_equipment').select('id, name, well_name, equipment_type, client_id, client:clients(id, company_name)'),
+            supabase.from('installed_equipment').select('id, name, well_name, equipment_type, client_id, client:clients(id, company_name, phone, email)'),
             supabase.from('external_workshops').select('*').order('name'),
             supabase.from('shipping_carriers').select('*').order('name'),
             supabase.from('clients').select('id, company_name').order('company_name'),
@@ -780,10 +780,12 @@ function KanbanCard({ repair: r, onStatusChange, onClick }: { repair: EquipmentR
             </p>
 
             {/* Client + provider */}
-            <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                <span className="truncate">
-                    {isWarehouse ? <span className="text-orange-500 font-medium">Bodega Núcleo</span> : (r.external_client_name || r.client?.company_name || "—")}
-                </span>
+            <div className="flex items-start justify-between text-[10px] text-slate-400 mb-1">
+                <div className="truncate flex flex-col gap-0.5">
+                    <span>{isWarehouse ? <span className="text-orange-500 font-medium">Bodega NÃºcleo</span> : (r.external_client_name || r.client?.company_name || 'â€”')}</span>
+                    {r.client?.phone && <span className="text-[9px] text-slate-400 flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">phone</span>{r.client.phone}</span>}
+                    {r.client?.email && <span className="text-[9px] text-slate-400 flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">mail</span>{r.client.email}</span>}
+                </div>
                 <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 ${urgencyColor.bg} ${urgencyColor.text} font-bold`}>
                     <span className={`h-1.5 w-1.5 rounded-full ${urgencyColor.dot}`} />{URGENCY_LABELS[r.urgency]}
                 </span>
@@ -800,7 +802,7 @@ function KanbanCard({ repair: r, onStatusChange, onClick }: { repair: EquipmentR
             {/* Actions */}
             {r.client?.phone && r.status === 'pending_approval' && (
               <a href={`https://wa.me/${r.client.phone.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(r.client.company_name || '')}.%20Su%20equipo%20sigue%20en%20nuestro%20taller.%20%C2%BFNos%20confirma%20si%20se%20va%20a%20reparar?`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="mt-2 flex items-center justify-center gap-1 w-full rounded-md bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">
-                <span className="material-symbols-outlined text-[14px]">chat</span> Recordatorio 15 días
+                <span className="material-symbols-outlined text-[14px]">chat</span> Recordatorio 15 dÃ­as
               </a>
             )}
             {r.client?.phone && (r.status === 'ready_for_pickup' || r.status === 'completed') && (
@@ -831,4 +833,3 @@ function KanbanCard({ repair: r, onStatusChange, onClick }: { repair: EquipmentR
         </div>
     );
 }
-

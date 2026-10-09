@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { triggerWaAutomation } from '../../lib/waAutomation';
@@ -75,9 +75,9 @@ export default function RepairDetail() {
         const updates: Record<string, unknown> = { status: newStatus };
         if (newStatus === 'completed') updates.completion_date = new Date().toISOString().split('T')[0];
         await supabase.from('equipment_repairs').update(updates).eq('id', repair.id);
-        await supabase.from('repair_timeline').insert({ repair_id: repair.id, event_type: 'status_change', old_status: repair.status, new_status: newStatus, description: `${REPAIR_STATUS_LABELS[repair.status]} → ${REPAIR_STATUS_LABELS[newStatus]}` });
+        await supabase.from('repair_timeline').insert({ repair_id: repair.id, event_type: 'status_change', old_status: repair.status, new_status: newStatus, description: `${REPAIR_STATUS_LABELS[repair.status]} â†’ ${REPAIR_STATUS_LABELS[newStatus]}` });
 
-        // → M9: WA automation
+        // â†’ M9: WA automation
         triggerWaAutomation({
             module: 'repairs',
             event: 'status_change',
@@ -126,14 +126,14 @@ export default function RepairDetail() {
 
         await supabase.from('equipment_repairs').update(finalData).eq('id', repair.id);
         const desc = section === 'report' ? 'Datos del reporte actualizados' :
-            section === 'pickup' ? 'Datos de recolección actualizados' :
-            section === 'shipping_to' ? 'Datos de envío actualizados' :
-            section === 'diagnosis' ? 'Diagnóstico actualizado' :
-            section === 'quote' ? 'Cotización actualizada' :
-            section === 'authorization' ? 'Autorización / OC actualizada' :
+            section === 'pickup' ? 'Datos de recolecciÃ³n actualizados' :
+            section === 'shipping_to' ? 'Datos de envÃ­o actualizados' :
+            section === 'diagnosis' ? 'DiagnÃ³stico actualizado' :
+            section === 'quote' ? 'CotizaciÃ³n actualizada' :
+            section === 'authorization' ? 'AutorizaciÃ³n / OC actualizada' :
             section === 'return' ? 'Datos de regreso actualizados' :
             section === 'delivery' ? 'Entrega actualizada' :
-            section === 'invoice' ? 'Facturación actualizada' :
+            section === 'invoice' ? 'FacturaciÃ³n actualizada' :
             section === 'costs' ? 'Costos actualizados' : 'Datos actualizados';
         await supabase.from('repair_timeline').insert({ repair_id: repair.id, event_type: 'note', description: desc });
         setEditSection(null);
@@ -154,7 +154,7 @@ export default function RepairDetail() {
         await supabase.from('repair_parts').insert({ repair_id: repair.id, part_name: partForm.part_name, part_number: partForm.part_number || null, quantity: qty, unit_cost: cost, source: partForm.source, notes: partForm.notes || null });
         const newPartsCost = (repair.parts_cost || 0) + (qty * cost);
         await supabase.from('equipment_repairs').update({ parts_cost: newPartsCost }).eq('id', repair.id);
-        await supabase.from('repair_timeline').insert({ repair_id: repair.id, event_type: 'part_added', description: `Refacción: ${partForm.part_name} x${qty} — ${formatCurrencyRepair(qty * cost)}` });
+        await supabase.from('repair_timeline').insert({ repair_id: repair.id, event_type: 'part_added', description: `RefacciÃ³n: ${partForm.part_name} x${qty} â€” ${formatCurrencyRepair(qty * cost)}` });
         setShowPartForm(false);
         setPartForm({ part_name: '', part_number: '', quantity: '1', unit_cost: '0', source: 'purchased', notes: '' });
         fetchAll();
@@ -219,8 +219,8 @@ export default function RepairDetail() {
                         </div>
                         <p className="text-sm text-slate-500 flex items-center gap-2 flex-wrap">
                             <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">{FAILURE_TYPE_ICONS[repair.failure_type]}</span>{FAILURE_TYPE_LABELS[repair.failure_type]}</span>
-                            {(repair.external_client_name || repair.client?.company_name) && <><span>·</span><span>{repair.external_client_name || repair.client?.company_name}</span></>}
-                            {repair.external_provider && <><span>·</span><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">warehouse</span>{repair.external_provider}</span></>}
+                            {(repair.external_client_name || repair.client?.company_name) && <><span>Â·</span><span>{repair.external_client_name || repair.client?.company_name}</span></>}
+                            {repair.external_provider && <><span>Â·</span><span className="flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">warehouse</span>{repair.external_provider}</span></>}
                         </p>
                     </div>
                 </div>
@@ -228,7 +228,7 @@ export default function RepairDetail() {
                     <div className="flex gap-2 flex-wrap">
                         {nextOptions.map(ns => (
                             <button key={ns} onClick={() => changeStatus(ns)} className={`rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:opacity-90`}>
-                                → {REPAIR_STATUS_LABELS[ns]}
+                                â†’ {REPAIR_STATUS_LABELS[ns]}
                             </button>
                         ))}
                         {repair.access_token && (
@@ -245,9 +245,9 @@ export default function RepairDetail() {
             {/* Metrics */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {[
-                    { label: 'Días', value: `${days}`, warn: days > 15 },
-                    { label: 'Cotización', value: repair.quote_amount > 0 ? formatCurrencyRepair(repair.quote_amount) : '—' },
-                    { label: 'Factura', value: repair.invoice_amount > 0 ? formatCurrencyRepair(repair.invoice_amount) : '—' },
+                    { label: 'DÃ­as', value: `${days}`, warn: days > 15 },
+                    { label: 'CotizaciÃ³n', value: repair.quote_amount > 0 ? formatCurrencyRepair(repair.quote_amount) : 'â€”' },
+                    { label: 'Factura', value: repair.invoice_amount > 0 ? formatCurrencyRepair(repair.invoice_amount) : 'â€”' },
                     { label: 'Costo Interno', value: formatCurrencyRepair(total) },
                     { label: 'Refacciones', value: `${parts.length}` },
                 ].map(k => (
@@ -273,7 +273,7 @@ export default function RepairDetail() {
                 ))}
             </div>
 
-            {/* TAB: Workflow — visual step-by-step */}
+            {/* TAB: Workflow â€” visual step-by-step */}
             {tab === 'workflow' && (
                 <div className="space-y-4">
                     {/* Step 1: Reporte */}
@@ -303,11 +303,11 @@ export default function RepairDetail() {
                                         {!editData.is_external ? (
                                             <select value={editData.equipment_id} onChange={e => setEditData({ ...editData, equipment_id: e.target.value })} required className={inputClass}>
                                                 <option value="">Seleccionar equipo...</option>
-                                                {equipment.map((eq: any) => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} — ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}
+                                                {equipment.map((eq: any) => <option key={eq.id} value={eq.id}>{eq.well_name ? `${eq.well_name} â€” ` : ''}{eq.name} {eq.client?.company_name ? `(${eq.client.company_name})` : ''}</option>)}
                                             </select>
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <input value={editData.external_equipment_name} onChange={e => setEditData({ ...editData, external_equipment_name: e.target.value })} required placeholder="Nombre o descripción del equipo..." className={inputClass} />
+                                                <input value={editData.external_equipment_name} onChange={e => setEditData({ ...editData, external_equipment_name: e.target.value })} required placeholder="Nombre o descripciÃ³n del equipo..." className={inputClass} />
                                                 <div>
                                                     <input list="clients-ext-list-edit" value={editData.client_name_input} onChange={e => setEditData({ ...editData, client_name_input: e.target.value })} placeholder="Seleccionar o escribir cliente (opcional)..." className={inputClass} />
                                                     <datalist id="clients-ext-list-edit">
@@ -317,10 +317,10 @@ export default function RepairDetail() {
                                             </div>
                                         )}
                                     </div>
-                                    <div className="md:col-span-2"><label className={labelClass}>Descripción de la Falla</label><textarea value={editData.failure_description} onChange={e => setEditData({...editData, failure_description: e.target.value})} rows={3} className={inputClass + ' resize-none'} /></div>
+                                    <div className="md:col-span-2"><label className={labelClass}>DescripciÃ³n de la Falla</label><textarea value={editData.failure_description} onChange={e => setEditData({...editData, failure_description: e.target.value})} rows={3} className={inputClass + ' resize-none'} /></div>
                                     <div><label className={labelClass}>Tipo de Falla</label><select value={editData.failure_type} onChange={e => setEditData({...editData, failure_type: e.target.value})} className={inputClass}>{Object.entries(FAILURE_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
                                     <div><label className={labelClass}>Urgencia</label><select value={editData.urgency} onChange={e => setEditData({...editData, urgency: e.target.value})} className={inputClass}>{Object.entries(URGENCY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-                                    <div><label className={labelClass}>Reportó</label><input value={editData.reported_by} onChange={e => setEditData({...editData, reported_by: e.target.value})} className={inputClass} /></div>
+                                    <div><label className={labelClass}>ReportÃ³</label><input value={editData.reported_by} onChange={e => setEditData({...editData, reported_by: e.target.value})} className={inputClass} /></div>
                                     <div><label className={labelClass}>Asignado a</label><input value={editData.assigned_to} onChange={e => setEditData({...editData, assigned_to: e.target.value})} className={inputClass} /></div>
                                     <div><label className={labelClass}>Fecha Reporte</label><input type="date" value={editData.report_date} onChange={e => setEditData({...editData, report_date: e.target.value})} className={inputClass} /></div>
                                 </div>
@@ -330,45 +330,45 @@ export default function RepairDetail() {
                             <>
                                 <p className="text-sm text-slate-600 dark:text-slate-300">{repair.failure_description}</p>
                                 <div className="mt-2 flex gap-4 text-xs text-slate-500">
-                                    {repair.reported_by && <span>Reportó: <strong>{repair.reported_by}</strong></span>}
+                                    {repair.reported_by && <span>ReportÃ³: <strong>{repair.reported_by}</strong></span>}
                                     {repair.assigned_to && <span>Asignado: <strong>{repair.assigned_to}</strong></span>}
                                 </div>
                             </>
                         )}
                     </div>
 
-                    {/* Step 2: Recolección */}
+                    {/* Step 2: RecolecciÃ³n */}
                     <div className={stepClass(isCurrent('pickup_pending') || isCurrent('picked_up'), isDone('picked_up'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-orange-100 text-orange-600 text-[12px] font-bold dark:bg-orange-900/30">2</span>
-                                Recolección del Equipo
+                                RecolecciÃ³n del Equipo
                                 {isDone('picked_up') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
                             {editSection !== 'pickup' && <button onClick={() => startEdit('pickup', { pickup_method: repair.pickup_method || 'pickup', pickup_location: repair.pickup_location || '', pickup_date: repair.pickup_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
                         </div>
                         {editSection === 'pickup' ? (
                             <div className="grid grid-cols-3 gap-3">
-                                <div><label className={labelClass}>Método</label><select value={editData.pickup_method} onChange={e => setEditData({...editData, pickup_method: e.target.value})} className={inputClass}>{Object.entries(PICKUP_METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
-                                <div><label className={labelClass}>Lugar</label><input value={editData.pickup_location} onChange={e => setEditData({...editData, pickup_location: e.target.value})} className={inputClass} placeholder="Ubicación del equipo..." /></div>
+                                <div><label className={labelClass}>MÃ©todo</label><select value={editData.pickup_method} onChange={e => setEditData({...editData, pickup_method: e.target.value})} className={inputClass}>{Object.entries(PICKUP_METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+                                <div><label className={labelClass}>Lugar</label><input value={editData.pickup_location} onChange={e => setEditData({...editData, pickup_location: e.target.value})} className={inputClass} placeholder="UbicaciÃ³n del equipo..." /></div>
                                 <div><label className={labelClass}>Fecha</label><input type="date" value={editData.pickup_date} onChange={e => setEditData({...editData, pickup_date: e.target.value})} className={inputClass} /></div>
                                 <div className="flex items-end gap-2"><button onClick={() => saveSection('pickup')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
                             </div>
                         ) : (
                             <div className="grid grid-cols-3 gap-3 text-sm">
-                                <InfoField label="Método" value={PICKUP_METHOD_LABELS[repair.pickup_method] || '—'} />
+                                <InfoField label="MÃ©todo" value={PICKUP_METHOD_LABELS[repair.pickup_method] || 'â€”'} />
                                 <InfoField label="Lugar" value={repair.pickup_location} />
                                 <InfoField label="Fecha" value={repair.pickup_date ? new Date(repair.pickup_date).toLocaleDateString('es-MX') : null} />
                             </div>
                         )}
                     </div>
 
-                    {/* Step 3: Envío al Proveedor */}
+                    {/* Step 3: EnvÃ­o al Proveedor */}
                     <div className={stepClass(isCurrent('sent_to_provider') || isCurrent('received_by_provider'), isDone('received_by_provider'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-sky-600 text-[12px] font-bold dark:bg-sky-900/30">3</span>
-                                Envío al Proveedor
+                                EnvÃ­o al Proveedor
                                 {isDone('received_by_provider') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
                             {editSection !== 'shipping_to' && <button onClick={() => startEdit('shipping_to', { external_provider: repair.external_provider || '', shipping_carrier_to: repair.shipping_carrier_to || '', tracking_number_to: repair.tracking_number_to || '', sent_to_provider_date: repair.sent_to_provider_date || '', provider_received_date: repair.provider_received_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
@@ -376,62 +376,62 @@ export default function RepairDetail() {
                         {editSection === 'shipping_to' ? (
                             <div className="grid grid-cols-2 gap-3">
                                 <div><label className={labelClass}>Proveedor</label><input list="ws-list" value={editData.external_provider} onChange={e => setEditData({...editData, external_provider: e.target.value})} className={inputClass} /><datalist id="ws-list">{workshops.map(w => <option key={w.id} value={w.name}/>)}</datalist></div>
-                                <div><label className={labelClass}>Paquetería</label><input list="cr-list" value={editData.shipping_carrier_to} onChange={e => setEditData({...editData, shipping_carrier_to: e.target.value})} className={inputClass} /><datalist id="cr-list">{carriers.map(c => <option key={c.id} value={c.name}/>)}</datalist></div>
-                                <div><label className={labelClass}>No. Guía</label><input value={editData.tracking_number_to} onChange={e => setEditData({...editData, tracking_number_to: e.target.value})} placeholder="Número de guía..." className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha Envío</label><input type="date" value={editData.sent_to_provider_date} onChange={e => setEditData({...editData, sent_to_provider_date: e.target.value})} className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha Recepción Proveedor</label><input type="date" value={editData.provider_received_date} onChange={e => setEditData({...editData, provider_received_date: e.target.value})} className={inputClass} /></div>
+                                <div><label className={labelClass}>PaqueterÃ­a</label><input list="cr-list" value={editData.shipping_carrier_to} onChange={e => setEditData({...editData, shipping_carrier_to: e.target.value})} className={inputClass} /><datalist id="cr-list">{carriers.map(c => <option key={c.id} value={c.name}/>)}</datalist></div>
+                                <div><label className={labelClass}>No. GuÃ­a</label><input value={editData.tracking_number_to} onChange={e => setEditData({...editData, tracking_number_to: e.target.value})} placeholder="NÃºmero de guÃ­a..." className={inputClass} /></div>
+                                <div><label className={labelClass}>Fecha EnvÃ­o</label><input type="date" value={editData.sent_to_provider_date} onChange={e => setEditData({...editData, sent_to_provider_date: e.target.value})} className={inputClass} /></div>
+                                <div><label className={labelClass}>Fecha RecepciÃ³n Proveedor</label><input type="date" value={editData.provider_received_date} onChange={e => setEditData({...editData, provider_received_date: e.target.value})} className={inputClass} /></div>
                                 <div className="flex items-end gap-2"><button onClick={() => saveSection('shipping_to')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
                                 <InfoField label="Proveedor" value={repair.external_provider} />
-                                <InfoField label="Paquetería" value={repair.shipping_carrier_to} />
-                                <InfoField label="Guía" value={repair.tracking_number_to} mono />
+                                <InfoField label="PaqueterÃ­a" value={repair.shipping_carrier_to} />
+                                <InfoField label="GuÃ­a" value={repair.tracking_number_to} mono />
                                 <InfoField label="Enviado" value={repair.sent_to_provider_date ? new Date(repair.sent_to_provider_date).toLocaleDateString('es-MX') : null} />
                                 <InfoField label="Recibido" value={repair.provider_received_date ? new Date(repair.provider_received_date).toLocaleDateString('es-MX') : null} />
                             </div>
                         )}
                     </div>
 
-                    {/* Step 4: Diagnóstico */}
+                    {/* Step 4: DiagnÃ³stico */}
                     <div className={stepClass(isCurrent('diagnosis_received'), isDone('diagnosis_received'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 text-[12px] font-bold dark:bg-indigo-900/30">4</span>
-                                Diagnóstico del Proveedor
+                                DiagnÃ³stico del Proveedor
                                 {isDone('diagnosis_received') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
                             {editSection !== 'diagnosis' && <button onClick={() => startEdit('diagnosis', { diagnosis: repair.diagnosis || '', diagnosis_date: repair.diagnosis_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
                         </div>
                         {editSection === 'diagnosis' ? (
                             <div className="space-y-3">
-                                <div><label className={labelClass}>Diagnóstico</label><textarea value={editData.diagnosis} onChange={e => setEditData({...editData, diagnosis: e.target.value})} rows={3} className={inputClass + ' resize-none'} /></div>
+                                <div><label className={labelClass}>DiagnÃ³stico</label><textarea value={editData.diagnosis} onChange={e => setEditData({...editData, diagnosis: e.target.value})} rows={3} className={inputClass + ' resize-none'} /></div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <div><label className={labelClass}>Fecha Diagnóstico</label><input type="date" value={editData.diagnosis_date} onChange={e => setEditData({...editData, diagnosis_date: e.target.value})} className={inputClass} /></div>
+                                    <div><label className={labelClass}>Fecha DiagnÃ³stico</label><input type="date" value={editData.diagnosis_date} onChange={e => setEditData({...editData, diagnosis_date: e.target.value})} className={inputClass} /></div>
                                     <div className="flex items-end gap-2"><button onClick={() => saveSection('diagnosis')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
                                 </div>
                             </div>
                         ) : (
                             <div>
-                                <p className="text-sm text-slate-600 dark:text-slate-300">{repair.diagnosis || <span className="text-slate-400 italic">Pendiente de diagnóstico</span>}</p>
+                                <p className="text-sm text-slate-600 dark:text-slate-300">{repair.diagnosis || <span className="text-slate-400 italic">Pendiente de diagnÃ³stico</span>}</p>
                                 {repair.diagnosis_date && <p className="text-xs text-slate-400 mt-1">Recibido: {new Date(repair.diagnosis_date).toLocaleDateString('es-MX')}</p>}
                             </div>
                         )}
                     </div>
 
-                    {/* Step 5: Cotización */}
+                    {/* Step 5: CotizaciÃ³n */}
                     <div className={stepClass(isCurrent('quoted'), isDone('quoted'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-purple-600 text-[12px] font-bold dark:bg-purple-900/30">5</span>
-                                Cotización al Cliente
+                                CotizaciÃ³n al Cliente
                                 {isDone('quoted') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
                             {editSection !== 'quote' && <button onClick={() => startEdit('quote', { quote_amount: repair.quote_amount || 0, quote_date: repair.quote_date || '', quote_notes: repair.quote_notes || '' })} className="text-xs text-primary font-semibold">Editar</button>}
                         </div>
                         {editSection === 'quote' ? (
                             <div className="grid grid-cols-2 gap-3">
-                                <div><label className={labelClass}>Monto Cotización</label><input type="number" step="0.01" value={editData.quote_amount} onChange={e => setEditData({...editData, quote_amount: parseFloat(e.target.value) || 0})} className={inputClass} /></div>
+                                <div><label className={labelClass}>Monto CotizaciÃ³n</label><input type="number" step="0.01" value={editData.quote_amount} onChange={e => setEditData({...editData, quote_amount: parseFloat(e.target.value) || 0})} className={inputClass} /></div>
                                 <div><label className={labelClass}>Fecha</label><input type="date" value={editData.quote_date} onChange={e => setEditData({...editData, quote_date: e.target.value})} className={inputClass} /></div>
                                 <div className="col-span-2"><label className={labelClass}>Notas</label><textarea value={editData.quote_notes} onChange={e => setEditData({...editData, quote_notes: e.target.value})} rows={2} className={inputClass + ' resize-none'} /></div>
                                 <div className="flex gap-2"><button onClick={() => saveSection('quote')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
@@ -445,12 +445,12 @@ export default function RepairDetail() {
                         )}
                     </div>
 
-                    {/* Step 6: Autorización + OC */}
+                    {/* Step 6: AutorizaciÃ³n + OC */}
                     <div className={stepClass(isCurrent('authorized') || isCurrent('po_sent'), isDone('po_sent'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-fuchsia-100 text-fuchsia-600 text-[12px] font-bold dark:bg-fuchsia-900/30">6</span>
-                                Autorización y Orden de Compra
+                                AutorizaciÃ³n y Orden de Compra
                                 {isDone('po_sent') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
                             {editSection !== 'authorization' && <button onClick={() => startEdit('authorization', { authorization_date: repair.authorization_date || '', authorized_by: repair.authorized_by || '', purchase_order_number: repair.purchase_order_number || '', purchase_order_date: repair.purchase_order_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
@@ -458,7 +458,7 @@ export default function RepairDetail() {
                         {editSection === 'authorization' ? (
                             <div className="grid grid-cols-2 gap-3">
                                 <div><label className={labelClass}>Autorizado por</label><input value={editData.authorized_by} onChange={e => setEditData({...editData, authorized_by: e.target.value})} className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha Autorización</label><input type="date" value={editData.authorization_date} onChange={e => setEditData({...editData, authorization_date: e.target.value})} className={inputClass} /></div>
+                                <div><label className={labelClass}>Fecha AutorizaciÃ³n</label><input type="date" value={editData.authorization_date} onChange={e => setEditData({...editData, authorization_date: e.target.value})} className={inputClass} /></div>
                                 <div><label className={labelClass}>No. Orden de Compra</label><input value={editData.purchase_order_number} onChange={e => setEditData({...editData, purchase_order_number: e.target.value})} className={inputClass} /></div>
                                 <div><label className={labelClass}>Fecha OC</label><input type="date" value={editData.purchase_order_date} onChange={e => setEditData({...editData, purchase_order_date: e.target.value})} className={inputClass} /></div>
                                 <div className="flex gap-2"><button onClick={() => saveSection('authorization')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
@@ -473,18 +473,18 @@ export default function RepairDetail() {
                         )}
                     </div>
 
-                    {/* Step 7: Reparación */}
+                    {/* Step 7: ReparaciÃ³n */}
                     <div className={stepClass(isCurrent('in_repair'), isDone('in_repair'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-600 text-[12px] font-bold dark:bg-amber-900/30">7</span>
-                                En Reparación
+                                En ReparaciÃ³n
                                 {isDone('in_repair') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                             <InfoField label="Inicio" value={repair.repair_start_date ? new Date(repair.repair_start_date).toLocaleDateString('es-MX') : null} />
-                            <InfoField label="Días Estimados" value={repair.estimated_days ? `${repair.estimated_days} días` : null} />
+                            <InfoField label="DÃ­as Estimados" value={repair.estimated_days ? `${repair.estimated_days} dÃ­as` : null} />
                         </div>
                     </div>
 
@@ -500,16 +500,16 @@ export default function RepairDetail() {
                         </div>
                         {editSection === 'return' ? (
                             <div className="grid grid-cols-2 gap-3">
-                                <div><label className={labelClass}>Paquetería</label><input list="cr-ret" value={editData.shipping_carrier_return} onChange={e => setEditData({...editData, shipping_carrier_return: e.target.value})} className={inputClass} /><datalist id="cr-ret">{carriers.map(c => <option key={c.id} value={c.name}/>)}</datalist></div>
-                                <div><label className={labelClass}>No. Guía Regreso</label><input value={editData.tracking_number_return} onChange={e => setEditData({...editData, tracking_number_return: e.target.value})} className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha Envío Regreso</label><input type="date" value={editData.return_shipped_date} onChange={e => setEditData({...editData, return_shipped_date: e.target.value})} className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha Recepción</label><input type="date" value={editData.return_received_date} onChange={e => setEditData({...editData, return_received_date: e.target.value})} className={inputClass} /></div>
+                                <div><label className={labelClass}>PaqueterÃ­a</label><input list="cr-ret" value={editData.shipping_carrier_return} onChange={e => setEditData({...editData, shipping_carrier_return: e.target.value})} className={inputClass} /><datalist id="cr-ret">{carriers.map(c => <option key={c.id} value={c.name}/>)}</datalist></div>
+                                <div><label className={labelClass}>No. GuÃ­a Regreso</label><input value={editData.tracking_number_return} onChange={e => setEditData({...editData, tracking_number_return: e.target.value})} className={inputClass} /></div>
+                                <div><label className={labelClass}>Fecha EnvÃ­o Regreso</label><input type="date" value={editData.return_shipped_date} onChange={e => setEditData({...editData, return_shipped_date: e.target.value})} className={inputClass} /></div>
+                                <div><label className={labelClass}>Fecha RecepciÃ³n</label><input type="date" value={editData.return_received_date} onChange={e => setEditData({...editData, return_received_date: e.target.value})} className={inputClass} /></div>
                                 <div className="flex gap-2"><button onClick={() => saveSection('return')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
                             </div>
                         ) : (
                             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                                <InfoField label="Paquetería" value={repair.shipping_carrier_return} />
-                                <InfoField label="Guía" value={repair.tracking_number_return} mono />
+                                <InfoField label="PaqueterÃ­a" value={repair.shipping_carrier_return} />
+                                <InfoField label="GuÃ­a" value={repair.tracking_number_return} mono />
                                 <InfoField label="Enviado" value={repair.return_shipped_date ? new Date(repair.return_shipped_date).toLocaleDateString('es-MX') : null} />
                                 <InfoField label="Recibido" value={repair.return_received_date ? new Date(repair.return_received_date).toLocaleDateString('es-MX') : null} />
                             </div>
@@ -539,12 +539,12 @@ export default function RepairDetail() {
                             </div>
                         )}
 
-                        {/* Fotos de Entrega — siempre visibles desde que se marca 'delivered' */}
+                        {/* Fotos de Entrega â€” siempre visibles desde que se marca 'delivered' */}
                         {(repair.status === 'delivered' || repair.status === 'invoiced' || repair.status === 'completed') && (
                             <div className="mt-4 border-t border-slate-200/60 pt-4 dark:border-slate-700/60">
                                 <p className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 flex items-center gap-2">
                                     <span className="material-symbols-outlined text-lime-600 text-[16px]">photo_camera</span>
-                                    Evidencia fotográfica de entrega
+                                    Evidencia fotogrÃ¡fica de entrega
                                 </p>
                                 {deliveryPhotos.length > 0
                                     ? <PhotoGallery photos={deliveryPhotos} />
@@ -565,12 +565,12 @@ export default function RepairDetail() {
                         )}
                     </div>
 
-                    {/* Step 10: Facturación */}
+                    {/* Step 10: FacturaciÃ³n */}
                     <div className={stepClass(isCurrent('invoiced'), isDone('invoiced'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 text-[12px] font-bold dark:bg-emerald-900/30">10</span>
-                                Facturación
+                                FacturaciÃ³n
                                 {isDone('invoiced') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
                             {editSection !== 'invoice' && <button onClick={() => startEdit('invoice', { invoice_number: repair.invoice_number || '', invoice_date: repair.invoice_date || '', invoice_amount: repair.invoice_amount || 0 })} className="text-xs text-primary font-semibold">Editar</button>}
@@ -601,7 +601,7 @@ export default function RepairDetail() {
                     </div>}
                     {showNoteForm && (
                         <div className={sectionClass}>
-                            <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3} placeholder="Escribe una nota o actualización..." className={inputClass + ' resize-none'} />
+                            <textarea value={noteText} onChange={e => setNoteText(e.target.value)} rows={3} placeholder="Escribe una nota o actualizaciÃ³n..." className={inputClass + ' resize-none'} />
                             <div className="mt-3 flex gap-2"><button onClick={addNote} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setShowNoteForm(false)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
                         </div>
                     )}
@@ -642,7 +642,7 @@ export default function RepairDetail() {
             {/* TAB: Parts */}
             {tab === 'parts' && (
                 <div className="space-y-4">
-                    {isActive && <button onClick={() => setShowPartForm(!showPartForm)} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white"><span className="material-symbols-outlined text-[16px]">add</span>Agregar Refacción</button>}
+                    {isActive && <button onClick={() => setShowPartForm(!showPartForm)} className="flex items-center gap-1 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-white"><span className="material-symbols-outlined text-[16px]">add</span>Agregar RefacciÃ³n</button>}
                     {showPartForm && (
                         <form onSubmit={addPart} className={sectionClass}>
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -699,17 +699,17 @@ export default function RepairDetail() {
                                     await supabase.from('equipment_repairs').update({ photos_before: photos }).eq('id', repair.id);
                                 }}
                                 folder={`repairs/before/${id}`}
-                                uploaderName="Recepción"
+                                uploaderName="RecepciÃ³n"
                                 compact
                             />
                         </div>
                     </div>
 
-                    {/* Después (Reparado) */}
+                    {/* DespuÃ©s (Reparado) */}
                     <div className={sectionClass}>
                         <h4 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 mb-3 flex items-center gap-2">
                             <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                            Después (Reparado)
+                            DespuÃ©s (Reparado)
                             {afterPhotos.length > 0 && <span className="ml-auto rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:bg-emerald-900/30">{afterPhotos.length} foto{afterPhotos.length !== 1 ? 's' : ''}</span>}
                         </h4>
                         {afterPhotos.length > 0 && (
@@ -725,7 +725,7 @@ export default function RepairDetail() {
                                     await supabase.from('equipment_repairs').update({ photos_after: photos }).eq('id', repair.id);
                                 }}
                                 folder={`repairs/after/${id}`}
-                                uploaderName="Técnico"
+                                uploaderName="TÃ©cnico"
                                 compact
                             />
                         </div>
