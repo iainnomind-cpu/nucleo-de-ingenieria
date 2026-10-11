@@ -72,7 +72,20 @@ export default function UninstallationsTab() {
         e.preventDefault();
         setSaving(true);
         try {
-            const payload = {
+            let notesWithExtra = form.notes || '';
+            const extraDesc = (form as any).extra_pipe_desc;
+            const extraLen = (form as any).extra_pipe_length;
+
+            const executeSave = async (payloadToSave: any) => {
+                if (editingId) {
+                    return await supabase.from('well_uninstallations').update(payloadToSave).eq('id', editingId);
+                } else {
+                    return await supabase.from('well_uninstallations').insert([{ ...payloadToSave, ...(user?.id ? { created_by: user.id } : {}) }]).select().single();
+                }
+            };
+
+            // Attempt 1: Try with extra_pipe columns
+            let payload: any = {
                 folio: form.folio,
                 uninstallation_date: form.installation_date,
                 client_id: form.client_id || null,
@@ -95,17 +108,28 @@ export default function UninstallationsTab() {
                 flow_rate: form.flow_rate,
                 bottom_depth: form.bottom_depth,
                 reason: form.reason,
-                notes: form.notes,
+                notes: notesWithExtra,
                 photos,
+                extra_pipe_desc: extraDesc || null,
+                extra_pipe_length: extraLen || null,
             };
 
-            if (editingId) {
-                const { error } = await supabase.from('well_uninstallations').update(payload).eq('id', editingId);
-                if (error) throw error;
-            } else {
-                const { error } = await supabase.from('well_uninstallations').insert([{ ...payload, ...(user?.id ? { created_by: user.id } : {}) }]);
-                if (error) throw error;
+            let { error } = await executeSave(payload);
+
+            // Attempt 2: Fallback if extra_pipe columns don't exist
+            if (error && (error.message?.includes('extra_pipe') || error.message?.includes('schema cache'))) {
+                if (extraDesc || extraLen) {
+                    const extraNote = `[Tramo Extra: ${extraDesc || ''}${extraLen ? ` - ${extraLen}m` : ''}]`;
+                    if (!notesWithExtra.includes(extraNote)) {
+                        notesWithExtra = (notesWithExtra ? notesWithExtra + '\n' : '') + extraNote;
+                    }
+                }
+                const { extra_pipe_desc: _epd, extra_pipe_length: _epl, ...safePayload } = payload;
+                const retryRes = await executeSave({ ...safePayload, notes: notesWithExtra });
+                error = retryRes.error;
             }
+
+            if (error) throw error;
             setShowForm(false);
             setEditingId(null);
             resetForm();
@@ -172,7 +196,9 @@ export default function UninstallationsTab() {
             bottom_depth: rec.bottom_depth || 0,
             reason: rec.reason || '',
             notes: rec.notes || '',
-        });
+            extra_pipe_desc: (rec as any).extra_pipe_desc || '',
+            extra_pipe_length: (rec as any).extra_pipe_length || '',
+        } as any);
         setPhotos((rec as any).photos || []);
         setShowForm(true);
     };

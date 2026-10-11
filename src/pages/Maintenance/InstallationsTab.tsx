@@ -86,13 +86,36 @@ export default function InstallationsTab() {
         setSaving(true);
         try {
             const { client: _cl, equipment: _eq, ...cleanForm } = form as any;
-            if (editingId) {
-                const { error: instErr } = await supabase.from('well_installations').update({ ...cleanForm, photos }).eq('id', editingId);
-                if (instErr) throw instErr;
-            } else {
-                const { error: instErr } = await supabase.from('well_installations').insert([{ ...cleanForm, photos, created_by: user?.id }]).select().single();
-                if (instErr) throw instErr;
+
+            // Helper to execute save
+            const executeSave = async (payloadToSave: any) => {
+                if (editingId) {
+                    return await supabase.from('well_installations').update(payloadToSave).eq('id', editingId);
+                } else {
+                    return await supabase.from('well_installations').insert([{ ...payloadToSave, ...(user?.id ? { created_by: user.id } : {}) }]).select().single();
+                }
+            };
+
+            // Attempt 1: Full payload
+            let payload: any = { ...cleanForm, photos };
+            let { error: instErr } = await executeSave(payload);
+
+            // Attempt 2: If schema cache or column error on extra_pipe_desc / extra_pipe_length
+            if (instErr && (instErr.message?.includes('extra_pipe') || instErr.message?.includes('schema cache'))) {
+                const { extra_pipe_desc, extra_pipe_length, ...safeForm } = cleanForm;
+                let fallbackObs = safeForm.observations || '';
+                if (extra_pipe_desc || extra_pipe_length) {
+                    const extraNote = `[Tramo Extra: ${extra_pipe_desc || ''}${extra_pipe_length ? ` - ${extra_pipe_length}m` : ''}]`;
+                    if (!fallbackObs.includes(extraNote)) {
+                        fallbackObs = (fallbackObs ? fallbackObs + '\n' : '') + extraNote;
+                    }
+                }
+                const fallbackPayload = { ...safeForm, observations: fallbackObs, photos };
+                const retryRes = await executeSave(fallbackPayload);
+                instErr = retryRes.error;
             }
+
+            if (instErr) throw instErr;
 
             setShowForm(false);
             setEditingId(null);
@@ -137,7 +160,9 @@ export default function InstallationsTab() {
             flow_rate: inst.flow_rate || 0,
             bottom_depth: inst.bottom_depth || 0,
             observations: inst.observations || '',
-        });
+            extra_pipe_desc: (inst as any).extra_pipe_desc || '',
+            extra_pipe_length: (inst as any).extra_pipe_length || '',
+        } as any);
 
         setPhotos((inst as any).photos || []);
         setShowForm(true);
