@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { triggerWaAutomation } from '../../lib/waAutomation';
@@ -68,6 +68,7 @@ export default function RepairsDashboard() {
         urgency: 'normal' as RepairUrgency, reported_by: '',
         pickup_method: 'pickup' as PickupMethod, pickup_location: '', pickup_date: '',
         external_provider: '', shipping_carrier_to: '', assigned_to: '',
+        client_phone: '', client_email: '', pickup_deadline_date: '',
     });
 
     const fetchAll = useCallback(async () => {
@@ -127,6 +128,9 @@ export default function RepairsDashboard() {
                 external_provider: form.external_provider || null,
                 shipping_carrier_to: form.shipping_carrier_to || null,
                 assigned_to: form.assigned_to || null,
+                client_phone: form.client_phone || null,
+                client_email: form.client_email || null,
+                pickup_deadline_date: form.pickup_deadline_date || null,
                 status: 'reported',
             }).select().single();
 
@@ -142,7 +146,7 @@ export default function RepairsDashboard() {
                 await supabase.from('external_workshops').insert({ name: form.external_provider });
             }
 
-            const resetForm = { is_external: false, equipment_id: '', external_equipment_name: '', client_name_input: '', failure_description: '', failure_type: 'other' as FailureType, urgency: 'normal' as RepairUrgency, reported_by: '', pickup_method: 'pickup' as PickupMethod, pickup_location: '', pickup_date: '', external_provider: '', shipping_carrier_to: '', assigned_to: '' };
+            const resetForm = { is_external: false, equipment_id: '', external_equipment_name: '', client_name_input: '', failure_description: '', failure_type: 'other' as FailureType, urgency: 'normal' as RepairUrgency, reported_by: '', pickup_method: 'pickup' as PickupMethod, pickup_location: '', pickup_date: '', external_provider: '', shipping_carrier_to: '', assigned_to: '', client_phone: '', client_email: '', pickup_deadline_date: '' };
             setShowForm(false);
             setForm(resetForm);
 
@@ -733,6 +737,34 @@ export default function RepairsDashboard() {
 
                                 <div><label className={labelClass}>Reportado por</label><input value={form.reported_by} onChange={e => setForm({ ...form, reported_by: e.target.value })} placeholder="Nombre" className={inputClass} /></div>
                                 <div><label className={labelClass}>Asignado a</label><input value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} placeholder="Responsable del seguimiento" className={inputClass} /></div>
+
+                                {/* Contacto del cliente — avisos de recogida (sólo equipo de cliente) */}
+                                {equipSource === 'client' && (
+                                    <>
+                                        <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
+                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                                                <span className="material-symbols-outlined text-[14px]">contact_phone</span>
+                                                Contacto del Cliente — Avisos de Recogida
+                                            </p>
+                                            <p className="text-[11px] text-slate-400 mb-3">
+                                                Se enviará un recordatorio semanal al celular/correo y cada 15 días se preguntará si se va a reparar. Si no recoge antes de la fecha límite, se notificará que el equipo se desechará.
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Celular del Cliente</label>
+                                            <input value={form.client_phone} onChange={e => setForm({ ...form, client_phone: e.target.value })} placeholder="Ej. 3411234567" className={inputClass} />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Correo del Cliente</label>
+                                            <input type="email" value={form.client_email} onChange={e => setForm({ ...form, client_email: e.target.value })} placeholder="correo@ejemplo.com" className={inputClass} />
+                                        </div>
+                                        <div>
+                                            <label className={labelClass}>Fecha Límite para Recoger</label>
+                                            <input type="date" value={form.pickup_deadline_date} onChange={e => setForm({ ...form, pickup_deadline_date: e.target.value })} className={inputClass} />
+                                            <p className="text-[10px] text-slate-400 mt-1">Si no recoge antes de esta fecha, el equipo se desechará.</p>
+                                        </div>
+                                    </>
+                                )}
                             </div>
                             <div className="mt-6 flex justify-end gap-3">
                                 <button type="button" onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400">Cancelar</button>
@@ -799,18 +831,87 @@ function KanbanCard({ repair: r, onStatusChange, onClick }: { repair: EquipmentR
                 </div>
             )}
 
-            {/* Actions */}
-            {r.client?.phone && r.status === 'pending_approval' && (
-              <a href={`https://wa.me/${r.client.phone.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(r.client.company_name || '')}.%20Su%20equipo%20sigue%20en%20nuestro%20taller.%20%C2%BFNos%20confirma%20si%20se%20va%20a%20reparar?`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="mt-2 flex items-center justify-center gap-1 w-full rounded-md bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">
-                <span className="material-symbols-outlined text-[14px]">chat</span> Recordatorio 15 dÃ­as
-              </a>
-            )}
-            {r.client?.phone && (r.status === 'ready_for_pickup' || r.status === 'completed') && (
-              <a href={`https://wa.me/${r.client.phone.replace(/\D/g, '')}?text=Hola%20${encodeURIComponent(r.client.company_name || '')}.%20Su%20equipo%20ya%20est%C3%A1%20listo.%20Le%20recordamos%20que%20si%20no%20pasa%20por%20%C3%A9l%20en%20los%20pr%C3%B3ximos%20d%C3%ADas%2C%20se%20tendr%C3%A1%20que%20desechar.`} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} className="mt-2 flex items-center justify-center gap-1 w-full rounded-md bg-red-50 px-2 py-1.5 text-[10px] font-bold text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400">
-                <span className="material-symbols-outlined text-[14px]">warning</span> Aviso Recoger/Desechar
-              </a>
-            )}
+            {/* Contacto del cliente — acciones rápidas de aviso */}
+            {(() => {
+                const phone = (r as any).client_phone || r.client?.phone;
+                const email = (r as any).client_email || r.client?.email;
+                const clientName = r.external_client_name || r.client?.company_name || 'Cliente';
+                const equipName = r.external_equipment_name || r.equipment?.well_name || r.equipment?.name || 'su equipo';
+                const deadline = (r as any).pickup_deadline_date;
+                const isClientRepair = (r as any).repair_source === 'client' || r.client_id || r.external_client_name;
+                if (!isClientRepair || (!phone && !email)) return null;
 
+                // Mensaje semanal: recordatorio de tiempo restante
+                const deadlineMsg = deadline
+                    ? `Tiene hasta el ${new Date(deadline).toLocaleDateString('es-MX')} para recogerlo, de lo contrario será desechado.`
+                    : 'Le pedimos que pase a recogerlo a la brevedad posible.';
+
+                const weeklyWa = phone
+                    ? `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(
+                        `Hola ${clientName}, le recordamos que su equipo "${equipName}" se encuentra en nuestro taller Núcleo de Ingeniería. ${deadlineMsg} Cualquier duda, contáctenos.`
+                      )}`
+                    : null;
+
+                const biweeklyWa = phone
+                    ? `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(
+                        `Hola ${clientName}, su equipo "${equipName}" lleva tiempo con nosotros esperando confirmación de reparación. ¿Desea que procedamos con la reparación o prefiere pasar a recogerlo? ${deadlineMsg}`
+                      )}`
+                    : null;
+
+                const discardWa = phone
+                    ? `https://wa.me/${phone.replace(/\D/g,'')}?text=${encodeURIComponent(
+                        `Hola ${clientName}, le informamos que su equipo "${equipName}" se desechará próximamente si no pasa a recogerlo.${deadline ? ` Fecha límite: ${new Date(deadline).toLocaleDateString('es-MX')}.` : ''} Por favor contáctenos para evitar el desecho.`
+                      )}`
+                    : null;
+
+                return (
+                    <div className="mt-2 space-y-1 border-t border-slate-100 pt-2 dark:border-slate-700/60" onClick={e => e.stopPropagation()}>
+                        <p className="text-[9px] font-bold uppercase text-slate-400 mb-1 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-[11px]">notifications</span>
+                            Avisos al Cliente
+                        </p>
+                        {weeklyWa && (
+                            <a href={weeklyWa} target="_blank" rel="noreferrer"
+                                className="flex items-center gap-1 w-full rounded-md bg-green-50 px-2 py-1.5 text-[10px] font-bold text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-400">
+                                <span className="material-symbols-outlined text-[13px]">chat</span>
+                                Recordatorio Semanal WA
+                            </a>
+                        )}
+                        {biweeklyWa && (
+                            <a href={biweeklyWa} target="_blank" rel="noreferrer"
+                                className="flex items-center gap-1 w-full rounded-md bg-amber-50 px-2 py-1.5 text-[10px] font-bold text-amber-700 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400">
+                                <span className="material-symbols-outlined text-[13px]">help</span>
+                                ¿Se repara? (15 días)
+                            </a>
+                        )}
+                        {discardWa && (
+                            <a href={discardWa} target="_blank" rel="noreferrer"
+                                className="flex items-center gap-1 w-full rounded-md bg-red-50 px-2 py-1.5 text-[10px] font-bold text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400">
+                                <span className="material-symbols-outlined text-[13px]">warning</span>
+                                Aviso de Desecho
+                            </a>
+                        )}
+                        {email && (
+                            <a href={`mailto:${email}?subject=${encodeURIComponent(`Equipo en taller: ${equipName}`)}&body=${encodeURIComponent(
+                                `Estimado(a) ${clientName},
+
+Le recordamos que su equipo "${equipName}" se encuentra en nuestro taller.
+${deadlineMsg}
+
+Si tiene alguna duda, no dude en contactarnos.
+
+Núcleo de Ingeniería`
+                            )}`}
+                                className="flex items-center gap-1 w-full rounded-md bg-sky-50 px-2 py-1.5 text-[10px] font-bold text-sky-700 hover:bg-sky-100 dark:bg-sky-900/30 dark:text-sky-400">
+                                <span className="material-symbols-outlined text-[13px]">mail</span>
+                                Enviar Correo
+                            </a>
+                        )}
+                    </div>
+                );
+            })()}
+
+            {/* Quote amount */}
             {/* Quote amount */}
             {r.quote_amount > 0 && (
                 <div className="flex items-center justify-between border-t border-slate-100 pt-2 dark:border-slate-700/60 text-[10px]">

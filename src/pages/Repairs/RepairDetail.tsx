@@ -286,7 +286,7 @@ export default function RepairDetail() {
                             </h4>
                             <div className="flex items-center gap-3">
                                 <span className="text-xs text-slate-400">{new Date(repair.report_date).toLocaleDateString('es-MX')}</span>
-                                {editSection !== 'report' && <button onClick={() => startEdit('report', { is_external: !repair.equipment_id, equipment_id: repair.equipment_id || '', external_equipment_name: repair.external_equipment_name || '', client_name_input: repair.external_client_name || repair.client?.company_name || '', failure_description: repair.failure_description || '', failure_type: repair.failure_type || 'other', urgency: repair.urgency || 'normal', reported_by: repair.reported_by || '', assigned_to: repair.assigned_to || '', report_date: repair.report_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
+                                {editSection !== 'report' && <button onClick={() => startEdit('report', { is_external: !repair.equipment_id, equipment_id: repair.equipment_id || '', external_equipment_name: repair.external_equipment_name || '', client_name_input: repair.external_client_name || repair.client?.company_name || '', failure_description: repair.failure_description || '', failure_type: repair.failure_type || 'other', urgency: repair.urgency || 'normal', reported_by: repair.reported_by || '', assigned_to: repair.assigned_to || '', report_date: repair.report_date || '', client_phone: repair.client_phone || '', client_email: repair.client_email || '', pickup_deadline_date: repair.pickup_deadline_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
                             </div>
                         </div>
                         {editSection === 'report' ? (
@@ -323,6 +323,22 @@ export default function RepairDetail() {
                                     <div><label className={labelClass}>ReportÃ³</label><input value={editData.reported_by} onChange={e => setEditData({...editData, reported_by: e.target.value})} className={inputClass} /></div>
                                     <div><label className={labelClass}>Asignado a</label><input value={editData.assigned_to} onChange={e => setEditData({...editData, assigned_to: e.target.value})} className={inputClass} /></div>
                                     <div><label className={labelClass}>Fecha Reporte</label><input type="date" value={editData.report_date} onChange={e => setEditData({...editData, report_date: e.target.value})} className={inputClass} /></div>
+                                    {editData.is_external && (
+                                        <>
+                                            <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-3 mt-1">
+                                                <p className="text-[10px] font-bold uppercase text-slate-400 mb-2 flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[12px]">contact_phone</span>
+                                                    Contacto para Avisos de Recogida
+                                                </p>
+                                            </div>
+                                            <div><label className={labelClass}>Celular del Cliente</label><input value={editData.client_phone} onChange={e => setEditData({...editData, client_phone: e.target.value})} placeholder="Ej. 3411234567" className={inputClass} /></div>
+                                            <div><label className={labelClass}>Correo del Cliente</label><input type="email" value={editData.client_email} onChange={e => setEditData({...editData, client_email: e.target.value})} placeholder="correo@ejemplo.com" className={inputClass} /></div>
+                                            <div><label className={labelClass}>Fecha Límite para Recoger</label>
+                                                <input type="date" value={editData.pickup_deadline_date} onChange={e => setEditData({...editData, pickup_deadline_date: e.target.value})} className={inputClass} />
+                                                <p className="text-[10px] text-slate-400 mt-1">Si no recoge antes de esta fecha, se desechará.</p>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                                 <div className="flex gap-2"><button onClick={() => saveSection('report')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
                             </div>
@@ -333,6 +349,73 @@ export default function RepairDetail() {
                                     {repair.reported_by && <span>ReportÃ³: <strong>{repair.reported_by}</strong></span>}
                                     {repair.assigned_to && <span>Asignado: <strong>{repair.assigned_to}</strong></span>}
                                 </div>
+                                {/* Contacto del cliente para avisos */}
+                                {(repair.client_phone || repair.client_email || repair.pickup_deadline_date) && (
+                                    <div className="mt-3 rounded-lg border border-sky-200 bg-sky-50/50 p-3 dark:border-sky-800/40 dark:bg-sky-900/10">
+                                        <p className="text-[10px] font-bold uppercase text-sky-600 dark:text-sky-400 mb-2 flex items-center gap-1">
+                                            <span className="material-symbols-outlined text-[12px]">contact_phone</span>
+                                            Contacto para Avisos de Recogida
+                                        </p>
+                                        <div className="flex flex-wrap gap-4 text-xs text-slate-600 dark:text-slate-300">
+                                            {repair.client_phone && (
+                                                <span className="flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[14px] text-green-500">phone</span>
+                                                    <a href={`https://wa.me/${repair.client_phone.replace(/\D/g,'')}`} target="_blank" rel="noreferrer" className="font-semibold text-green-600 hover:underline dark:text-green-400">{repair.client_phone}</a>
+                                                </span>
+                                            )}
+                                            {repair.client_email && (
+                                                <span className="flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[14px] text-sky-500">mail</span>
+                                                    <a href={`mailto:${repair.client_email}`} className="font-semibold text-sky-600 hover:underline dark:text-sky-400">{repair.client_email}</a>
+                                                </span>
+                                            )}
+                                            {repair.pickup_deadline_date && (
+                                                <span className="flex items-center gap-1">
+                                                    <span className="material-symbols-outlined text-[14px] text-red-500">event_busy</span>
+                                                    <span>Recoger antes del: <strong className="text-red-600 dark:text-red-400">{new Date(repair.pickup_deadline_date + 'T12:00:00').toLocaleDateString('es-MX')}</strong></span>
+                                                </span>
+                                            )}
+                                        </div>
+                                        {/* Botones de aviso rápido */}
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {repair.client_phone && (
+                                                <a href={`https://wa.me/${repair.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(
+                                                    `Hola ${repair.external_client_name || repair.client?.company_name || 'Cliente'}, le recordamos que su equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || 'en reparación'}" se encuentra en nuestro taller Núcleo de Ingeniería.${repair.pickup_deadline_date ? ` Tiene hasta el ${new Date(repair.pickup_deadline_date + 'T12:00:00').toLocaleDateString('es-MX')} para recogerlo, de lo contrario será desechado.` : ' Le pedimos que pase a recogerlo a la brevedad.'}`
+                                                )}`} target="_blank" rel="noreferrer"
+                                                    className="flex items-center gap-1 rounded-lg bg-green-100 px-3 py-1.5 text-[11px] font-bold text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400">
+                                                    <span className="material-symbols-outlined text-[14px]">chat</span>
+                                                    Recordatorio WA
+                                                </a>
+                                            )}
+                                            {repair.client_phone && (
+                                                <a href={`https://wa.me/${repair.client_phone.replace(/\D/g,'')}?text=${encodeURIComponent(
+                                                    `Hola ${repair.external_client_name || repair.client?.company_name || 'Cliente'}, su equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || 'en espera'}" lleva tiempo con nosotros esperando confirmación. ¿Desea que procedamos con la reparación o pasará a recogerlo?`
+                                                )}`} target="_blank" rel="noreferrer"
+                                                    className="flex items-center gap-1 rounded-lg bg-amber-100 px-3 py-1.5 text-[11px] font-bold text-amber-700 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    <span className="material-symbols-outlined text-[14px]">help</span>
+                                                    ¿Se repara? (15 días)
+                                                </a>
+                                            )}
+                                            {repair.client_email && (
+                                                <a href={`mailto:${repair.client_email}?subject=${encodeURIComponent(`Equipo en taller: ${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}`)}&body=${encodeURIComponent(
+                                                    `Estimado(a) ${repair.external_client_name || repair.client?.company_name || 'Cliente'},
+
+Le recordamos que su equipo se encuentra en nuestro taller Núcleo de Ingeniería.${repair.pickup_deadline_date ? `
+
+Tiene hasta el ${new Date(repair.pickup_deadline_date + 'T12:00:00').toLocaleDateString('es-MX')} para recogerlo; de no hacerlo, el equipo será desechado.` : ''}
+
+Cualquier duda, contáctenos.
+
+Núcleo de Ingeniería`
+                                                )}`}
+                                                    className="flex items-center gap-1 rounded-lg bg-sky-100 px-3 py-1.5 text-[11px] font-bold text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400">
+                                                    <span className="material-symbols-outlined text-[14px]">mail</span>
+                                                    Enviar Correo
+                                                </a>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>

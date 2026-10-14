@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // Tipos para el mÃ³dulo de Reparaciones â€” Flujo completo NÃºcleo
 // Recoger â†’ Enviar â†’ DiagnÃ³stico â†’ Cotizar â†’ Autorizar â†’ OC â†’ Reparar â†’ Regreso â†’ Entregar â†’ Facturar
 // ============================================================
@@ -90,6 +90,10 @@ export interface EquipmentRepair {
     resolution_notes: string | null;
     photos_after: unknown[];
     completion_date: string | null;
+    // Contacto directo del cliente (para avisos de recogida)
+    client_phone: string | null;
+    client_email: string | null;
+    pickup_deadline_date: string | null;
     // Estado
     status: RepairStatus;
     assigned_to: string | null;
