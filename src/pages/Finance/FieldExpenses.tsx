@@ -1,8 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { FieldExpense, EXPENSE_TYPE_LABELS, EXPENSE_TYPE_ICONS } from '../../types/projects';
+import { FieldExpense, EXPENSE_TYPE_LABELS } from '../../types/projects';
 import { formatCurrencyMXN } from '../../types/projects';
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+    PieChart, Pie, Cell, Legend,
+} from 'recharts';
 
 type ExpenseType = keyof typeof EXPENSE_TYPE_LABELS;
 
@@ -86,7 +90,7 @@ export default function FieldExpenses() {
         setExpenses((expRes.data as unknown as FieldExpense[]) || []);
         setAdvances(advRes.data || []);
         setAllTimeExpenses(allExpRes.data as unknown as FieldExpense[] || []);
-        setAllTimeAdvances(allAdvRes.data || []);
+        setAllTimeAdvances((allAdvRes.data as unknown as Advance[]) || []);
         setProjects(projRes.data || []);
         setWeeklyBudget(budgetRes.data || null);
         setAllTimeBudgets(allBudgetsRes.data || []);
@@ -205,6 +209,40 @@ export default function FieldExpenses() {
     });
 
     const weekLabel = `Semana del ${start.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} al ${end.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    // --- Chart data ---
+    const PIE_COLORS = ['#f97316', '#3b82f6', '#10b981', '#8b5cf6', '#f59e0b', '#ef4444'];
+
+    // 1) Gastos de la semana por empleado (bar chart)
+    const weekExpByEmployee = expenses.reduce((acc, e) => {
+        const name = e.employee_name || 'Sin asignar';
+        acc[name] = (acc[name] || 0) + Number(e.amount);
+        return acc;
+    }, {} as Record<string, number>);
+    const barChartData = Object.entries(weekExpByEmployee)
+        .sort(([, a], [, b]) => b - a)
+        .map(([name, amount]) => ({ name: name.split(' ')[0], fullName: name, amount }));
+
+    // 2) Distribución por tipo de gasto (pie/donut) — semana actual
+    const weekExpByType = expenses.reduce((acc, e) => {
+        const label = EXPENSE_TYPE_LABELS[e.expense_type] || e.expense_type;
+        acc[label] = (acc[label] || 0) + Number(e.amount);
+        return acc;
+    }, {} as Record<string, number>);
+    const pieChartData = Object.entries(weekExpByType)
+        .sort(([, a], [, b]) => b - a)
+        .map(([name, value]) => ({ name, value }));
+
+    // 3) Asignado vs Comprobado por empleado — acumulado
+    const assignedVsSpentData = Object.entries(empBalances)
+        .sort(([, a], [, b]) => b.assigned - a.assigned)
+        .slice(0, 8)
+        .map(([emp, data]) => ({
+            name: emp.split(' ')[0],
+            fullName: emp,
+            asignado: data.assigned,
+            comprobado: data.spent,
+        }));
+
 
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1';
@@ -275,6 +313,129 @@ export default function FieldExpenses() {
                 <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <h3 className="text-sm font-bold text-slate-500 uppercase mb-2">Gastos Comprobados (Semanal)</h3>
                     <p className="text-2xl font-black text-orange-500">{formatCurrencyMXN(weekTotalExpenses)}</p>
+                </div>
+            </div>
+
+            {/* ── Charts Section ── */}
+            <div className="grid gap-6 lg:grid-cols-3">
+                {/* Bar: Gastos por empleado (semana) */}
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-white">
+                        <span className="material-symbols-outlined text-orange-500 text-[20px]">bar_chart</span>
+                        Gastos por Empleado — Semana Actual
+                    </h3>
+                    {barChartData.length === 0 ? (
+                        <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin gastos registrados esta semana.</div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                            <BarChart data={barChartData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                                <Tooltip
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null;
+                                        const d = payload[0];
+                                        return (
+                                            <div style={{ borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', padding: '8px 12px', fontSize: 12 }}>
+                                                <p style={{ fontWeight: 600, marginBottom: 2 }}>{d.payload?.fullName}</p>
+                                                <p style={{ color: '#f97316' }}>{formatCurrencyMXN(d.value as number)}</p>
+                                            </div>
+                                        );
+                                    }}
+                                    cursor={{ fill: '#f97316', opacity: 0.08 }}
+                                />
+                                <Bar dataKey="amount" fill="#f97316" radius={[6, 6, 0, 0]} maxBarSize={48} name="Gasto" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+
+                {/* Pie: Distribución por tipo de gasto */}
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-white">
+                        <span className="material-symbols-outlined text-purple-500 text-[20px]">donut_large</span>
+                        Distribución por Tipo de Gasto — Semana
+                    </h3>
+                    {pieChartData.length === 0 ? (
+                        <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin gastos registrados esta semana.</div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                            <PieChart>
+                                <Pie
+                                    data={pieChartData}
+                                    cx="50%"
+                                    cy="45%"
+                                    innerRadius={55}
+                                    outerRadius={85}
+                                    paddingAngle={3}
+                                    dataKey="value"
+                                    nameKey="name"
+                                >
+                                    {pieChartData.map((_entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip
+                                    content={({ active, payload }) => {
+                                        if (!active || !payload?.length) return null;
+                                        const d = payload[0];
+                                        return (
+                                            <div style={{ borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', padding: '8px 12px', fontSize: 12 }}>
+                                                <p style={{ fontWeight: 600, marginBottom: 2 }}>{d.name}</p>
+                                                <p style={{ color: d.payload?.fill }}>{formatCurrencyMXN(d.value as number)}</p>
+                                            </div>
+                                        );
+                                    }}
+                                />
+                                <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    )}
+                </div>
+
+                {/* Grouped Bar: Asignado vs Comprobado por empleado (acumulado) */}
+                <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-slate-800 dark:text-white">
+                        <span className="material-symbols-outlined text-blue-500 text-[20px]">compare_arrows</span>
+                        Asignado vs. Comprobado — Acumulado
+                    </h3>
+                    {assignedVsSpentData.length === 0 ? (
+                        <div className="flex h-48 items-center justify-center text-sm text-slate-400">Sin datos de empleados.</div>
+                    ) : (
+                        <ResponsiveContainer width="100%" height={220}>
+                            <BarChart data={assignedVsSpentData} margin={{ top: 4, right: 8, left: 8, bottom: 4 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                                <Tooltip
+                                    content={({ active, payload, label }) => {
+                                        if (!active || !payload?.length) return null;
+                                        const fullName = payload[0]?.payload?.fullName || label;
+                                        return (
+                                            <div style={{ borderRadius: 8, border: '1px solid #e2e8f0', background: '#fff', padding: '8px 12px', fontSize: 12 }}>
+                                                <p style={{ fontWeight: 600, marginBottom: 4 }}>{fullName}</p>
+                                                {payload.map((p) => (
+                                                    <p key={p.dataKey as string} style={{ color: p.fill, marginBottom: 2 }}>
+                                                        {p.dataKey === 'asignado' ? 'Asignado' : 'Comprobado'}: {formatCurrencyMXN(p.value as number)}
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        );
+                                    }}
+                                    cursor={{ fill: '#64748b', opacity: 0.06 }}
+                                />
+                                <Legend
+                                    formatter={(value) => value === 'asignado' ? 'Asignado' : 'Comprobado'}
+                                    iconType="circle"
+                                    iconSize={8}
+                                    wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }}
+                                />
+                                <Bar dataKey="asignado" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={28} name="asignado" />
+                                <Bar dataKey="comprobado" fill="#f97316" radius={[4, 4, 0, 0]} maxBarSize={28} name="comprobado" />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    )}
                 </div>
             </div>
 
