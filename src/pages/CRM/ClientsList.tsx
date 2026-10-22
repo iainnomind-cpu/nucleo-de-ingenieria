@@ -389,6 +389,23 @@ export default function ClientsList() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                                    {/* Copiar link del portal */}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            const url = `https://nucleo-de-ingenieria.vercel.app/client-portal/${client.id}`;
+                                                            navigator.clipboard.writeText(url).then(() => {
+                                                                alert(`Link del portal copiado para ${client.company_name}`);
+                                                            }).catch(() => {
+                                                                prompt('Copia este link:', url);
+                                                            });
+                                                        }}
+                                                        className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-sky-50 hover:text-sky-600 dark:hover:bg-sky-900/20"
+                                                        title="Copiar link del Portal del Cliente"
+                                                    >
+                                                        <span className="material-symbols-outlined text-[20px]">content_copy</span>
+                                                    </button>
+
                                                     <button
                                                         onClick={(e) => {
                                                             e.stopPropagation();

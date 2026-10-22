@@ -217,26 +217,126 @@ export default function ClientPortalPublic() {
 
                 {/* TAB CONTENT: Arranques */}
                 {tab === 'arranque' && (
-                    <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="space-y-6 animate-in fade-in duration-500">
                         {startups.map(s => (
                             <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-emerald-500">power</span> 
-                                    Servicio de Arranque {s.folio && <span className="text-sm font-normal text-slate-500 ml-2">Folio: {s.folio}</span>}
-                                </h3>
-                                <p className="text-sm text-slate-500 mb-4">{s.record_date} {s.location ? ` · ${s.location}` : ''}</p>
-                                
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4 bg-slate-50 p-3 rounded-lg">
-                                    <div><span className="block text-xs text-slate-400">Voltaje Prom.</span><span className="font-medium">{s.avg_volts || '-'} V</span></div>
-                                    <div><span className="block text-xs text-slate-400">Amperaje Prom.</span><span className="font-medium">{s.avg_amps || '-'} A</span></div>
-                                    <div><span className="block text-xs text-slate-400">Desbalance</span><span className="font-medium">{s.unbalance_percentage || '-'} %</span></div>
-                                    <div><span className="block text-xs text-slate-400">Caudal</span><span className="font-medium">{s.flow_rate || '-'}</span></div>
+                                {/* Header */}
+                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-emerald-500">power</span>
+                                            Formato de Arranque
+                                        </h3>
+                                        {s.folio && <span className="inline-block mt-1 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">Folio: {s.folio}</span>}
+                                    </div>
+                                    <div className="text-right text-sm text-slate-500">
+                                        <p>{s.record_date}</p>
+                                        {s.location && <p>{s.location}</p>}
+                                        {s.technician && <p className="text-xs text-slate-400">Técnico: {s.technician}</p>}
+                                        {s.equipment && <p className="text-xs text-slate-400">Equipo: {s.equipment}</p>}
+                                    </div>
                                 </div>
-                                {s.recommendations && (
-                                    <div className="text-sm text-slate-700 mb-4"><strong>Recomendaciones:</strong> {s.recommendations}</div>
+
+                                {/* Tabla de mediciones */}
+                                {(s.time_logged || s.time_logged_2 || s.time_logged_3) && (
+                                    <div className="mb-4">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Tabla de Mediciones</h4>
+                                        <div className="overflow-x-auto rounded-lg border border-slate-200">
+                                            <table className="w-full text-xs text-center">
+                                                <thead className="bg-slate-50 text-slate-500">
+                                                    <tr>
+                                                        <th className="px-2 py-2 border-b border-slate-200">Hora</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">V L1-L2</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">V L2-L3</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">V L1-L3</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">A L1</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">A L2</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">A L3</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">Caudal</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">N.D.</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">P.D.</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">Prom.V</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">Prom.A</th>
+                                                        <th className="px-2 py-2 border-b border-slate-200">% Desb.</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {[
+                                                        { h: s.time_logged, v1: s.volts_l1, v2: s.volts_l2, v3: s.volts_l3, a1: s.amp_l1, a2: s.amp_l2, a3: s.amp_l3, q: s.flow_rate, nd: s.dynamic_level, pd: s.discharge_pressure, pv: s.avg_volts, pa: s.avg_amps, d: s.unbalance_percentage },
+                                                        { h: s.time_logged_2, v1: s.volts_l1_2, v2: s.volts_l2_2, v3: s.volts_l3_2, a1: s.amp_l1_2, a2: s.amp_l2_2, a3: s.amp_l3_2, q: s.flow_rate_2, nd: s.dynamic_level_2, pd: s.discharge_pressure_2, pv: s.avg_volts_2, pa: s.avg_amps_2, d: s.unbalance_percentage_2 },
+                                                        { h: s.time_logged_3, v1: s.volts_l1_3, v2: s.volts_l2_3, v3: s.volts_l3_3, a1: s.amp_l1_3, a2: s.amp_l2_3, a3: s.amp_l3_3, q: s.flow_rate_3, nd: s.dynamic_level_3, pd: s.discharge_pressure_3, pv: s.avg_volts_3, pa: s.avg_amps_3, d: s.unbalance_percentage_3 },
+                                                    ].filter(r => r.h).map((r, i) => (
+                                                        <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                                                            <td className="px-2 py-2 font-medium">{r.h || '-'}</td>
+                                                            <td className="px-2 py-2">{r.v1 || '-'}</td>
+                                                            <td className="px-2 py-2">{r.v2 || '-'}</td>
+                                                            <td className="px-2 py-2">{r.v3 || '-'}</td>
+                                                            <td className="px-2 py-2">{r.a1 || '-'}</td>
+                                                            <td className="px-2 py-2">{r.a2 || '-'}</td>
+                                                            <td className="px-2 py-2">{r.a3 || '-'}</td>
+                                                            <td className="px-2 py-2">{r.q || '-'}</td>
+                                                            <td className="px-2 py-2">{r.nd || '-'}</td>
+                                                            <td className="px-2 py-2">{r.pd || '-'}</td>
+                                                            <td className="px-2 py-2 font-semibold text-sky-700">{r.pv || '-'}</td>
+                                                            <td className="px-2 py-2 font-semibold text-sky-700">{r.pa || '-'}</td>
+                                                            <td className="px-2 py-2 font-semibold text-amber-600">{r.d || '-'}%</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
                                 )}
+
+                                {/* Parámetros eléctricos + Datos Motor */}
+                                {(s.low_voltage || s.high_voltage || s.overload_amps || s.motor_power_hp || s.motor_feed_volts) && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        {(s.low_voltage || s.high_voltage || s.overload_amps || s.underload_amps || s.phase_unbalance) && (
+                                            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+                                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Parámetros Eléctricos</h4>
+                                                <div className="space-y-1 text-sm">
+                                                    {s.low_voltage && <p><span className="text-slate-400">Bajo voltaje:</span> <span className="font-medium">{s.low_voltage} V</span></p>}
+                                                    {s.high_voltage && <p><span className="text-slate-400">Alto voltaje:</span> <span className="font-medium">{s.high_voltage} V</span></p>}
+                                                    {s.overload_amps && <p><span className="text-slate-400">Sobre carga:</span> <span className="font-medium">{s.overload_amps} A</span></p>}
+                                                    {s.underload_amps && <p><span className="text-slate-400">Baja carga:</span> <span className="font-medium">{s.underload_amps} A</span></p>}
+                                                    {s.phase_unbalance && <p><span className="text-slate-400">Desbalance de fases:</span> <span className="font-medium">{s.phase_unbalance} %</span></p>}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {(s.motor_power_hp || s.motor_feed_volts || s.motor_frequency_hz || s.motor_nom_amps || s.motor_protection_type) && (
+                                            <div className="rounded-lg bg-slate-50 p-3 border border-slate-200">
+                                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Datos del Motor</h4>
+                                                <div className="space-y-1 text-sm">
+                                                    {s.motor_power_hp && <p><span className="text-slate-400">Potencia:</span> <span className="font-medium">{s.motor_power_hp} Hp</span></p>}
+                                                    {s.motor_feed_volts && <p><span className="text-slate-400">Alimentación:</span> <span className="font-medium">{s.motor_feed_volts} V</span></p>}
+                                                    {s.motor_frequency_hz && <p><span className="text-slate-400">Frecuencia:</span> <span className="font-medium">{s.motor_frequency_hz} Hz</span></p>}
+                                                    {s.motor_nom_amps && <p><span className="text-slate-400">Amp. Nominal:</span> <span className="font-medium">{s.motor_nom_amps} A</span></p>}
+                                                    {s.motor_protection_type && <p><span className="text-slate-400">Protección:</span> <span className="font-medium">{s.motor_protection_type}</span></p>}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* Recomendaciones */}
+                                {s.recommendations && (
+                                    <div className="text-sm text-slate-700 mb-4 rounded-lg bg-amber-50 border border-amber-100 p-3">
+                                        <strong className="text-amber-800">Observaciones y recomendaciones:</strong>
+                                        <p className="mt-1 whitespace-pre-line">{s.recommendations}</p>
+                                    </div>
+                                )}
+
+                                {/* Firmas */}
+                                {(s.received_by || s.reviewed_by || s.authorized_by) && (
+                                    <div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
+                                        <div><p className="font-semibold uppercase">Recibió</p><p className="mt-1 font-medium text-slate-700">{s.received_by || '—'}</p></div>
+                                        <div><p className="font-semibold uppercase">Revisó</p><p className="mt-1 font-medium text-slate-700">{s.reviewed_by || '—'}</p></div>
+                                        <div><p className="font-semibold uppercase">Autorizó</p><p className="mt-1 font-medium text-slate-700">{s.authorized_by || '—'}</p></div>
+                                    </div>
+                                )}
+
                                 {s.photos && s.photos.length > 0 && (
-                                    <div className="mt-4"><PhotoGallery photos={s.photos} /></div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100"><PhotoGallery photos={s.photos} /></div>
                                 )}
                             </div>
                         ))}
@@ -245,26 +345,60 @@ export default function ClientPortalPublic() {
 
                 {/* TAB CONTENT: Instalaciones */}
                 {tab === 'instalaciones' && (
-                    <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="space-y-6 animate-in fade-in duration-500">
                         {installations.map(i => (
                             <div key={i.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-sky-500">build</span> 
-                                    Instalación de Equipo {i.folio && <span className="text-sm font-normal text-slate-500 ml-2">Folio: {i.folio}</span>}
-                                </h3>
-                                <p className="text-sm text-slate-500 mb-4">{i.installation_date} {i.location ? ` · ${i.location}` : ''}</p>
-                                
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4 bg-slate-50 p-3 rounded-lg">
-                                    <div><span className="block text-xs text-slate-400">Diám. Ademe</span><span className="font-medium">{i.ademe_diameter || '-'}</span></div>
-                                    <div><span className="block text-xs text-slate-400">Tubería</span><span className="font-medium">{i.pipe_diameter || '-'}</span></div>
-                                    <div><span className="block text-xs text-slate-400">Nivel Estático</span><span className="font-medium">{i.static_level || '-'} m</span></div>
-                                    <div><span className="block text-xs text-slate-400">Profundidad</span><span className="font-medium">{i.installation_depth || '-'} m</span></div>
+                                {/* Header */}
+                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-sky-500">build</span>
+                                            Maniobra / Instalación de Equipo
+                                        </h3>
+                                        {i.folio && <span className="inline-block mt-1 text-xs font-semibold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">Folio: {i.folio}</span>}
+                                    </div>
+                                    <div className="text-right text-sm text-slate-500">
+                                        <p>{i.installation_date}</p>
+                                        {i.location && <p>{i.location}</p>}
+                                    </div>
                                 </div>
-                                {i.observations && (
-                                    <div className="text-sm text-slate-700 mb-4"><strong>Observaciones:</strong> {i.observations}</div>
+
+                                {/* Pozo y Tubería */}
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                    {i.ademe_diameter && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Diám. Ademe</p><p className="font-semibold text-sm mt-0.5">{i.ademe_diameter}</p></div>}
+                                    {i.ademe_material && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Material Ademe</p><p className="font-semibold text-sm mt-0.5">{i.ademe_material}</p></div>}
+                                    {i.pipe_diameter && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Diám. Tubería</p><p className="font-semibold text-sm mt-0.5">{i.pipe_diameter}</p></div>}
+                                    {i.pipe_length && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Long. Tubería</p><p className="font-semibold text-sm mt-0.5">{i.pipe_length}</p></div>}
+                                    {i.pipe_segments ? <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Tramos</p><p className="font-semibold text-sm mt-0.5">{i.pipe_segments}</p></div> : null}
+                                    {i.valv_check ? <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Válv. Check</p><p className="font-semibold text-sm mt-0.5">{i.valv_check}</p></div> : null}
+                                    {i.cable_gauge && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Calibre Cable</p><p className="font-semibold text-sm mt-0.5">{i.cable_gauge}</p></div>}
+                                    {i.motor_hp && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Motor / HP</p><p className="font-semibold text-sm mt-0.5">{i.motor_hp}</p></div>}
+                                    {i.pump_model && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Modelo Bomba</p><p className="font-semibold text-sm mt-0.5">{i.pump_model}</p></div>}
+                                    {i.starter_system && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Sist. Arranque</p><p className="font-semibold text-sm mt-0.5">{i.starter_system}</p></div>}
+                                    {i.protection_type && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Protección</p><p className="font-semibold text-sm mt-0.5">{i.protection_type}</p></div>}
+                                    {i.has_ground !== undefined && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Tierra Física</p><p className="font-semibold text-sm mt-0.5">{i.has_ground ? 'Sí' : 'No'}{i.ground_location ? ` (${i.ground_location})` : ''}</p></div>}
+                                </div>
+
+                                {/* Niveles */}
+                                {(i.static_level || i.dynamic_level || i.flow_rate || i.bottom_depth) && (
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                        {i.static_level ? <div className="bg-sky-50 rounded-lg p-3 border border-sky-200"><p className="text-xs text-sky-400">Nivel Estático</p><p className="font-semibold text-sm mt-0.5 text-sky-700">{i.static_level} m</p></div> : null}
+                                        {i.dynamic_level ? <div className="bg-sky-50 rounded-lg p-3 border border-sky-200"><p className="text-xs text-sky-400">Nivel Dinámico</p><p className="font-semibold text-sm mt-0.5 text-sky-700">{i.dynamic_level} m</p></div> : null}
+                                        {i.flow_rate ? <div className="bg-sky-50 rounded-lg p-3 border border-sky-200"><p className="text-xs text-sky-400">Gasto</p><p className="font-semibold text-sm mt-0.5 text-sky-700">{i.flow_rate} lps</p></div> : null}
+                                        {i.bottom_depth ? <div className="bg-sky-50 rounded-lg p-3 border border-sky-200"><p className="text-xs text-sky-400">Prof. Fondo</p><p className="font-semibold text-sm mt-0.5 text-sky-700">{i.bottom_depth} m</p></div> : null}
+                                    </div>
                                 )}
+
+                                {/* Observaciones */}
+                                {i.observations && (
+                                    <div className="text-sm text-slate-700 mb-4 rounded-lg bg-amber-50 border border-amber-100 p-3">
+                                        <strong className="text-amber-800">Observaciones:</strong>
+                                        <p className="mt-1 whitespace-pre-line">{i.observations}</p>
+                                    </div>
+                                )}
+
                                 {i.photos && i.photos.length > 0 && (
-                                    <div className="mt-4"><PhotoGallery photos={i.photos} /></div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100"><PhotoGallery photos={i.photos} /></div>
                                 )}
                             </div>
                         ))}
@@ -273,20 +407,53 @@ export default function ClientPortalPublic() {
 
                 {/* TAB CONTENT: Desinstalaciones */}
                 {tab === 'desinstalaciones' && (
-                    <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="space-y-6 animate-in fade-in duration-500">
                         {uninstallations.map(u => (
                             <div key={u.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-orange-500">settings_backup_restore</span> 
-                                    Desinstalación {u.folio && <span className="text-sm font-normal text-slate-500 ml-2">Folio: {u.folio}</span>}
-                                </h3>
-                                <p className="text-sm text-slate-500 mb-4">{u.uninstallation_date} {u.location ? ` · ${u.location}` : ''}</p>
-                                
-                                <div className="text-sm text-slate-700 bg-orange-50 p-3 rounded-lg border border-orange-100 mb-4">
-                                    <strong>Motivo de extracción:</strong> {u.reason || 'No especificado'}
+                                {/* Header */}
+                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-orange-500">settings_backup_restore</span>
+                                            Desinstalación de Equipo
+                                        </h3>
+                                        {u.folio && <span className="inline-block mt-1 text-xs font-semibold bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">Folio: {u.folio}</span>}
+                                    </div>
+                                    <div className="text-right text-sm text-slate-500">
+                                        <p>{u.uninstallation_date}</p>
+                                        {u.location && <p>{u.location}</p>}
+                                    </div>
                                 </div>
+
+                                {/* Datos del equipo extraído */}
+                                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                                    {u.equipment_type && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Tipo de Equipo</p><p className="font-semibold text-sm mt-0.5">{u.equipment_type}</p></div>}
+                                    {u.motor_hp && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Motor / HP</p><p className="font-semibold text-sm mt-0.5">{u.motor_hp}</p></div>}
+                                    {u.pump_model && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Modelo Bomba</p><p className="font-semibold text-sm mt-0.5">{u.pump_model}</p></div>}
+                                    {u.pipe_diameter && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Diám. Tubería</p><p className="font-semibold text-sm mt-0.5">{u.pipe_diameter}</p></div>}
+                                    {u.pipe_segments ? <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Tramos Extraídos</p><p className="font-semibold text-sm mt-0.5">{u.pipe_segments}</p></div> : null}
+                                    {u.cable_gauge && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Calibre Cable</p><p className="font-semibold text-sm mt-0.5">{u.cable_gauge}</p></div>}
+                                    {u.static_level ? <div className="bg-sky-50 rounded-lg p-3 border border-sky-200"><p className="text-xs text-sky-400">Nivel Estático</p><p className="font-semibold text-sm mt-0.5 text-sky-700">{u.static_level} m</p></div> : null}
+                                    {u.bottom_depth ? <div className="bg-sky-50 rounded-lg p-3 border border-sky-200"><p className="text-xs text-sky-400">Prof. Fondo</p><p className="font-semibold text-sm mt-0.5 text-sky-700">{u.bottom_depth} m</p></div> : null}
+                                    {u.technician && <div className="bg-slate-50 rounded-lg p-3 border border-slate-200"><p className="text-xs text-slate-400">Técnico</p><p className="font-semibold text-sm mt-0.5">{u.technician}</p></div>}
+                                </div>
+
+                                {/* Motivo */}
+                                <div className="text-sm text-slate-700 bg-orange-50 p-3 rounded-lg border border-orange-100 mb-4">
+                                    <strong className="text-orange-800">Motivo de extracción:</strong>
+                                    <p className="mt-1 whitespace-pre-line">{u.reason || 'No especificado'}</p>
+                                </div>
+
+                                {/* Observaciones */}
+                                {u.observations && (
+                                    <div className="text-sm text-slate-700 mb-4 rounded-lg bg-amber-50 border border-amber-100 p-3">
+                                        <strong className="text-amber-800">Observaciones:</strong>
+                                        <p className="mt-1 whitespace-pre-line">{u.observations}</p>
+                                    </div>
+                                )}
+
                                 {u.photos && u.photos.length > 0 && (
-                                    <div className="mt-4"><PhotoGallery photos={u.photos} /></div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100"><PhotoGallery photos={u.photos} /></div>
                                 )}
                             </div>
                         ))}
@@ -295,29 +462,78 @@ export default function ClientPortalPublic() {
 
                 {/* TAB CONTENT: Cuadros */}
                 {tab === 'cuadros' && (
-                    <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="space-y-6 animate-in fade-in duration-500">
                         {panels.map(p => (
                             <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-amber-500">electrical_services</span> 
-                                    Cuadro Eléctrico {p.folio && <span className="text-sm font-normal text-slate-500 ml-2">Folio: {p.folio}</span>}
-                                </h3>
-                                <p className="text-sm text-slate-500 mb-4">{p.record_date} {p.well_name ? ` · Pozo: ${p.well_name}` : ''}</p>
-                                
-                                <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <h4 className="font-bold text-xs text-slate-500 mb-2 uppercase tracking-wide border-b border-slate-200 pb-1">Transformador</h4>
-                                        <p><span className="text-slate-400">Capacidad:</span> {p.trans_capacity || '-'}</p>
-                                        <p><span className="text-slate-400">Marca:</span> {p.trans_brand || '-'}</p>
+                                {/* Header */}
+                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                            <span className="material-symbols-outlined text-amber-500">electrical_services</span>
+                                            Cuadro Eléctrico
+                                        </h3>
+                                        {p.folio && <span className="inline-block mt-1 text-xs font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">Folio: {p.folio}</span>}
                                     </div>
-                                    <div className="bg-slate-50 p-3 rounded-lg">
-                                        <h4 className="font-bold text-xs text-slate-500 mb-2 uppercase tracking-wide border-b border-slate-200 pb-1">Arrancador</h4>
-                                        <p><span className="text-slate-400">Voltaje:</span> {p.arr_voltage || '-'}</p>
-                                        <p><span className="text-slate-400">Gabinete:</span> {p.arr_cabinet_type || '-'}</p>
+                                    <div className="text-right text-sm text-slate-500">
+                                        <p>{p.record_date}</p>
+                                        {p.well_name && <p>Pozo: {p.well_name}</p>}
+                                        {p.location && <p>{p.location}</p>}
+                                        {p.technician && <p className="text-xs text-slate-400">Técnico: {p.technician}</p>}
                                     </div>
                                 </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                                    {/* Transformador */}
+                                    {(p.trans_capacity || p.trans_brand || p.trans_primary_voltage || p.trans_secondary_voltage) && (
+                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                            <h4 className="font-bold text-xs text-slate-500 mb-2 uppercase tracking-wide border-b border-slate-200 pb-1">Transformador</h4>
+                                            <div className="space-y-1 text-sm">
+                                                {p.trans_capacity && <p><span className="text-slate-400">Capacidad:</span> <span className="font-medium">{p.trans_capacity}</span></p>}
+                                                {p.trans_brand && <p><span className="text-slate-400">Marca:</span> <span className="font-medium">{p.trans_brand}</span></p>}
+                                                {p.trans_primary_voltage && <p><span className="text-slate-400">Voltaje Primario:</span> <span className="font-medium">{p.trans_primary_voltage} V</span></p>}
+                                                {p.trans_secondary_voltage && <p><span className="text-slate-400">Voltaje Secundario:</span> <span className="font-medium">{p.trans_secondary_voltage} V</span></p>}
+                                                {p.trans_phases && <p><span className="text-slate-400">Fases:</span> <span className="font-medium">{p.trans_phases}</span></p>}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Arrancador */}
+                                    {(p.arr_voltage || p.arr_cabinet_type || p.arr_brand || p.arr_model) && (
+                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                            <h4 className="font-bold text-xs text-slate-500 mb-2 uppercase tracking-wide border-b border-slate-200 pb-1">Arrancador</h4>
+                                            <div className="space-y-1 text-sm">
+                                                {p.arr_voltage && <p><span className="text-slate-400">Voltaje:</span> <span className="font-medium">{p.arr_voltage} V</span></p>}
+                                                {p.arr_cabinet_type && <p><span className="text-slate-400">Gabinete:</span> <span className="font-medium">{p.arr_cabinet_type}</span></p>}
+                                                {p.arr_brand && <p><span className="text-slate-400">Marca:</span> <span className="font-medium">{p.arr_brand}</span></p>}
+                                                {p.arr_model && <p><span className="text-slate-400">Modelo:</span> <span className="font-medium">{p.arr_model}</span></p>}
+                                                {p.arr_hp && <p><span className="text-slate-400">HP:</span> <span className="font-medium">{p.arr_hp}</span></p>}
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Motor */}
+                                    {(p.motor_hp || p.motor_voltage || p.motor_brand || p.motor_model) && (
+                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
+                                            <h4 className="font-bold text-xs text-slate-500 mb-2 uppercase tracking-wide border-b border-slate-200 pb-1">Motor</h4>
+                                            <div className="space-y-1 text-sm">
+                                                {p.motor_hp && <p><span className="text-slate-400">HP:</span> <span className="font-medium">{p.motor_hp}</span></p>}
+                                                {p.motor_voltage && <p><span className="text-slate-400">Voltaje:</span> <span className="font-medium">{p.motor_voltage} V</span></p>}
+                                                {p.motor_brand && <p><span className="text-slate-400">Marca:</span> <span className="font-medium">{p.motor_brand}</span></p>}
+                                                {p.motor_model && <p><span className="text-slate-400">Modelo:</span> <span className="font-medium">{p.motor_model}</span></p>}
+                                                {p.motor_nom_amps && <p><span className="text-slate-400">Amp. Nominal:</span> <span className="font-medium">{p.motor_nom_amps} A</span></p>}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Observaciones */}
+                                {p.observations && (
+                                    <div className="text-sm text-slate-700 mb-4 rounded-lg bg-amber-50 border border-amber-100 p-3">
+                                        <strong className="text-amber-800">Observaciones:</strong>
+                                        <p className="mt-1 whitespace-pre-line">{p.observations}</p>
+                                    </div>
+                                )}
+
                                 {p.photos && p.photos.length > 0 && (
-                                    <div className="mt-4"><PhotoGallery photos={p.photos} /></div>
+                                    <div className="mt-4 pt-4 border-t border-slate-100"><PhotoGallery photos={p.photos} /></div>
                                 )}
                             </div>
                         ))}

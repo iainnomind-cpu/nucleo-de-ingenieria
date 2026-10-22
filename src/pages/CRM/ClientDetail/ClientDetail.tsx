@@ -366,6 +366,22 @@ export default function ClientDetail() {
                             <span className="material-symbols-outlined text-[18px]">public</span>
                             Portal del Cliente
                         </a>
+                        {/* Copiar Link del Portal */}
+                        <button
+                            onClick={() => {
+                                const url = `https://nucleo-de-ingenieria.vercel.app/client-portal/${id}`;
+                                navigator.clipboard.writeText(url).then(() => {
+                                    alert('¡Link copiado! Ya puedes pegarlo en WhatsApp o correo.');
+                                }).catch(() => {
+                                    prompt('Copia este link:', url);
+                                });
+                            }}
+                            className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-50 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700"
+                            title="Copiar link del portal"
+                        >
+                            <span className="material-symbols-outlined text-[18px]">content_copy</span>
+                            Copiar Link
+                        </button>
                         {/* M2: Quick action - Generate Quote */}
                         <button onClick={handleCreateQuote}
                             className="flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-emerald-500/20 transition-all hover:shadow-lg">
@@ -847,28 +863,44 @@ export default function ClientDetail() {
 
                 {/* TAB: Equipment (M5) */}
                 {activeTab === 'equipment' && (
-                    <div className="space-y-6">
+                    <div className="space-y-6 p-6">
                         <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300">Equipos Instalados</h3>
                         {clientEquipment.length === 0 ? (
                             <p className="py-8 text-center text-sm text-slate-400">No hay equipos registrados para este cliente en M5.</p>
                         ) : (
                             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 {clientEquipment.map(eq => (
-                                    <div key={eq.id} onClick={() => navigate(`/maintenance/equipment/${eq.id}`)} className="group cursor-pointer rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/30 dark:border-slate-800/60 dark:bg-slate-900/50">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                                                    <span className="material-symbols-outlined text-primary text-[20px]">engineering</span>
+                                    <div key={eq.id} className="group relative rounded-xl border border-slate-200/60 bg-white/70 p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/30 dark:border-slate-800/60 dark:bg-slate-900/50">
+                                        {/* Boton eliminar equipo */}
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (!confirm(`¿Eliminar el equipo "${eq.name}"? Esta accion no se puede deshacer.`)) return;
+                                                const { error } = await supabase.from('installed_equipment').delete().eq('id', eq.id);
+                                                if (error) { alert('Error al eliminar: ' + error.message); return; }
+                                                fetchMaintenance();
+                                            }}
+                                            className="absolute right-3 top-3 rounded-lg p-1.5 text-slate-300 opacity-0 transition-all hover:bg-red-50 hover:text-red-500 group-hover:opacity-100 dark:hover:bg-red-900/20"
+                                            title="Eliminar equipo"
+                                        >
+                                            <span className="material-symbols-outlined text-[18px]">delete</span>
+                                        </button>
+                                        <div className="cursor-pointer" onClick={() => navigate(`/maintenance/equipment/${eq.id}`)}>
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                                                        <span className="material-symbols-outlined text-primary text-[20px]">engineering</span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-sm text-slate-900 dark:text-white">{eq.name}</p>
+                                                        <p className="text-xs text-slate-400">{eq.equipment_type}{eq.brand ? ` · ${eq.brand}` : ''}{eq.model ? ` ${eq.model}` : ''}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-semibold text-sm text-slate-900 dark:text-white">{eq.name}</p>
-                                                    <p className="text-xs text-slate-400">{eq.equipment_type}{eq.brand ? ` · ${eq.brand}` : ''}{eq.model ? ` ${eq.model}` : ''}</p>
-                                                </div>
+                                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${eq.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400'}`}>{eq.status === 'active' ? 'Activo' : eq.status}</span>
                                             </div>
-                                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${eq.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700/50 dark:text-slate-400'}`}>{eq.status === 'active' ? 'Activo' : eq.status}</span>
+                                            {eq.well_name && <p className="mt-2 text-xs text-slate-500 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">water</span>{eq.well_name}</p>}
+                                            {eq.installation_date && <p className="mt-1 text-[10px] text-slate-400">Instalado: {new Date(eq.installation_date).toLocaleDateString('es-MX')}</p>}
                                         </div>
-                                        {eq.well_name && <p className="mt-2 text-xs text-slate-500 flex items-center gap-1"><span className="material-symbols-outlined text-[12px]">water</span>{eq.well_name}</p>}
-                                        {eq.installation_date && <p className="mt-1 text-[10px] text-slate-400">Instalado: {new Date(eq.installation_date).toLocaleDateString('es-MX')}</p>}
                                     </div>
                                 ))}
                             </div>
