@@ -39,6 +39,31 @@ export default function RepairDetail() {
     const [afterPhotos, setAfterPhotos] = useState<PhotoAttachment[]>([]);
     const [deliveryPhotos, setDeliveryPhotos] = useState<PhotoAttachment[]>([]);
     const [shippingPhotos, setShippingPhotos] = useState<PhotoAttachment[]>([]);
+    const [editingWorkshopContact, setEditingWorkshopContact] = useState(false);
+    const [wsPhoneInput, setWsPhoneInput] = useState('');
+    const [wsEmailInput, setWsEmailInput] = useState('');
+
+    const saveWorkshopContact = async (name: string, phone: string, email: string) => {
+        if (!name.trim()) return;
+        const existingWs = workshops.find(w => w.name.toLowerCase() === name.trim().toLowerCase());
+        if (existingWs) {
+            await supabase.from('external_workshops').update({
+                contact_phone: phone.trim() || null,
+                contact_email: email.trim() || null,
+            }).eq('id', existingWs.id);
+            setWorkshops(prev => prev.map(w => w.id === existingWs.id ? { ...w, contact_phone: phone.trim() || null, contact_email: email.trim() || null } : w));
+        } else {
+            const { data } = await supabase.from('external_workshops').insert({
+                name: name.trim(),
+                contact_phone: phone.trim() || null,
+                contact_email: email.trim() || null,
+            }).select().single();
+            if (data) {
+                setWorkshops(prev => [...prev, data as ExternalWorkshop]);
+            }
+        }
+        setEditingWorkshopContact(false);
+    };
 
     const fetchAll = useCallback(async () => {
         if (!id) return;
@@ -100,6 +125,30 @@ export default function RepairDetail() {
         if (!repair) return;
         
         let finalData = { ...editData };
+        if (section === 'shipping_to') {
+            const wsName = (finalData.external_provider || '').trim();
+            const wsPhone = typeof finalData.ws_phone === 'string' ? finalData.ws_phone.trim() : null;
+            const wsEmail = typeof finalData.ws_email === 'string' ? finalData.ws_email.trim() : null;
+            delete finalData.ws_phone;
+            delete finalData.ws_email;
+
+            if (wsName) {
+                const existingWs = workshops.find(w => w.name.toLowerCase() === wsName.toLowerCase());
+                if (existingWs) {
+                    await supabase.from('external_workshops').update({
+                        contact_phone: wsPhone || existingWs.contact_phone || null,
+                        contact_email: wsEmail || existingWs.contact_email || null,
+                    }).eq('id', existingWs.id);
+                } else {
+                    await supabase.from('external_workshops').insert({
+                        name: wsName,
+                        contact_phone: wsPhone || null,
+                        contact_email: wsEmail || null,
+                    });
+                }
+            }
+        }
+
         if (section === 'report') {
             if (finalData.is_external) {
                 finalData.equipment_id = null;
@@ -444,33 +493,129 @@ Núcleo de Ingeniería`
                         )}
                     </div>
 
-                    {/* Step 3: EnvÃ­o al Proveedor */}
+                    {/* Step 3: Envío al Proveedor */}
                     <div className={stepClass(isCurrent('sent_to_provider') || isCurrent('received_by_provider'), isDone('received_by_provider'))}>
                         <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-sky-600 text-[12px] font-bold dark:bg-sky-900/30">3</span>
-                                EnvÃ­o al Proveedor
+                                Envío al Proveedor / Taller Externo
                                 {isDone('received_by_provider') && <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span>}
                             </h4>
-                            {editSection !== 'shipping_to' && <button onClick={() => startEdit('shipping_to', { external_provider: repair.external_provider || '', shipping_carrier_to: repair.shipping_carrier_to || '', tracking_number_to: repair.tracking_number_to || '', sent_to_provider_date: repair.sent_to_provider_date || '', provider_received_date: repair.provider_received_date || '' })} className="text-xs text-primary font-semibold">Editar</button>}
+                            {editSection !== 'shipping_to' && (
+                                <button onClick={() => {
+                                    const curWs = workshops.find(w => w.name.toLowerCase() === (repair.external_provider || '').toLowerCase());
+                                    startEdit('shipping_to', {
+                                        external_provider: repair.external_provider || '',
+                                        ws_phone: curWs?.contact_phone || '',
+                                        ws_email: curWs?.contact_email || '',
+                                        shipping_carrier_to: repair.shipping_carrier_to || '',
+                                        tracking_number_to: repair.tracking_number_to || '',
+                                        sent_to_provider_date: repair.sent_to_provider_date || '',
+                                        provider_received_date: repair.provider_received_date || ''
+                                    });
+                                }} className="text-xs text-primary font-semibold">Editar</button>
+                            )}
                         </div>
                         {editSection === 'shipping_to' ? (
-                            <div className="grid grid-cols-2 gap-3">
-                                <div><label className={labelClass}>Proveedor</label><input list="ws-list" value={editData.external_provider} onChange={e => setEditData({...editData, external_provider: e.target.value})} className={inputClass} /><datalist id="ws-list">{workshops.map(w => <option key={w.id} value={w.name}/>)}</datalist></div>
-                                <div><label className={labelClass}>PaqueterÃ­a</label><input list="cr-list" value={editData.shipping_carrier_to} onChange={e => setEditData({...editData, shipping_carrier_to: e.target.value})} className={inputClass} /><datalist id="cr-list">{carriers.map(c => <option key={c.id} value={c.name}/>)}</datalist></div>
-                                <div><label className={labelClass}>No. GuÃ­a</label><input value={editData.tracking_number_to} onChange={e => setEditData({...editData, tracking_number_to: e.target.value})} placeholder="NÃºmero de guÃ­a..." className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha EnvÃ­o</label><input type="date" value={editData.sent_to_provider_date} onChange={e => setEditData({...editData, sent_to_provider_date: e.target.value})} className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha RecepciÃ³n Proveedor</label><input type="date" value={editData.provider_received_date} onChange={e => setEditData({...editData, provider_received_date: e.target.value})} className={inputClass} /></div>
-                                <div className="flex items-end gap-2"><button onClick={() => saveSection('shipping_to')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button><button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button></div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className={labelClass}>Proveedor / Taller</label>
+                                    <input
+                                        list="ws-list"
+                                        value={editData.external_provider}
+                                        onChange={e => {
+                                            const pName = e.target.value;
+                                            const matchedWs = workshops.find(w => w.name.toLowerCase() === pName.trim().toLowerCase());
+                                            setEditData({
+                                                ...editData,
+                                                external_provider: pName,
+                                                ws_phone: matchedWs ? (matchedWs.contact_phone || '') : editData.ws_phone || '',
+                                                ws_email: matchedWs ? (matchedWs.contact_email || '') : editData.ws_email || '',
+                                            });
+                                        }}
+                                        placeholder="Nombre del taller..."
+                                        className={inputClass}
+                                    />
+                                    <datalist id="ws-list">{workshops.map(w => <option key={w.id} value={w.name}/>)}</datalist>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Paquetería</label>
+                                    <input list="cr-list" value={editData.shipping_carrier_to} onChange={e => setEditData({...editData, shipping_carrier_to: e.target.value})} placeholder="Paquetexpress, Tres Guerras..." className={inputClass} />
+                                    <datalist id="cr-list">{carriers.map(c => <option key={c.id} value={c.name}/>)}</datalist>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Celular / WhatsApp Taller</label>
+                                    <input value={editData.ws_phone ?? ''} onChange={e => setEditData({...editData, ws_phone: e.target.value})} placeholder="Ej. 3411234567" className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Correo del Taller</label>
+                                    <input type="email" value={editData.ws_email ?? ''} onChange={e => setEditData({...editData, ws_email: e.target.value})} placeholder="taller@ejemplo.com" className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>No. Guía</label>
+                                    <input value={editData.tracking_number_to} onChange={e => setEditData({...editData, tracking_number_to: e.target.value})} placeholder="Número de guía..." className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Fecha Envío</label>
+                                    <input type="date" value={editData.sent_to_provider_date} onChange={e => setEditData({...editData, sent_to_provider_date: e.target.value})} className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Fecha Recepción Proveedor</label>
+                                    <input type="date" value={editData.provider_received_date} onChange={e => setEditData({...editData, provider_received_date: e.target.value})} className={inputClass} />
+                                </div>
+                                <div className="md:col-span-2 flex items-center gap-2 pt-2">
+                                    <button onClick={() => saveSection('shipping_to')} className="rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white">Guardar</button>
+                                    <button onClick={() => setEditSection(null)} className="rounded-lg border border-slate-200 px-4 py-2 text-xs text-slate-500 dark:border-slate-700">Cancelar</button>
+                                </div>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-                                <InfoField label="Proveedor" value={repair.external_provider} />
-                                <InfoField label="PaqueterÃ­a" value={repair.shipping_carrier_to} />
-                                <InfoField label="GuÃ­a" value={repair.tracking_number_to} mono />
-                                <InfoField label="Enviado" value={repair.sent_to_provider_date ? new Date(repair.sent_to_provider_date).toLocaleDateString('es-MX') : null} />
-                                <InfoField label="Recibido" value={repair.provider_received_date ? new Date(repair.provider_received_date).toLocaleDateString('es-MX') : null} />
-                            </div>
+                            <>
+                                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
+                                    <InfoField label="Proveedor" value={repair.external_provider} />
+                                    <InfoField label="Paquetería" value={repair.shipping_carrier_to} />
+                                    <InfoField label="Guía" value={repair.tracking_number_to} mono />
+                                    <InfoField label="Enviado" value={repair.sent_to_provider_date ? new Date(repair.sent_to_provider_date).toLocaleDateString('es-MX') : null} />
+                                    <InfoField label="Recibido" value={repair.provider_received_date ? new Date(repair.provider_received_date).toLocaleDateString('es-MX') : null} />
+                                </div>
+                                {(() => {
+                                    const ws = workshops.find(w => w.name.toLowerCase() === (repair.external_provider || '').toLowerCase());
+                                    const phone = ws?.contact_phone;
+                                    const email = ws?.contact_email;
+                                    const hasPhotos = shippingPhotos.length > 0;
+                                    if (!repair.external_provider && !hasPhotos) return null;
+                                    return (
+                                        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {phone && (
+                                                    <a href={`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                                                        `Hola ${repair.external_provider}, le informamos que su guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible. Folio: ${repair.id.slice(0,8).toUpperCase()}.${repair.shipping_carrier_to ? ` Paquetería: ${repair.shipping_carrier_to}.` : ''}${repair.tracking_number_to ? ` No. Guía: ${repair.tracking_number_to}.` : ''}`
+                                                    )}`} target="_blank" rel="noreferrer"
+                                                        className="flex items-center gap-1 rounded-lg bg-green-100 px-2.5 py-1 text-[11px] font-bold text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400">
+                                                        <span className="material-symbols-outlined text-[13px]">chat</span>
+                                                        WhatsApp Taller ({phone})
+                                                    </a>
+                                                )}
+                                                {email && (
+                                                    <a href={`mailto:${email}?subject=${encodeURIComponent(`Guía de paquetería - ${repair.external_equipment_name || repair.equipment?.name || ''}`)}&body=${encodeURIComponent(
+                                                        `Hola ${repair.external_provider},\n\nLe informamos que la guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible.\n\nFolio: ${repair.id.slice(0,8).toUpperCase()}\nPaquetería: ${repair.shipping_carrier_to || 'N/A'}\nNo. Guía: ${repair.tracking_number_to || 'N/A'}\n\nNúcleo de Ingeniería`
+                                                    )}`}
+                                                        className="flex items-center gap-1 rounded-lg bg-sky-100 px-2.5 py-1 text-[11px] font-bold text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400">
+                                                        <span className="material-symbols-outlined text-[13px]">mail</span>
+                                                        Correo Taller
+                                                    </a>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setTab('photos')}
+                                                className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline">
+                                                <span className="material-symbols-outlined text-[14px]">local_shipping</span>
+                                                {hasPhotos ? `Ver Fotos de Guía (${shippingPhotos.length})` : 'Subir Fotos de Guía'} →
+                                            </button>
+                                        </div>
+                                    );
+                                })()}
+                            </>
                         )}
                     </div>
 
@@ -671,77 +816,6 @@ Núcleo de Ingeniería`
                             </div>
                         )}
                     </div>
-
-                    {/* Guía de Paquetería */}
-                    <div className={sectionClass}>
-                        <h4 className="text-sm font-bold text-sky-700 dark:text-sky-400 mb-1 flex items-center gap-2">
-                            <span className="material-symbols-outlined text-sky-600 text-[18px]">local_shipping</span>
-                            Guía de Paquetería
-                            {shippingPhotos.length > 0 && <span className="ml-auto rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:bg-sky-900/30">{shippingPhotos.length} foto{shippingPhotos.length !== 1 ? 's' : ''}</span>}
-                        </h4>
-                        <p className="text-[10px] text-slate-400 mb-3">PaqueteExpress, Tres Guerras, DHL, etc. Al subir, se notificará al taller.</p>
-                        {shippingPhotos.length > 0 && (
-                            <div className="mb-3">
-                                <PhotoGallery photos={shippingPhotos} />
-                            </div>
-                        )}
-                        {/* Info del taller para notificación */}
-                        {repair.external_provider && (
-                            <div className="mb-3 rounded-lg border border-sky-200 bg-sky-50/60 p-3 dark:border-sky-800/40 dark:bg-sky-900/10">
-                                <p className="text-[10px] font-bold uppercase text-sky-600 mb-1">Notificar al Taller: {repair.external_provider}</p>
-                                <div className="flex flex-wrap gap-2">
-                                    {(() => {
-                                        const ws = workshops.find(w => w.name === repair.external_provider);
-                                        return (<>
-                                            {ws?.contact_phone && (
-                                                <a href={`https://wa.me/${ws.contact_phone.replace(/\D/g, '')}?text=${encodeURIComponent(
-                                                    `Hola ${repair.external_provider}, le informamos que su guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible. Folio de reparación: ${repair.id.slice(0,8).toUpperCase()}.`
-                                                )}`} target="_blank" rel="noreferrer"
-                                                    className="flex items-center gap-1 rounded-lg bg-green-100 px-3 py-1.5 text-[11px] font-bold text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400">
-                                                    <span className="material-symbols-outlined text-[14px]">chat</span>
-                                                    WhatsApp Taller
-                                                </a>
-                                            )}
-                                            {ws?.contact_email && (
-                                                <a href={`mailto:${ws.contact_email}?subject=${encodeURIComponent(`Guía de paquetería - ${repair.external_equipment_name || repair.equipment?.name || ''}`)}&body=${encodeURIComponent(
-                                                    `Hola ${repair.external_provider},\n\nLe informamos que la guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible.\n\nFolio: ${repair.id.slice(0,8).toUpperCase()}\nPaquetería: ${repair.shipping_carrier_to || ''}\nNo. Guía: ${repair.tracking_number_to || ''}\n\nNúcleo de Ingeniería`
-                                                )}`}
-                                                    className="flex items-center gap-1 rounded-lg bg-sky-100 px-3 py-1.5 text-[11px] font-bold text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400">
-                                                    <span className="material-symbols-outlined text-[14px]">mail</span>
-                                                    Correo Taller
-                                                </a>
-                                            )}
-                                            {!ws?.contact_phone && !ws?.contact_email && (
-                                                <p className="text-[10px] text-slate-400 italic">Agrega teléfono/correo al taller desde la lista de talleres para notificar.</p>
-                                            )}
-                                        </>);
-                                    })()}
-                                </div>
-                            </div>
-                        )}
-                        <div className={shippingPhotos.length > 0 ? 'border-t border-slate-200/60 pt-3 dark:border-slate-700/60' : ''}>
-                            <PhotoUploader
-                                photos={shippingPhotos}
-                                onPhotosChange={async (photos) => {
-                                    setShippingPhotos(photos);
-                                    await supabase.from('equipment_repairs').update({ shipping_guide_photos: photos }).eq('id', repair.id);
-                                    // Si hay taller con teléfono, abrir WA automáticamente al subir la primera foto
-                                    if (photos.length === 1) {
-                                        const ws = workshops.find(w => w.name === repair.external_provider);
-                                        if (ws?.contact_phone) {
-                                            const msg = encodeURIComponent(
-                                                `Hola ${repair.external_provider}, le informamos que su guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible. Paquetería: ${repair.shipping_carrier_to || 'N/A'}, No. Guía: ${repair.tracking_number_to || 'N/A'}.`
-                                            );
-                                            window.open(`https://wa.me/${ws.contact_phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
-                                        }
-                                    }
-                                }}
-                                folder={`repairs/shipping/${id}`}
-                                uploaderName="Paquetería"
-                                compact
-                            />
-                        </div>
-                    </div>
                 </div>
             )}
 
@@ -852,6 +926,147 @@ Núcleo de Ingeniería`
                                 }}
                                 folder={`repairs/before/${id}`}
                                 uploaderName="RecepciÃ³n"
+                                compact
+                            />
+                        </div>
+                    </div>
+
+                    {/* Guía de Paquetería */}
+                    <div className={sectionClass}>
+                        <h4 className="text-sm font-bold text-sky-700 dark:text-sky-400 mb-1 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-sky-600 text-[18px]">local_shipping</span>
+                            Guía de Paquetería
+                            {shippingPhotos.length > 0 && <span className="ml-auto rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold text-sky-600 dark:bg-sky-900/30">{shippingPhotos.length} foto{shippingPhotos.length !== 1 ? 's' : ''}</span>}
+                        </h4>
+                        <p className="text-[10px] text-slate-400 mb-3">Paquetexpress, Tres Guerras, Castores, etc. Al subir foto se notifica al taller.</p>
+                        
+                        {shippingPhotos.length > 0 && (
+                            <div className="mb-3">
+                                <PhotoGallery photos={shippingPhotos} />
+                            </div>
+                        )}
+
+                        {/* Info del taller para notificación y configuración de teléfono/correo */}
+                        {repair.external_provider ? (
+                            <div className="mb-3 rounded-lg border border-sky-200 bg-sky-50/70 p-3 dark:border-sky-800/40 dark:bg-sky-900/10">
+                                {(() => {
+                                    const ws = workshops.find(w => w.name.toLowerCase() === (repair.external_provider || '').toLowerCase());
+                                    const phone = ws?.contact_phone;
+                                    const email = ws?.contact_email;
+                                    const hasContact = phone || email;
+
+                                    if (editingWorkshopContact || !hasContact) {
+                                        return (
+                                            <div className="space-y-2">
+                                                <p className="text-[10px] font-bold uppercase text-sky-700 dark:text-sky-300 flex items-center justify-between">
+                                                    <span>{hasContact ? 'Editar Contacto del Taller' : 'Registrar Contacto del Taller'}: {repair.external_provider}</span>
+                                                    {hasContact && (
+                                                        <button type="button" onClick={() => setEditingWorkshopContact(false)} className="text-[10px] text-slate-400 underline">
+                                                            Cancelar
+                                                        </button>
+                                                    )}
+                                                </p>
+                                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                                    <div>
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Teléfono / WhatsApp</label>
+                                                        <input
+                                                            value={wsPhoneInput}
+                                                            onChange={e => setWsPhoneInput(e.target.value)}
+                                                            placeholder="Ej. 3411234567"
+                                                            className={inputClass}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Correo Electrónico</label>
+                                                        <input
+                                                            type="email"
+                                                            value={wsEmailInput}
+                                                            onChange={e => setWsEmailInput(e.target.value)}
+                                                            placeholder="taller@ejemplo.com"
+                                                            className={inputClass}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-end pt-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => saveWorkshopContact(repair.external_provider!, wsPhoneInput, wsEmailInput)}
+                                                        className="rounded-lg bg-sky-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-sky-700 shadow-sm">
+                                                        Guardar Datos del Taller
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    }
+
+                                    return (
+                                        <div>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <p className="text-[10px] font-bold uppercase text-sky-700 dark:text-sky-400">
+                                                    Notificar al Taller: <strong className="text-slate-800 dark:text-slate-100">{repair.external_provider}</strong>
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setWsPhoneInput(phone || '');
+                                                        setWsEmailInput(email || '');
+                                                        setEditingWorkshopContact(true);
+                                                    }}
+                                                    className="text-[10px] font-semibold text-sky-600 hover:underline flex items-center gap-0.5">
+                                                    <span className="material-symbols-outlined text-[12px]">edit</span>
+                                                    Editar contacto
+                                                </button>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {phone && (
+                                                    <a href={`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+                                                        `Hola ${repair.external_provider}, le informamos que su guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible. Folio de reparación: ${repair.id.slice(0,8).toUpperCase()}.${repair.shipping_carrier_to ? ` Paquetería: ${repair.shipping_carrier_to}.` : ''}${repair.tracking_number_to ? ` No. Guía: ${repair.tracking_number_to}.` : ''}`
+                                                    )}`} target="_blank" rel="noreferrer"
+                                                        className="flex items-center gap-1 rounded-lg bg-green-100 px-3 py-1.5 text-[11px] font-bold text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400">
+                                                        <span className="material-symbols-outlined text-[14px]">chat</span>
+                                                        WhatsApp ({phone})
+                                                    </a>
+                                                )}
+                                                {email && (
+                                                    <a href={`mailto:${email}?subject=${encodeURIComponent(`Guía de paquetería - ${repair.external_equipment_name || repair.equipment?.name || ''}`)}&body=${encodeURIComponent(
+                                                        `Hola ${repair.external_provider},\n\nLe informamos que la guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible.\n\nFolio: ${repair.id.slice(0,8).toUpperCase()}\nPaquetería: ${repair.shipping_carrier_to || 'N/A'}\nNo. Guía: ${repair.tracking_number_to || 'N/A'}\n\nNúcleo de Ingeniería`
+                                                    )}`}
+                                                        className="flex items-center gap-1 rounded-lg bg-sky-100 px-3 py-1.5 text-[11px] font-bold text-sky-700 hover:bg-sky-200 dark:bg-sky-900/30 dark:text-sky-400">
+                                                        <span className="material-symbols-outlined text-[14px]">mail</span>
+                                                        Enviar Correo
+                                                    </a>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        ) : (
+                            <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60 p-2.5 dark:border-amber-800/40 dark:bg-amber-900/10 text-[11px] text-amber-700 dark:text-amber-400">
+                                ℹ️ Asigna un proveedor/taller en el <strong>Paso 3 (Envío al Proveedor)</strong> para habilitar las notificaciones por WhatsApp y correo.
+                            </div>
+                        )}
+
+                        <div className={shippingPhotos.length > 0 ? 'border-t border-slate-200/60 pt-3 dark:border-slate-700/60' : ''}>
+                            <PhotoUploader
+                                photos={shippingPhotos}
+                                onPhotosChange={async (photos) => {
+                                    const isNewUpload = photos.length > shippingPhotos.length;
+                                    setShippingPhotos(photos);
+                                    await supabase.from('equipment_repairs').update({ shipping_guide_photos: photos }).eq('id', repair.id);
+                                    // Si subió foto y hay taller con teléfono, abrir WhatsApp automáticamente
+                                    if (isNewUpload && repair.external_provider) {
+                                        const ws = workshops.find(w => w.name.toLowerCase() === repair.external_provider?.toLowerCase());
+                                        if (ws?.contact_phone) {
+                                            const msg = encodeURIComponent(
+                                                `Hola ${repair.external_provider}, le informamos que su guía de paquetería para el equipo "${repair.external_equipment_name || repair.equipment?.well_name || repair.equipment?.name || ''}" ya está disponible. Paquetería: ${repair.shipping_carrier_to || 'N/A'}, No. Guía: ${repair.tracking_number_to || 'N/A'}. Folio: ${repair.id.slice(0,8).toUpperCase()}.`
+                                            );
+                                            window.open(`https://wa.me/${ws.contact_phone.replace(/\D/g, '')}?text=${msg}`, '_blank');
+                                        }
+                                    }
+                                }}
+                                folder={`repairs/shipping/${id}`}
+                                uploaderName="Paquetería"
                                 compact
                             />
                         </div>

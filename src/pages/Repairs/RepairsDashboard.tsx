@@ -660,7 +660,16 @@ export default function RepairsDashboard() {
                                     </div>
 
                                     {equipSource === 'warehouse' ? (
-                                        <select value={form.equipment_id} onChange={e => setForm({ ...form, equipment_id: e.target.value })} required className={inputClass}>
+                                        <select value={form.equipment_id} onChange={e => {
+                                                        const eqId = e.target.value;
+                                                        const matchedEq = equipment.find((eq: any) => eq.id === eqId);
+                                                        setForm(prev => ({
+                                                            ...prev,
+                                                            equipment_id: eqId,
+                                                            client_phone: prev.client_phone || matchedEq?.client?.phone || '',
+                                                            client_email: prev.client_email || matchedEq?.client?.email || '',
+                                                        }));
+                                                    }} required className={inputClass}>
                                             <option value="">Seleccionar equipo de bodega...</option>
                                             {['bomba', 'motor', 'soldadora', 'generador', 'compresor', 'pulidora', 'otro'].map(cat => {
                                                 const catEquip = warehouseEquipment.filter(eq => eq.category === cat);
@@ -680,7 +689,16 @@ export default function RepairsDashboard() {
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <input value={form.external_equipment_name} onChange={e => setForm({ ...form, external_equipment_name: e.target.value })} required placeholder="Nombre o descripciÃ³n del equipo del cliente..." className={inputClass} />
                                             <div>
-                                                <input list="clients-ext-list" value={form.client_name_input} onChange={e => setForm({ ...form, client_name_input: e.target.value })} placeholder="Seleccionar o escribir cliente (opcional)..." className={inputClass} />
+                                                <input list="clients-ext-list" value={form.client_name_input} onChange={e => {
+                                                    const cName = e.target.value;
+                                                    const matchedC = clients.find(c => c.company_name?.toLowerCase() === cName.trim().toLowerCase());
+                                                    setForm(prev => ({
+                                                        ...prev,
+                                                        client_name_input: cName,
+                                                        client_phone: matchedC?.phone || prev.client_phone,
+                                                        client_email: matchedC?.email || prev.client_email,
+                                                    }));
+                                                }} placeholder="Seleccionar o escribir cliente (opcional)..." className={inputClass} />
                                                 <datalist id="clients-ext-list">
                                                     {clients.map(c => <option key={c.id} value={c.company_name} />)}
                                                 </datalist>
@@ -738,33 +756,29 @@ export default function RepairsDashboard() {
                                 <div><label className={labelClass}>Reportado por</label><input value={form.reported_by} onChange={e => setForm({ ...form, reported_by: e.target.value })} placeholder="Nombre" className={inputClass} /></div>
                                 <div><label className={labelClass}>Asignado a</label><input value={form.assigned_to} onChange={e => setForm({ ...form, assigned_to: e.target.value })} placeholder="Responsable del seguimiento" className={inputClass} /></div>
 
-                                {/* Contacto del cliente — avisos de recogida (sólo equipo de cliente) */}
-                                {equipSource === 'client' && (
-                                    <>
-                                        <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
-                                            <p className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-[14px]">contact_phone</span>
-                                                Contacto del Cliente — Avisos de Recogida
-                                            </p>
-                                            <p className="text-[11px] text-slate-400 mb-3">
-                                                Se enviará un recordatorio semanal al celular/correo y cada 15 días se preguntará si se va a reparar. Si no recoge antes de la fecha límite, se notificará que el equipo se desechará.
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <label className={labelClass}>Celular del Cliente</label>
-                                            <input value={form.client_phone} onChange={e => setForm({ ...form, client_phone: e.target.value })} placeholder="Ej. 3411234567" className={inputClass} />
-                                        </div>
-                                        <div>
-                                            <label className={labelClass}>Correo del Cliente</label>
-                                            <input type="email" value={form.client_email} onChange={e => setForm({ ...form, client_email: e.target.value })} placeholder="correo@ejemplo.com" className={inputClass} />
-                                        </div>
-                                        <div>
-                                            <label className={labelClass}>Fecha Límite para Recoger</label>
-                                            <input type="date" value={form.pickup_deadline_date} onChange={e => setForm({ ...form, pickup_deadline_date: e.target.value })} className={inputClass} />
-                                            <p className="text-[10px] text-slate-400 mt-1">Si no recoge antes de esta fecha, el equipo se desechará.</p>
-                                        </div>
-                                    </>
-                                )}
+                                {/* Contacto del cliente — avisos de recogida */}
+                                <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[14px]">contact_phone</span>
+                                        Contacto del Cliente — Avisos de Recogida
+                                    </p>
+                                    <p className="text-[11px] text-slate-400 mb-3">
+                                        Se enviará un recordatorio semanal al celular/correo y cada 15 días se preguntará si se va a reparar. Si no recoge antes de la fecha límite, se notificará que el equipo se desechará.
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Celular del Cliente</label>
+                                    <input value={form.client_phone} onChange={e => setForm({ ...form, client_phone: e.target.value })} placeholder="Ej. 3411234567" className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Correo del Cliente</label>
+                                    <input type="email" value={form.client_email} onChange={e => setForm({ ...form, client_email: e.target.value })} placeholder="correo@ejemplo.com" className={inputClass} />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Fecha Límite para Recoger</label>
+                                    <input type="date" value={form.pickup_deadline_date} onChange={e => setForm({ ...form, pickup_deadline_date: e.target.value })} className={inputClass} />
+                                    <p className="text-[10px] text-slate-400 mt-1">Si no recoge antes de esta fecha, el equipo se desechará.</p>
+                                </div>
                             </div>
                             <div className="mt-6 flex justify-end gap-3">
                                 <button type="button" onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400">Cancelar</button>
