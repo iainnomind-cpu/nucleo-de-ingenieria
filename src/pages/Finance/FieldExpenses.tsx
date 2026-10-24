@@ -7,6 +7,8 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell, Legend,
 } from 'recharts';
+import PhotoUploader, { PhotoGallery } from '../../components/PhotoUploader';
+import type { PhotoAttachment } from '../../types/photos';
 
 type ExpenseType = keyof typeof EXPENSE_TYPE_LABELS;
 
@@ -47,6 +49,16 @@ export default function FieldExpenses() {
     const [editingId, setEditingId] = useState<string | null>(null);
     const [form, setForm] = useState(defaultForm);
     const [advanceForm, setAdvanceForm] = useState(defaultAdvanceForm);
+    const [expensePhotos, setExpensePhotos] = useState<PhotoAttachment[]>([]);
+    const [selectedEmployee, setSelectedEmployee] = useState<string | null>(null);
+    const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    });
+    const [reportMonth, setReportMonth] = useState<string>(() => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    });
 
     const getWeekRange = useCallback((offset: number) => {
         const now = new Date();
@@ -80,7 +92,7 @@ export default function FieldExpenses() {
                 .gte('date', startStr)
                 .lte('date', endStr)
                 .order('date', { ascending: false }),
-            supabase.from('field_expenses').select('employee_name, amount'),
+            supabase.from('field_expenses').select('*, project:projects(project_number, title)').order('expense_date', { ascending: false }),
             supabase.from('field_advances').select('employee_name, amount, date'),
             supabase.from('projects').select('id, project_number, title').order('project_number', { ascending: false }),
             supabase.from('field_weekly_budgets').select('*').eq('week_start', startStr).maybeSingle(),
@@ -111,7 +123,8 @@ export default function FieldExpenses() {
             payment_method: form.payment_method,
             folio_fiscal: form.folio_fiscal || null,
             notes: form.description || null,
-            receipt_url: form.receipt_url || null,
+            receipt_url: expensePhotos.length > 0 ? expensePhotos[0].url : (form.receipt_url || null),
+            photos: expensePhotos.length > 0 ? JSON.parse(JSON.stringify(expensePhotos)) : null,
         };
         try {
             if (editingId) {
@@ -124,6 +137,7 @@ export default function FieldExpenses() {
             setShowForm(false);
             setEditingId(null);
             setForm(defaultForm);
+            setExpensePhotos([]);
             fetchExpenses();
         } catch (error: any) {
             alert('Error al guardar el viático: ' + error.message);
@@ -244,6 +258,132 @@ export default function FieldExpenses() {
         }));
 
 
+    const handleDownloadMonthReport = () => {
+        const [yr, mo] = reportMonth.split('-').map(Number);
+        const monthExpenses = allTimeExpenses.filter(e => {
+            const d = new Date((e.expense_date || '') + 'T12:00:00');
+            return d.getFullYear() === yr && d.getMonth() + 1 === mo;
+        });
+        const monthAdvances = allTimeAdvances.filter(a => {
+            const d = new Date((a.date || '') + 'T12:00:00');
+            return d.getFullYear() === yr && d.getMonth() + 1 === mo;
+        });
+        const total = monthExpenses.reduce((s, e) => s + Number(e.amount), 0);
+        const totalAdvances = monthAdvances.reduce((s, a) => s + Number(a.amount), 0);
+        const monthName = new Date(yr, mo - 1, 1).toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+
+        const rows = monthExpenses.map(e => `
+            <tr>
+                <td>${(e.expense_date || '').split('-').reverse().join('/')}</td>
+                <td>${e.employee_name || ''}</td>
+                <td><strong>${EXPENSE_TYPE_LABELS[e.expense_type] || e.expense_type}</strong><br/><small>${e.notes || e.area_destination || ''}</small></td>
+                <td>${e.payment_method === 'transfer' ? 'Transferencia' : e.payment_method === 'card' ? 'Tarjeta' : 'Efectivo'}</td>
+                <td style="text-align:right;font-weight:700">$${Number(e.amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+            </tr>`).join('');
+
+        const advRows = monthAdvances.map(a => `
+            <tr>
+                <td>${(a.date || '').split('-').reverse().join('/')}</td>
+                <td>${a.employee_name || ''}</td>
+                <td colspan="2">${a.notes || 'Asignación de viáticos'}</td>
+                <td style="text-align:right;font-weight:700;color:#3b82f6">$${Number(a.amount).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+            </tr>`).join('');
+
+        const pw = window.open('', '_blank');
+        if (!pw) { alert('Permite ventanas emergentes para generar el reporte.'); return; }
+        pw.document.write(`<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Reporte de Viáticos — ${monthName}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; color: #1e293b; background: #fff; padding: 32px; }
+  .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #f97316; padding-bottom: 16px; margin-bottom: 24px; }
+  .logo-area { display: flex; align-items: center; gap: 12px; }
+  .logo-area img { height: 60px; }
+  .company-name { font-size: 22px; font-weight: 900; color: #1e293b; }
+  .company-sub { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .report-title { text-align: right; }
+  .report-title h1 { font-size: 18px; font-weight: 800; color: #f97316; }
+  .report-title p { font-size: 12px; color: #64748b; margin-top: 4px; }
+  h2 { font-size: 14px; font-weight: 700; color: #475569; margin: 20px 0 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th { background: #f8fafc; border-bottom: 2px solid #e2e8f0; padding: 8px 10px; text-align: left; font-weight: 700; color: #64748b; text-transform: uppercase; font-size: 10px; }
+  tbody td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  tbody tr:hover { background: #fafafa; }
+  .total-row td { font-weight: 900; font-size: 13px; background: #fff7ed; border-top: 2px solid #f97316; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 20px 0; }
+  .summary-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; text-align: center; }
+  .summary-card .label { font-size: 10px; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 6px; }
+  .summary-card .value { font-size: 20px; font-weight: 900; }
+  .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; text-align: center; }
+  @media print { body { padding: 16px; } }
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="logo-area">
+    <img src="https://nucleo-de-ingenieria.vercel.app/logo.png" alt="Logo" onerror="this.style.display='none'" />
+    <div>
+      <div class="company-name">Núcleo de Ingeniería</div>
+      <div class="company-sub">Soluciones Técnicas Integrales</div>
+    </div>
+  </div>
+  <div class="report-title">
+    <h1>Reporte de Viáticos</h1>
+    <p>${monthName}</p>
+    <p style="margin-top:2px;font-size:10px;color:#94a3b8">Generado: ${new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+  </div>
+</div>
+
+<div class="summary">
+  <div class="summary-card">
+    <div class="label">Total Asignado</div>
+    <div class="value" style="color:#3b82f6">$${totalAdvances.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">Total Comprobado</div>
+    <div class="value" style="color:#f97316">$${total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+  </div>
+  <div class="summary-card">
+    <div class="label">Diferencia</div>
+    <div class="value" style="color:${totalAdvances - total >= 0 ? '#10b981' : '#ef4444'}">$${Math.abs(totalAdvances - total).toLocaleString('es-MX', { minimumFractionDigits: 2 })}</div>
+  </div>
+</div>
+
+<h2>Gastos Comprobados</h2>
+<table>
+<thead><tr><th>Fecha</th><th>Empleado</th><th>Concepto</th><th>Forma de Pago</th><th style="text-align:right">Monto</th></tr></thead>
+<tbody>
+${rows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Sin gastos registrados en este mes.</td></tr>'}
+<tr class="total-row">
+  <td colspan="4">TOTAL COMPROBADO</td>
+  <td style="text-align:right">$${total.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+</tr>
+</tbody>
+</table>
+
+<h2 style="margin-top:24px">Asignaciones a Empleados</h2>
+<table>
+<thead><tr><th>Fecha</th><th>Empleado</th><th colspan="2">Notas</th><th style="text-align:right">Monto</th></tr></thead>
+<tbody>
+${advRows || '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:20px">Sin asignaciones en este mes.</td></tr>'}
+<tr class="total-row" style="color:#3b82f6">
+  <td colspan="4">TOTAL ASIGNADO</td>
+  <td style="text-align:right">$${totalAdvances.toLocaleString('es-MX', { minimumFractionDigits: 2 })}</td>
+</tr>
+</tbody>
+</table>
+
+<div class="footer">Núcleo de Ingeniería — Reporte generado por el sistema de gestión interno.</div>
+</body>
+</html>`);
+        pw.document.close();
+        pw.focus();
+        setTimeout(() => pw.print(), 600);
+    };
+
     const inputClass = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white';
     const labelClass = 'block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1';
 
@@ -276,7 +416,19 @@ export default function FieldExpenses() {
                     <button onClick={() => setShowAdvanceForm(true)} className="flex items-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-600 hover:bg-orange-100 transition-colors dark:border-orange-500/20 dark:bg-orange-500/10 dark:text-orange-400">
                         <span className="material-symbols-outlined text-[18px]">payments</span>Asignar a Empleado
                     </button>
-                    <button onClick={() => { setEditingId(null); setForm(defaultForm); setShowForm(true); }} className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors">
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <span className="material-symbols-outlined text-slate-400 text-[18px]">calendar_month</span>
+                        <input
+                            type="month"
+                            value={reportMonth}
+                            onChange={e => setReportMonth(e.target.value)}
+                            className="text-sm text-slate-700 outline-none bg-transparent dark:text-slate-300"
+                        />
+                    </div>
+                    <button onClick={handleDownloadMonthReport} className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 transition-colors dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-400">
+                        <span className="material-symbols-outlined text-[18px]">download</span>Reporte Mensual
+                    </button>
+                    <button onClick={() => { setEditingId(null); setForm(defaultForm); setExpensePhotos([]); setShowForm(true); }} className="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-orange-600 transition-colors">
                         <span className="material-symbols-outlined text-[18px]">add</span>Registrar Gasto
                     </button>
                     <div className="flex items-center gap-2 rounded-lg bg-white p-1 shadow-sm border border-slate-200 dark:border-slate-700 dark:bg-slate-800">
@@ -453,8 +605,11 @@ export default function FieldExpenses() {
                             <div className="p-8 text-center text-sm text-slate-500">No hay registros para calcular.</div>
                         ) : (
                             Object.entries(empBalances).sort((a, b) => b[1].balance - a[1].balance).map(([emp, data]) => (
-                                <div key={emp} className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <div className="font-bold text-slate-800 dark:text-slate-200 mb-2">{emp}</div>
+                                <div key={emp} onClick={() => setSelectedEmployee(selectedEmployee === emp ? null : emp)} className={`p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors ${selectedEmployee === emp ? 'bg-orange-50 dark:bg-orange-900/10 border-l-2 border-orange-500' : ''}`}>
+                                    <div className="font-bold text-slate-800 dark:text-slate-200 mb-2 flex items-center justify-between">
+                                        <span>{emp}</span>
+                                        <span className="text-[10px] text-slate-400">{selectedEmployee === emp ? '▲ Ocultar' : '▼ Ver detalle'}</span>
+                                    </div>
                                     <div className="grid grid-cols-2 gap-2 text-xs">
                                         <div className="bg-slate-50 dark:bg-slate-800 rounded p-2">
                                             <span className="block text-slate-400 mb-1">Total Asignado</span>
@@ -476,6 +631,77 @@ export default function FieldExpenses() {
                         )}
                     </div>
                 </div>
+
+                {/* Employee Detail Panel */}
+                {selectedEmployee && (
+                    <div className="lg:col-span-2 rounded-xl border border-orange-200 bg-white overflow-hidden shadow-sm dark:border-orange-800/30 dark:bg-slate-900">
+                        <div className="border-b border-orange-100 bg-orange-50/50 p-4 dark:border-orange-800/30 dark:bg-orange-900/10 flex items-center justify-between">
+                            <div>
+                                <h3 className="font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-orange-500">person</span>
+                                    Detalle de Gastos: {selectedEmployee}
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Gastos comprobados del empleado por mes</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <input
+                                    type="month"
+                                    value={selectedMonth}
+                                    onChange={e => setSelectedMonth(e.target.value)}
+                                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm outline-none focus:border-orange-500 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                                />
+                                <button onClick={() => setSelectedEmployee(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 text-xs uppercase text-slate-500 dark:bg-slate-800/50">
+                                    <tr>
+                                        <th className="px-4 py-3">Fecha</th>
+                                        <th className="px-4 py-3">Concepto</th>
+                                        <th className="px-4 py-3">Proyecto / Área</th>
+                                        <th className="px-4 py-3">Forma Pago</th>
+                                        <th className="px-4 py-3 text-right">Monto</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                    {(() => {
+                                        const empMonthExpenses = allTimeExpenses.filter(e =>
+                                            e.employee_name === selectedEmployee &&
+                                            (e.expense_date || '').startsWith(selectedMonth)
+                                        );
+                                        const empTotal = empMonthExpenses.reduce((s, e) => s + Number(e.amount), 0);
+                                        if (empMonthExpenses.length === 0) return (
+                                            <tr><td colSpan={5} className="p-8 text-center text-slate-400">Sin gastos registrados en este mes.</td></tr>
+                                        );
+                                        return (<>
+                                            {empMonthExpenses.map(e => (
+                                                <tr key={e.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50">
+                                                    <td className="px-4 py-3 whitespace-nowrap text-slate-600">{(e.expense_date || '').split('-').reverse().join('/')}</td>
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-semibold text-orange-600">{EXPENSE_TYPE_LABELS[e.expense_type] || e.expense_type}</span>
+                                                            <span className="text-xs text-slate-500">{e.notes || '—'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-xs text-slate-500">{(e as any).project?.title || e.area_destination || '—'}</td>
+                                                    <td className="px-4 py-3 text-xs text-slate-500 capitalize">{e.payment_method === 'transfer' ? 'Transferencia' : e.payment_method === 'card' ? 'Tarjeta' : e.payment_method === 'cash' ? 'Efectivo' : e.payment_method || '—'}</td>
+                                                    <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">{formatCurrencyMXN(e.amount)}</td>
+                                                </tr>
+                                            ))}
+                                            <tr className="bg-orange-50 dark:bg-orange-900/10">
+                                                <td colSpan={4} className="px-4 py-3 font-bold text-slate-700 dark:text-slate-300 text-right uppercase text-xs">Total del Mes</td>
+                                                <td className="px-4 py-3 text-right font-black text-orange-600">{formatCurrencyMXN(empTotal)}</td>
+                                            </tr>
+                                        </>);
+                                    })()}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
 
                 {/* Main Tables */}
                 <div className="lg:col-span-2 space-y-6">
@@ -547,6 +773,11 @@ export default function FieldExpenses() {
                                                 <div className="flex flex-col">
                                                     <span className="text-xs font-semibold text-orange-600">{EXPENSE_TYPE_LABELS[e.expense_type] || e.expense_type}</span>
                                                     <span className="text-xs text-slate-500">{e.notes || e.area_destination || '—'}</span>
+                                                    {(e as any).photos && Array.isArray((e as any).photos) && (e as any).photos.length > 0 && (
+                                                        <div className="mt-1">
+                                                            <PhotoGallery photos={(e as any).photos} />
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-right font-bold text-slate-900 dark:text-white">{formatCurrencyMXN(e.amount)}</td>
@@ -623,7 +854,17 @@ export default function FieldExpenses() {
                                 <div><label className={labelClass}>Área (Si no es proyecto)</label><input disabled={!!form.project_id} value={form.area_destination} onChange={e => setForm({ ...form, area_destination: e.target.value })} className={`${inputClass} ${!!form.project_id ? 'opacity-50' : ''}`} placeholder="Ej. Oficina, Bodega" /></div>
                                 <div className="col-span-2"><label className={labelClass}>Concepto / Descripción</label><input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className={inputClass} placeholder="Detalles del gasto..." /></div>
                                 <div><label className={labelClass}>Folio Fiscal / Factura</label><input value={form.folio_fiscal} onChange={e => setForm({ ...form, folio_fiscal: e.target.value })} className={inputClass} placeholder="Opcional" /></div>
-                                <div><label className={labelClass}>URL Ticket / Recibo</label><input type="url" value={form.receipt_url} onChange={e => setForm({ ...form, receipt_url: e.target.value })} className={inputClass} placeholder="Enlace a la foto del ticket" /></div>
+                                <div className="col-span-2">
+                                    <label className={labelClass}>Evidencia Fotográfica (Ticket / Recibo)</label>
+                                    <PhotoUploader
+                                        photos={expensePhotos}
+                                        onPhotosChange={setExpensePhotos}
+                                        folder={`finanzas/viaticos/${editingId || 'nuevo'}`}
+                                        uploaderName="Evidencia"
+                                        compact
+                                        maxFiles={5}
+                                    />
+                                </div>
                             </div>
                             <div className="pt-4 flex justify-end gap-3">
                                 <button type="button" onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700">Cancelar</button>
