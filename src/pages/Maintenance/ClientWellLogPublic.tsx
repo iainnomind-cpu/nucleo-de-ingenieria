@@ -164,16 +164,23 @@ export default function ClientWellLogPublic() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50/30 to-white">
             {/* Header */}
-            <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-lg sticky top-0 z-10">
-                <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
+            <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-lg sticky top-0 z-10 shadow-sm">
+                <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 shadow-lg shadow-sky-200">
-                            <span className="material-symbols-outlined text-white text-[22px]">water_drop</span>
+                        <img src="/logo.png" alt="Núcleo de Ingeniería" className="h-11 w-11 object-contain" />
+                        <div className="border-l border-slate-200 pl-3">
+                            <h1 className="text-xs sm:text-sm font-extrabold text-sky-800 tracking-wide uppercase">
+                                NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA
+                            </h1>
+                            <p className="text-[9px] sm:text-[10px] text-slate-500 line-clamp-1 max-w-xl hidden md:block">
+                                Equipamiento y rehabilitación de pozos profundos, instalaciones eléctricas en media tensión y baja tensión, mantenimiento hidráulico y eléctrico, asesoría de proyectos hidráulicos y eléctricos, aforos, videograbación de pozos, reparación de equipos de bombeo y variadores, maniobras.
+                            </p>
+                            <p className="text-[10px] text-sky-600 font-semibold md:hidden">Portal de Bitácora del Pozo</p>
                         </div>
-                        <div>
-                            <h1 className="text-sm font-bold text-slate-900">Núcleo de Ingeniería</h1>
-                            <p className="text-[11px] text-slate-400">Portal del Cliente</p>
-                        </div>
+                    </div>
+                    <div className="text-right">
+                        <h2 className="text-xs sm:text-sm font-bold text-slate-900">{equip.client?.company_name || equip.name}</h2>
+                        <p className="text-[10px] sm:text-[11px] text-slate-400">Bitácora Oficial</p>
                     </div>
                 </div>
             </header>

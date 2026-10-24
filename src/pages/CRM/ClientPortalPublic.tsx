@@ -9,6 +9,111 @@ import {
 
 type PortalTab = 'equipos' | 'videos' | 'arranque' | 'instalaciones' | 'desinstalaciones' | 'cuadros' | 'aforos';
 
+const COMPANY_SERVICES_TEXT = 'Equipamiento y rehabilitación de pozos profundos, instalaciones eléctricas en media tensión y baja tensión, mantenimiento hidráulico y eléctrico, asesoría de proyectos hidráulicos y eléctricos, aforos, videograbación de pozos, reparación de equipos de bombeo y variadores, maniobras.';
+
+interface ClientFormatHeaderProps {
+    title: string;
+    folio?: string | null;
+    date?: string | null;
+    clientName?: string | null;
+    location?: string | null;
+    technician?: string | null;
+    equipment?: string | null;
+    onPrint?: () => void;
+}
+
+function ClientFormatHeader({
+    title,
+    folio,
+    date,
+    clientName,
+    location,
+    technician,
+    equipment,
+    onPrint,
+}: ClientFormatHeaderProps) {
+    return (
+        <div className="mb-5 pb-2">
+            {/* Encabezado: Logo + Empresa + Servicios */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 sm:gap-4">
+                    <img
+                        src="/logo.png"
+                        alt="Núcleo de Ingeniería"
+                        className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0"
+                    />
+                    <div>
+                        <h2 className="text-xs sm:text-sm md:text-base font-extrabold uppercase tracking-wide text-sky-800">
+                            NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA
+                        </h2>
+                        <p className="text-[8.5px] sm:text-[10px] text-slate-500 leading-tight max-w-2xl mt-0.5">
+                            {COMPANY_SERVICES_TEXT}
+                        </p>
+                    </div>
+                </div>
+
+                {/* Formato y Folio */}
+                <div className="flex md:flex-col items-end justify-between md:justify-center gap-1.5 border-t md:border-t-0 pt-2 md:pt-0 border-slate-100">
+                    <div className="text-right">
+                        <span className="text-xs sm:text-sm font-bold text-slate-800 uppercase tracking-wide block">
+                            {title}
+                        </span>
+                        {folio && (
+                            <span className="inline-block mt-0.5 text-xs font-mono font-bold text-sky-700 bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-200">
+                                {folio.startsWith('Folio:') ? folio : `Folio: ${folio}`}
+                            </span>
+                        )}
+                    </div>
+                    {onPrint && (
+                        <button
+                            type="button"
+                            onClick={onPrint}
+                            className="flex items-center gap-1 text-[11px] font-semibold text-slate-600 hover:text-sky-700 bg-slate-100 hover:bg-sky-50 px-2.5 py-1 rounded-md border border-slate-200 transition-colors">
+                            <span className="material-symbols-outlined text-[14px]">print</span>
+                            Imprimir / PDF
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Línea divisoria azul oficial */}
+            <div className="h-[2.5px] w-full bg-sky-600 my-3 rounded-full" />
+
+            {/* Fila de Metadatos: FECHA, CLIENTE, LUGAR / POZO, TÉCNICO */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 bg-slate-50/90 p-3 rounded-lg border border-slate-200/80 text-xs">
+                <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">FECHA</span>
+                    <span className="font-semibold text-slate-800 text-xs sm:text-sm">
+                        {date || '—'}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">CLIENTE</span>
+                    <span className="font-semibold text-slate-800 text-xs sm:text-sm truncate block" title={clientName || ''}>
+                        {clientName || '—'}
+                    </span>
+                </div>
+                <div>
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">LUGAR / POZO</span>
+                    <span className="font-semibold text-slate-800 text-xs sm:text-sm truncate block" title={location || ''}>
+                        {location || '—'}
+                    </span>
+                </div>
+                {(technician || equipment) && (
+                    <div>
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
+                            {technician ? 'TÉCNICO' : 'EQUIPO'}
+                        </span>
+                        <span className="font-semibold text-slate-800 text-xs sm:text-sm truncate block">
+                            {technician || equipment}
+                        </span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function ClientPortalPublic() {
     const { clientId } = useParams<{ clientId: string }>();
     
@@ -72,6 +177,243 @@ export default function ClientPortalPublic() {
     }, [clientId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
+    const openPrintWindow = (title: string, folio: string, date: string, loc: string, bodyContent: string) => {
+        const pw = window.open('', '_blank');
+        if (!pw) return;
+        pw.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${title} ${folio || ''}</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 10px; color: #111; padding: 20px; }
+  .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #0066cc; padding-bottom: 10px; margin-bottom: 14px; }
+  .company { font-weight: bold; font-size: 13px; color: #0066cc; }
+  .services { font-size: 7.5px; color: #555; max-width: 340px; line-height: 1.25; margin-top: 2px; }
+  .folio { font-size: 16px; font-weight: bold; color: #0066cc; }
+  .meta-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; padding: 8px; background: #f8fafc; border: 1px solid #e2e8f0; }
+  .meta-field { font-size: 10px; }
+  .meta-label { font-weight: bold; font-size: 8.5px; color: #64748b; text-transform: uppercase; }
+  .section-title { font-size: 11px; font-weight: bold; background: #e2e8f0; padding: 4px 8px; margin: 12px 0 6px; text-transform: uppercase; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .field { border-bottom: 1px solid #e2e8f0; padding: 4px 0; }
+  .field-label { font-size: 8.5px; color: #64748b; font-weight: bold; text-transform: uppercase; }
+  .field-value { font-size: 10px; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-size: 9px; margin-top: 6px; }
+  th, td { border: 1px solid #cbd5e1; padding: 5px; text-align: center; }
+  th { background: #f1f5f9; font-weight: bold; }
+  .obs { background: #fffbeb; border: 1px solid #fef3c7; padding: 8px; border-radius: 4px; margin-top: 10px; font-size: 9.5px; }
+  .photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .photos img { width: 110px; height: 80px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; }
+  .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center; margin-top: 35px; }
+  .sig-line { border-top: 1px solid #000; padding-top: 4px; font-size: 9px; font-weight: bold; }
+  @media print { body { padding: 15px; } }
+</style>
+</head><body>
+  <div class="header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="${window.location.origin}/logo.png" style="height:48px;" />
+      <div>
+        <div class="company">NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA</div>
+        <div class="services">${COMPANY_SERVICES_TEXT}</div>
+      </div>
+    </div>
+    <div style="text-align:right">
+      <div class="folio">${folio || ''}</div>
+      <div style="font-size:10px;color:#333;font-weight:bold;">${title}</div>
+      <div style="font-size:11px;font-weight:bold;color:#1e293b;">${client?.company_name || ''}</div>
+      <div style="font-size:10px;color:#64748b;">${date || ''}</div>
+    </div>
+  </div>
+  <div class="meta-grid">
+    <div class="meta-field"><div class="meta-label">FECHA</div><div>${date || '—'}</div></div>
+    <div class="meta-field"><div class="meta-label">CLIENTE</div><div>${client?.company_name || '—'}</div></div>
+    <div class="meta-field"><div class="meta-label">LUGAR / POZO</div><div>${loc || '—'}</div></div>
+  </div>
+  ${bodyContent}
+</body></html>`);
+        pw.document.close();
+        pw.focus();
+        setTimeout(() => pw.print(), 500);
+    };
+
+    const handlePrintStartup = (s: any) => {
+        let measurementsHtml = '';
+        const rows = [
+            { h: s.time_logged, v1: s.volts_l1, v2: s.volts_l2, v3: s.volts_l3, a1: s.amp_l1, a2: s.amp_l2, a3: s.amp_l3, q: s.flow_rate, nd: s.dynamic_level, pd: s.discharge_pressure, pv: s.avg_volts, pa: s.avg_amps, d: s.unbalance_percentage },
+            { h: s.time_logged_2, v1: s.volts_l1_2, v2: s.volts_l2_2, v3: s.volts_l3_2, a1: s.amp_l1_2, a2: s.amp_l2_2, a3: s.amp_l3_2, q: s.flow_rate_2, nd: s.dynamic_level_2, pd: s.discharge_pressure_2, pv: s.avg_volts_2, pa: s.avg_amps_2, d: s.unbalance_percentage_2 },
+            { h: s.time_logged_3, v1: s.volts_l1_3, v2: s.volts_l2_3, v3: s.volts_l3_3, a1: s.amp_l1_3, a2: s.amp_l2_3, a3: s.amp_l3_3, q: s.flow_rate_3, nd: s.dynamic_level_3, pd: s.discharge_pressure_3, pv: s.avg_volts_3, pa: s.avg_amps_3, d: s.unbalance_percentage_3 },
+        ].filter(r => r.h);
+
+        if (rows.length > 0) {
+            measurementsHtml = `
+            <div class="section-title">Tabla de Mediciones</div>
+            <table>
+              <thead><tr><th>Hora</th><th>V L1-L2</th><th>V L2-L3</th><th>V L1-L3</th><th>A L1</th><th>A L2</th><th>A L3</th><th>Caudal</th><th>N.D.</th><th>P.D.</th><th>Prom.V</th><th>Prom.A</th><th>% Desb.</th></tr></thead>
+              <tbody>
+                ${rows.map(r => `<tr><td>${r.h}</td><td>${r.v1||'-'}</td><td>${r.v2||'-'}</td><td>${r.v3||'-'}</td><td>${r.a1||'-'}</td><td>${r.a2||'-'}</td><td>${r.a3||'-'}</td><td>${r.q||'-'}</td><td>${r.nd||'-'}</td><td>${r.pd||'-'}</td><td>${r.pv||'-'}</td><td>${r.pa||'-'}</td><td>${r.d||'-'}%</td></tr>`).join('')}
+              </tbody>
+            </table>`;
+        }
+
+        const body = `
+          ${measurementsHtml}
+          <div class="section-title">Parámetros Eléctricos y Datos del Motor</div>
+          <div class="grid-2">
+            <div>
+              <div class="field"><div class="field-label">Bajo Voltaje</div><div class="field-value">${s.low_voltage ? s.low_voltage + ' V' : '-'}</div></div>
+              <div class="field"><div class="field-label">Alto Voltaje</div><div class="field-value">${s.high_voltage ? s.high_voltage + ' V' : '-'}</div></div>
+              <div class="field"><div class="field-label">Sobre Carga</div><div class="field-value">${s.overload_amps ? s.overload_amps + ' A' : '-'}</div></div>
+              <div class="field"><div class="field-label">Baja Carga</div><div class="field-value">${s.underload_amps ? s.underload_amps + ' A' : '-'}</div></div>
+              <div class="field"><div class="field-label">Desbalance de Fases</div><div class="field-value">${s.phase_unbalance ? s.phase_unbalance + ' %' : '-'}</div></div>
+            </div>
+            <div>
+              <div class="field"><div class="field-label">Potencia Motor</div><div class="field-value">${s.motor_power_hp ? s.motor_power_hp + ' HP' : '-'}</div></div>
+              <div class="field"><div class="field-label">Voltaje Alimentación</div><div class="field-value">${s.motor_feed_volts ? s.motor_feed_volts + ' V' : '-'}</div></div>
+              <div class="field"><div class="field-label">Frecuencia</div><div class="field-value">${s.motor_frequency_hz ? s.motor_frequency_hz + ' Hz' : '-'}</div></div>
+              <div class="field"><div class="field-label">Amp. Nominal</div><div class="field-value">${s.motor_nominal_amps ? s.motor_nominal_amps + ' A' : '-'}</div></div>
+              <div class="field"><div class="field-label">Protección</div><div class="field-value">${s.motor_protection || '-'}</div></div>
+            </div>
+          </div>
+          ${s.recommendations ? `<div class="obs"><strong>Observaciones y Recomendaciones:</strong><br/>${s.recommendations.replace(/\n/g, '<br/>')}</div>` : ''}
+          ${s.photos && s.photos.length > 0 ? `<div class="section-title">Fotografías</div><div class="photos">${s.photos.map((p: any) => `<img src="${p.url}"/>`).join('')}</div>` : ''}
+          <div class="signatures">
+            <div><div class="sig-line">RECIBIÓ<br/>${s.received_by || ''}</div></div>
+            <div><div class="sig-line">REVISÓ<br/>${s.reviewed_by || s.technician || 'ING. JOEL RINCÓN'}</div></div>
+            <div><div class="sig-line">AUTORIZÓ<br/>${s.authorized_by || ''}</div></div>
+          </div>
+        `;
+        openPrintWindow('FORMATO DE ARRANQUE', s.folio, s.record_date, s.location, body);
+    };
+
+    const handlePrintInstallation = (i: any) => {
+        const body = `
+          <div class="section-title">Pozo y Tubería</div>
+          <div class="grid-4">
+            <div class="field"><div class="field-label">Diám. Ademe</div><div class="field-value">${i.ademe_diameter || '-'}</div></div>
+            <div class="field"><div class="field-label">Material Ademe</div><div class="field-value">${i.ademe_material || '-'}</div></div>
+            <div class="field"><div class="field-label">Diám. Tubería</div><div class="field-value">${i.pipe_diameter || '-'}</div></div>
+            <div class="field"><div class="field-label">Long. Tubería</div><div class="field-value">${i.pipe_length || '-'}</div></div>
+            <div class="field"><div class="field-label">No. Tramos</div><div class="field-value">${i.pipe_segments || '-'}</div></div>
+            <div class="field"><div class="field-label">Válvula Check</div><div class="field-value">${i.valv_check || '-'}</div></div>
+            <div class="field"><div class="field-label">Calibre Cable</div><div class="field-value">${i.cable_gauge || '-'}</div></div>
+            <div class="field"><div class="field-label">Motor / HP</div><div class="field-value">${i.motor_hp || '-'}</div></div>
+            <div class="field"><div class="field-label">Modelo Bomba</div><div class="field-value">${i.pump_model || '-'}</div></div>
+            <div class="field"><div class="field-label">Sist. Arranque</div><div class="field-value">${i.starter_system || '-'}</div></div>
+            <div class="field"><div class="field-label">Protección</div><div class="field-value">${i.protection_type || '-'}</div></div>
+            <div class="field"><div class="field-label">Tierra Física</div><div class="field-value">${i.has_ground ? 'Sí' : 'No'} ${i.ground_location ? '(' + i.ground_location + ')' : ''}</div></div>
+          </div>
+          <div class="section-title">Niveles y Mediciones</div>
+          <div class="grid-4">
+            <div class="field"><div class="field-label">Nivel Estático</div><div class="field-value">${i.static_level ? i.static_level + ' m' : '-'}</div></div>
+            <div class="field"><div class="field-label">Nivel Dinámico</div><div class="field-value">${i.dynamic_level ? i.dynamic_level + ' m' : '-'}</div></div>
+            <div class="field"><div class="field-label">Gasto</div><div class="field-value">${i.flow_rate ? i.flow_rate + ' lps' : '-'}</div></div>
+            <div class="field"><div class="field-label">Prof. Fondo</div><div class="field-value">${i.bottom_depth ? i.bottom_depth + ' m' : '-'}</div></div>
+          </div>
+          ${i.observations ? `<div class="obs"><strong>Observaciones:</strong><br/>${i.observations.replace(/\n/g, '<br/>')}</div>` : ''}
+          ${i.photos && i.photos.length > 0 ? `<div class="section-title">Fotografías</div><div class="photos">${i.photos.map((p: any) => `<img src="${p.url}"/>`).join('')}</div>` : ''}
+        `;
+        openPrintWindow('MANIOBRA / INSTALACIÓN DE EQUIPO', i.folio, i.installation_date, i.location, body);
+    };
+
+    const handlePrintUninstallation = (u: any) => {
+        const body = `
+          <div class="obs" style="margin-top:0;margin-bottom:12px;"><strong>MOTIVO DE DESINSTALACIÓN:</strong><br/>${u.reason || 'Arena en pozo'}</div>
+          <div class="section-title">Pozo y Tubería</div>
+          <div class="grid-3">
+            <div class="field"><div class="field-label">DIÁMETRO ADEME</div><div class="field-value">${u.ademe_diameter || '-'}</div></div>
+            <div class="field"><div class="field-label">MATERIAL ADEME</div><div class="field-value">${u.ademe_material || 'Acero'}</div></div>
+            <div class="field"><div class="field-label">DIÁMETRO TUBERÍA</div><div class="field-value">${u.pipe_diameter || '-'}</div></div>
+            <div class="field"><div class="field-label">LONG. TUBERÍA</div><div class="field-value">${u.pipe_length || '-'}</div></div>
+            <div class="field"><div class="field-label">NO. TRAMOS</div><div class="field-value">${u.pipe_segments || '-'}</div></div>
+            <div class="field"><div class="field-label">NO. VALV. CHECK</div><div class="field-value">${u.valv_check || '-'}</div></div>
+            <div class="field"><div class="field-label">FONDO (M)</div><div class="field-value">${u.bottom_depth || '-'}</div></div>
+            <div class="field"><div class="field-label">NIVEL ESTÁTICO</div><div class="field-value">${u.static_level ? u.static_level + ' m' : '-'}</div></div>
+            <div class="field"><div class="field-label">NIVEL DINÁMICO</div><div class="field-value">${u.dynamic_level ? u.dynamic_level + ' m' : '-'}</div></div>
+          </div>
+          <div class="section-title">Datos Eléctricos y Motor</div>
+          <div class="grid-3">
+            <div class="field"><div class="field-label">CALIBRE CABLE</div><div class="field-value">${u.cable_gauge || '-'}</div></div>
+            <div class="field"><div class="field-label">MODELO BOMBA</div><div class="field-value">${u.pump_model || '-'}</div></div>
+            <div class="field"><div class="field-label">MOTOR / HP</div><div class="field-value">${u.motor_hp || '-'}</div></div>
+            <div class="field"><div class="field-label">TIPO DE EQUIPO</div><div class="field-value">${u.equipment_type || '-'}</div></div>
+            <div class="field"><div class="field-label">TÉCNICO RESPONSABLE</div><div class="field-value">${u.technician || '-'}</div></div>
+          </div>
+          ${u.observations ? `<div class="obs"><strong>Observaciones:</strong><br/>${u.observations.replace(/\n/g, '<br/>')}</div>` : ''}
+          ${u.photos && u.photos.length > 0 ? `<div class="section-title">Fotografías</div><div class="photos">${u.photos.map((p: any) => `<img src="${p.url}"/>`).join('')}</div>` : ''}
+        `;
+        openPrintWindow('DESINSTALACIÓN DE EQUIPO', u.folio, u.uninstallation_date, u.location, body);
+    };
+
+    const handlePrintPanel = (p: any) => {
+        const body = `
+          <div class="section-title">Transformador</div>
+          <div class="grid-3">
+            <div class="field"><div class="field-label">Capacidad</div><div class="field-value">${p.trans_capacity || '-'}</div></div>
+            <div class="field"><div class="field-label">Marca</div><div class="field-value">${p.trans_brand || '-'}</div></div>
+            <div class="field"><div class="field-label">Voltaje Primario</div><div class="field-value">${p.trans_primary_voltage ? p.trans_primary_voltage + ' V' : '-'}</div></div>
+            <div class="field"><div class="field-label">Voltaje Secundario</div><div class="field-value">${p.trans_secondary_voltage ? p.trans_secondary_voltage + ' V' : '-'}</div></div>
+            <div class="field"><div class="field-label">Fases</div><div class="field-value">${p.trans_phases || '-'}</div></div>
+          </div>
+          <div class="section-title">Arrancador</div>
+          <div class="grid-3">
+            <div class="field"><div class="field-label">Voltaje</div><div class="field-value">${p.arr_voltage ? p.arr_voltage + ' V' : '-'}</div></div>
+            <div class="field"><div class="field-label">Gabinete</div><div class="field-value">${p.arr_cabinet_type || '-'}</div></div>
+            <div class="field"><div class="field-label">Marca</div><div class="field-value">${p.arr_brand || '-'}</div></div>
+            <div class="field"><div class="field-label">Modelo</div><div class="field-value">${p.arr_model || '-'}</div></div>
+            <div class="field"><div class="field-label">HP</div><div class="field-value">${p.arr_hp || '-'}</div></div>
+          </div>
+          <div class="section-title">Motor</div>
+          <div class="grid-3">
+            <div class="field"><div class="field-label">HP</div><div class="field-value">${p.motor_hp || '-'}</div></div>
+            <div class="field"><div class="field-label">Voltaje</div><div class="field-value">${p.motor_voltage ? p.motor_voltage + ' V' : '-'}</div></div>
+            <div class="field"><div class="field-label">Marca</div><div class="field-value">${p.motor_brand || '-'}</div></div>
+            <div class="field"><div class="field-label">Modelo</div><div class="field-value">${p.motor_model || '-'}</div></div>
+            <div class="field"><div class="field-label">Amp. Nominal</div><div class="field-value">${p.motor_nom_amps ? p.motor_nom_amps + ' A' : '-'}</div></div>
+          </div>
+          ${p.observations ? `<div class="obs"><strong>Observaciones:</strong><br/>${p.observations.replace(/\n/g, '<br/>')}</div>` : ''}
+          ${p.photos && p.photos.length > 0 ? `<div class="section-title">Fotografías</div><div class="photos">${p.photos.map((ph: any) => `<img src="${ph.url}"/>`).join('')}</div>` : ''}
+        `;
+        openPrintWindow('CUADRO ELÉCTRICO', p.folio, p.record_date, p.location || p.well_name, body);
+    };
+
+    const handlePrintAforo = (a: any) => {
+        let rowsHtml = '';
+        if (a.measurements && a.measurements.length > 0) {
+            const sorted = [...a.measurements].sort((x: any, y: any) => (x.row_index || 0) - (y.row_index || 0));
+            rowsHtml = `
+            <div class="section-title">Lecturas de Aforo</div>
+            <table>
+              <thead><tr><th>Día</th><th>Hora</th><th>N.D. (m)</th><th>Caudal (LPS)</th></tr></thead>
+              <tbody>
+                ${sorted.map(m => `<tr><td>${m.day_label || '-'}</td><td>${m.hour_label || '-'}</td><td>${m.dynamic_level || '-'}</td><td>${m.flow_lps || '-'}</td></tr>`).join('')}
+              </tbody>
+            </table>`;
+        }
+        const body = `
+          <div class="grid-2">
+            <div class="field"><div class="field-label">Duración Aforo</div><div class="field-value">${a.duration_hours || '-'} Horas</div></div>
+            <div class="field"><div class="field-label">Técnico</div><div class="field-value">${a.technician || '-'}</div></div>
+          </div>
+          ${rowsHtml}
+        `;
+        openPrintWindow(`AFORO DE POZO (${a.duration_hours || ''}H)`, a.folio, a.created_at ? new Date(a.created_at).toLocaleDateString() : '', a.location, body);
+    };
+
+    const handlePrintVideo = (v: any) => {
+        const body = `
+          <div class="section-title">Datos del Pozo</div>
+          <div class="grid-4">
+            <div class="field"><div class="field-label">N. Estático</div><div class="field-value">${v.static_level ? v.static_level + ' m' : '-'}</div></div>
+            <div class="field"><div class="field-label">Prof. Fondo</div><div class="field-value">${v.bottom_depth ? v.bottom_depth + ' m' : '-'}</div></div>
+            <div class="field"><div class="field-label">Material Ademe</div><div class="field-value">${v.ademe_material || '-'}</div></div>
+            <div class="field"><div class="field-label">Diám. Ademe</div><div class="field-value">${v.ademe_diameter || '-'}</div></div>
+          </div>
+          ${v.casing_observations ? `<div class="obs"><strong>Observaciones de Ademe:</strong><br/>${v.casing_observations.replace(/\n/g, '<br/>')}</div>` : ''}
+          ${v.photos && v.photos.length > 0 ? `<div class="section-title">Capturas de Video</div><div class="photos">${v.photos.map((ph: any) => `<img src="${ph.url}"/>`).join('')}</div>` : ''}
+        `;
+        openPrintWindow('VIDEOGRABACIÓN DE POZO PROFUNDO', v.folio, v.recording_date, v.well_name || v.location, body);
+    };
+
 
     if (notFound) {
         return (
@@ -111,18 +453,23 @@ export default function ClientPortalPublic() {
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50/30 to-white pb-20">
             {/* Header */}
-            <header className="border-b border-slate-200/60 bg-white/80 backdrop-blur-lg sticky top-0 z-10 shadow-sm">
+            <header className="border-b border-slate-200/60 bg-white/90 backdrop-blur-lg sticky top-0 z-10 shadow-sm">
                 <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
                     <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="Núcleo de Ingeniería" className="h-10 object-contain" />
-                        <div className="hidden sm:block border-l border-slate-200 pl-3">
-                            <h1 className="text-[13px] font-bold text-sky-800">NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA</h1>
-                            <p className="text-[10px] text-slate-500">Portal del Cliente</p>
+                        <img src="/logo.png" alt="Núcleo de Ingeniería" className="h-11 w-11 object-contain" />
+                        <div className="border-l border-slate-200 pl-3">
+                            <h1 className="text-xs sm:text-sm font-extrabold text-sky-800 tracking-wide uppercase">
+                                NÚCLEO DE INGENIERÍA HIDRÁULICA Y ELÉCTRICA
+                            </h1>
+                            <p className="text-[9px] sm:text-[10px] text-slate-500 line-clamp-1 max-w-lg hidden md:block">
+                                {COMPANY_SERVICES_TEXT}
+                            </p>
+                            <p className="text-[10px] text-sky-600 font-semibold md:hidden">Portal del Cliente</p>
                         </div>
                     </div>
                     <div className="text-right">
-                        <h2 className="text-sm font-bold text-slate-900">{client.company_name}</h2>
-                        <p className="text-[11px] text-slate-400">Cliente de Núcleo</p>
+                        <h2 className="text-xs sm:text-sm font-bold text-slate-900">{client.company_name}</h2>
+                        <p className="text-[10px] sm:text-[11px] text-slate-400">Portal Oficial</p>
                     </div>
                 </div>
             </header>
@@ -182,20 +529,22 @@ export default function ClientPortalPublic() {
                     <div className="space-y-4 animate-in fade-in duration-500">
                         {videos.map(v => (
                             <div key={v.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <div className="flex justify-between items-start mb-4">
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-purple-500">videocam</span> 
-                                            Videograbación {v.folio && <span className="text-sm font-normal text-slate-500 ml-2">Folio: {v.folio}</span>}
-                                        </h3>
-                                        <p className="text-sm text-slate-500 mt-1">{v.recording_date} {v.well_name ? ` · ${v.well_name}` : ''}</p>
-                                    </div>
-                                    {v.video_url && (
-                                        <a href={v.video_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-600 hover:bg-purple-100">
-                                            <span className="material-symbols-outlined text-[16px]">play_circle</span> Ver Video
+                                <ClientFormatHeader
+                                    title="VIDEOGRABACIÓN DE POZO PROFUNDO"
+                                    folio={v.folio}
+                                    date={v.recording_date}
+                                    clientName={client.company_name}
+                                    location={v.well_name || v.location || client.address}
+                                    technician={v.technician}
+                                    onPrint={() => handlePrintVideo(v)}
+                                />
+                                {v.video_url && (
+                                    <div className="mb-4 flex justify-end">
+                                        <a href={v.video_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-semibold text-purple-700 hover:bg-purple-100 border border-purple-200">
+                                            <span className="material-symbols-outlined text-[16px]">play_circle</span> Ver Video de la Grabación
                                         </a>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4 bg-slate-50 p-3 rounded-lg">
                                     <div><span className="block text-xs text-slate-400">N. Estático</span><span className="font-medium">{v.static_level || '-'} m</span></div>
                                     <div><span className="block text-xs text-slate-400">Prof. Fondo</span><span className="font-medium">{v.bottom_depth || '-'} m</span></div>
@@ -220,22 +569,16 @@ export default function ClientPortalPublic() {
                     <div className="space-y-6 animate-in fade-in duration-500">
                         {startups.map(s => (
                             <div key={s.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                {/* Header */}
-                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-emerald-500">power</span>
-                                            Formato de Arranque
-                                        </h3>
-                                        {s.folio && <span className="inline-block mt-1 text-xs font-semibold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">Folio: {s.folio}</span>}
-                                    </div>
-                                    <div className="text-right text-sm text-slate-500">
-                                        <p>{s.record_date}</p>
-                                        {s.location && <p>{s.location}</p>}
-                                        {s.technician && <p className="text-xs text-slate-400">Técnico: {s.technician}</p>}
-                                        {s.equipment && <p className="text-xs text-slate-400">Equipo: {s.equipment}</p>}
-                                    </div>
-                                </div>
+                                <ClientFormatHeader
+                                    title="FORMATO DE ARRANQUE"
+                                    folio={s.folio}
+                                    date={s.record_date}
+                                    clientName={client.company_name}
+                                    location={s.location || client.address}
+                                    technician={s.technician}
+                                    equipment={s.equipment}
+                                    onPrint={() => handlePrintStartup(s)}
+                                />
 
                                 {/* Tabla de mediciones */}
                                 {(s.time_logged || s.time_logged_2 || s.time_logged_3) && (
@@ -348,20 +691,16 @@ export default function ClientPortalPublic() {
                     <div className="space-y-6 animate-in fade-in duration-500">
                         {installations.map(i => (
                             <div key={i.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                {/* Header */}
-                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-sky-500">build</span>
-                                            Maniobra / Instalación de Equipo
-                                        </h3>
-                                        {i.folio && <span className="inline-block mt-1 text-xs font-semibold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-full">Folio: {i.folio}</span>}
-                                    </div>
-                                    <div className="text-right text-sm text-slate-500">
-                                        <p>{i.installation_date}</p>
-                                        {i.location && <p>{i.location}</p>}
-                                    </div>
-                                </div>
+                                <ClientFormatHeader
+                                    title="MANIOBRA / INSTALACIÓN DE EQUIPO"
+                                    folio={i.folio}
+                                    date={i.installation_date}
+                                    clientName={client.company_name}
+                                    location={i.location || client.address}
+                                    technician={i.technician}
+                                    equipment={i.pump_model || i.motor_hp}
+                                    onPrint={() => handlePrintInstallation(i)}
+                                />
 
                                 {/* Pozo y Tubería */}
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -410,20 +749,16 @@ export default function ClientPortalPublic() {
                     <div className="space-y-6 animate-in fade-in duration-500">
                         {uninstallations.map(u => (
                             <div key={u.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                {/* Header */}
-                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-orange-500">settings_backup_restore</span>
-                                            Desinstalación de Equipo
-                                        </h3>
-                                        {u.folio && <span className="inline-block mt-1 text-xs font-semibold bg-orange-50 text-orange-700 px-2 py-0.5 rounded-full">Folio: {u.folio}</span>}
-                                    </div>
-                                    <div className="text-right text-sm text-slate-500">
-                                        <p>{u.uninstallation_date}</p>
-                                        {u.location && <p>{u.location}</p>}
-                                    </div>
-                                </div>
+                                <ClientFormatHeader
+                                    title="DESINSTALACIÓN DE EQUIPO"
+                                    folio={u.folio}
+                                    date={u.uninstallation_date}
+                                    clientName={client.company_name}
+                                    location={u.location || client.address}
+                                    technician={u.technician}
+                                    equipment={u.equipment_type || u.pump_model}
+                                    onPrint={() => handlePrintUninstallation(u)}
+                                />
 
                                 {/* Datos del equipo extraído */}
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
@@ -465,22 +800,16 @@ export default function ClientPortalPublic() {
                     <div className="space-y-6 animate-in fade-in duration-500">
                         {panels.map(p => (
                             <div key={p.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                {/* Header */}
-                                <div className="flex flex-wrap items-start justify-between gap-3 mb-4 pb-4 border-b border-slate-100">
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
-                                            <span className="material-symbols-outlined text-amber-500">electrical_services</span>
-                                            Cuadro Eléctrico
-                                        </h3>
-                                        {p.folio && <span className="inline-block mt-1 text-xs font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">Folio: {p.folio}</span>}
-                                    </div>
-                                    <div className="text-right text-sm text-slate-500">
-                                        <p>{p.record_date}</p>
-                                        {p.well_name && <p>Pozo: {p.well_name}</p>}
-                                        {p.location && <p>{p.location}</p>}
-                                        {p.technician && <p className="text-xs text-slate-400">Técnico: {p.technician}</p>}
-                                    </div>
-                                </div>
+                                <ClientFormatHeader
+                                    title="FORMATO DE CUADRO ELÉCTRICO"
+                                    folio={p.folio}
+                                    date={p.record_date}
+                                    clientName={client.company_name}
+                                    location={p.location || (p.well_name ? `Pozo: ${p.well_name}` : client.address)}
+                                    technician={p.technician}
+                                    equipment={p.motor_brand || p.arr_brand}
+                                    onPrint={() => handlePrintPanel(p)}
+                                />
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
                                     {/* Transformador */}
@@ -545,11 +874,15 @@ export default function ClientPortalPublic() {
                     <div className="space-y-4 animate-in fade-in duration-500">
                         {aforos.map(a => (
                             <div key={a.id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2 mb-2">
-                                    <span className="material-symbols-outlined text-blue-500">water_drop</span> 
-                                    Aforo {a.duration_hours}H {a.folio && <span className="text-sm font-normal text-slate-500 ml-2">Folio: {a.folio}</span>}
-                                </h3>
-                                <p className="text-sm text-slate-500 mb-4">{new Date(a.created_at).toLocaleDateString()} {a.location ? ` · ${a.location}` : ''}</p>
+                                <ClientFormatHeader
+                                    title={`FORMATO DE AFORO (${a.duration_hours || ''}H)`}
+                                    folio={a.folio}
+                                    date={a.created_at ? new Date(a.created_at).toLocaleDateString('es-MX') : ''}
+                                    clientName={client.company_name}
+                                    location={a.location || client.address}
+                                    technician={a.technician}
+                                    onPrint={() => handlePrintAforo(a)}
+                                />
                                 
                                 {a.measurements && a.measurements.length > 0 ? (
                                     <div className="overflow-x-auto rounded-lg border border-slate-200">
