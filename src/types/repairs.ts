@@ -1,6 +1,6 @@
 // ============================================================
-// Tipos para el mÃ³dulo de Reparaciones â€” Flujo completo NÃºcleo
-// Recoger â†’ Enviar â†’ DiagnÃ³stico â†’ Cotizar â†’ Autorizar â†’ OC â†’ Reparar â†’ Regreso â†’ Entregar â†’ Facturar
+// Tipos para el módulo de Reparaciones — Flujo completo Núcleo
+// Recoger → Enviar → Diagnóstico → Cotizar → Autorizar → OC → Reparar → Regreso → Entregar → Facturar
 // ============================================================
 
 export type RepairStatus =
@@ -35,32 +35,32 @@ export interface EquipmentRepair {
     failure_type: FailureType;
     urgency: RepairUrgency;
     photos_before: unknown[];
-    // 2) RecolecciÃ³n
+    // 2) Recolección
     pickup_date: string | null;
     pickup_location: string | null;
     pickup_method: PickupMethod;
-    // 3) EnvÃ­o al proveedor
+    // 3) Envío al proveedor
     external_provider: string | null;
     shipping_carrier_to: string | null;
     tracking_number_to: string | null;
     sent_to_provider_date: string | null;
     provider_received_date: string | null;
-    // 4) DiagnÃ³stico
+    // 4) Diagnóstico
     diagnosis: string | null;
     diagnosis_date: string | null;
     diagnosis_documents: unknown[];
-    // 5) CotizaciÃ³n
+    // 5) Cotización
     quote_amount: number;
     quote_date: string | null;
     quote_notes: string | null;
     quote_document_url: string | null;
-    // 6) AutorizaciÃ³n y OC
+    // 6) Autorización y OC
     authorization_date: string | null;
     authorized_by: string | null;
     purchase_order_number: string | null;
     purchase_order_date: string | null;
     purchase_order_url: string | null;
-    // 7) ReparaciÃ³n
+    // 7) Reparación
     repair_start_date: string | null;
     estimated_days: number | null;
     repair_location: RepairLocation;
@@ -73,7 +73,7 @@ export interface EquipmentRepair {
     delivery_date: string | null;
     delivery_notes: string | null;
     delivery_photos: unknown[];
-    // 10) FacturaciÃ³n
+    // 10) Facturación
     invoice_number: string | null;
     invoice_date: string | null;
     invoice_amount: number;
@@ -83,10 +83,10 @@ export interface EquipmentRepair {
     labor_cost: number;
     external_cost: number;
     other_cost: number;
-    // GarantÃ­a
+    // Garantía
     is_warranty_claim: boolean;
     warranty_id: string | null;
-    // ResoluciÃ³n
+    // Resolución
     resolution_notes: string | null;
     photos_after: unknown[];
     completion_date: string | null;
@@ -148,7 +148,7 @@ export interface ShippingCarrier {
 }
 
 // ============================================================
-// Labels & Colors â€” Full workflow
+// Labels & Colors — Full workflow
 // ============================================================
 
 export const REPAIR_STATUS_LABELS: Record<RepairStatus, string> = {
@@ -156,12 +156,12 @@ export const REPAIR_STATUS_LABELS: Record<RepairStatus, string> = {
     pickup_pending: 'Pend. Recoger',
     picked_up: 'Recogido',
     sent_to_provider: 'Enviado a Proveedor',
-    received_by_provider: 'Proveedor RecibiÃ³',
-    diagnosis_received: 'DiagnÃ³stico Recibido',
+    received_by_provider: 'Proveedor Recibió',
+    diagnosis_received: 'Diagnóstico Recibido',
     quoted: 'Cotizado',
     authorized: 'Autorizado',
     po_sent: 'OC Enviada',
-    in_repair: 'En ReparaciÃ³n',
+    in_repair: 'En Reparación',
     return_shipped: 'Regreso Enviado',
     return_received: 'Regreso Recibido',
     delivered: 'Entregado a Cliente',
@@ -198,13 +198,13 @@ export const REPAIR_STATUS_ORDER: RepairStatus[] = [
     'delivered', 'invoiced', 'completed', 'cancelled',
 ];
 
-// Kanban groups â€” para no tener 16 columnas, agrupamos en fases
+// Kanban groups — para no tener 16 columnas, agrupamos en fases
 export type KanbanPhase = 'logistics_out' | 'diagnosis_quote' | 'repair' | 'logistics_return' | 'closing';
 export const KANBAN_PHASES: { key: KanbanPhase; label: string; icon: string; statuses: RepairStatus[]; color: string }[] = [
-    { key: 'logistics_out', label: 'LogÃ­stica EnvÃ­o', icon: 'local_shipping', statuses: ['reported', 'pickup_pending', 'picked_up', 'sent_to_provider', 'received_by_provider'], color: 'border-t-sky-500' },
-    { key: 'diagnosis_quote', label: 'DiagnÃ³stico y CotizaciÃ³n', icon: 'troubleshoot', statuses: ['diagnosis_received', 'quoted', 'authorized', 'po_sent'], color: 'border-t-purple-500' },
-    { key: 'repair', label: 'En ReparaciÃ³n', icon: 'construction', statuses: ['in_repair'], color: 'border-t-amber-500' },
-    { key: 'logistics_return', label: 'LogÃ­stica Regreso', icon: 'flight_land', statuses: ['return_shipped', 'return_received', 'delivered'], color: 'border-t-teal-500' },
+    { key: 'logistics_out', label: 'Logística Envío', icon: 'local_shipping', statuses: ['reported', 'pickup_pending', 'picked_up', 'sent_to_provider', 'received_by_provider'], color: 'border-t-sky-500' },
+    { key: 'diagnosis_quote', label: 'Diagnóstico y Cotización', icon: 'troubleshoot', statuses: ['diagnosis_received', 'quoted', 'authorized', 'po_sent'], color: 'border-t-purple-500' },
+    { key: 'repair', label: 'En Reparación', icon: 'construction', statuses: ['in_repair'], color: 'border-t-amber-500' },
+    { key: 'logistics_return', label: 'Logística Regreso', icon: 'flight_land', statuses: ['return_shipped', 'return_received', 'delivered'], color: 'border-t-teal-500' },
     { key: 'closing', label: 'Cierre', icon: 'check_circle', statuses: ['invoiced', 'completed'], color: 'border-t-emerald-500' },
 ];
 
@@ -227,8 +227,8 @@ export const NEXT_STATUS_MAP: Partial<Record<RepairStatus, RepairStatus[]>> = {
 };
 
 export const FAILURE_TYPE_LABELS: Record<FailureType, string> = {
-    electrical: 'ElÃ©ctrica', mechanical: 'MecÃ¡nica', hydraulic: 'HidrÃ¡ulica',
-    electronic: 'ElectrÃ³nica', structural: 'Estructural', other: 'Otra',
+    electrical: 'Eléctrica', mechanical: 'Mecánica', hydraulic: 'Hidráulica',
+    electronic: 'Electrónica', structural: 'Estructural', other: 'Otra',
 };
 export const FAILURE_TYPE_ICONS: Record<FailureType, string> = {
     electrical: 'electric_bolt', mechanical: 'settings', hydraulic: 'water_drop',
@@ -236,7 +236,7 @@ export const FAILURE_TYPE_ICONS: Record<FailureType, string> = {
 };
 
 export const URGENCY_LABELS: Record<RepairUrgency, string> = {
-    critical: 'CrÃ­tica', high: 'Alta', normal: 'Normal', low: 'Baja',
+    critical: 'Crítica', high: 'Alta', normal: 'Normal', low: 'Baja',
 };
 export const URGENCY_COLORS: Record<RepairUrgency, { bg: string; text: string; dot: string }> = {
     critical: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', dot: 'bg-red-500' },
@@ -246,11 +246,11 @@ export const URGENCY_COLORS: Record<RepairUrgency, { bg: string; text: string; d
 };
 
 export const PICKUP_METHOD_LABELS: Record<PickupMethod, string> = {
-    crane: 'GrÃºa', pickup: 'RecolecciÃ³n', client_delivers: 'Cliente Entrega', other: 'Otro',
+    crane: 'Grúa', pickup: 'Recolección', client_delivers: 'Cliente Entrega', other: 'Otro',
 };
 
 export const REPAIR_LOCATION_LABELS: Record<RepairLocation, string> = {
-    internal: 'ReparaciÃ³n Interna', external: 'Taller Externo',
+    internal: 'Reparación Interna', external: 'Taller Externo',
 };
 export const PART_SOURCE_LABELS: Record<PartSource, string> = {
     inventory: 'Del Inventario', purchased: 'Comprada', client_provided: 'Proporcionada por Cliente',

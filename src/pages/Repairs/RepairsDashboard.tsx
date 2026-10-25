@@ -59,7 +59,7 @@ export default function RepairsDashboard() {
     // Warehouse equipment management
     const [showWarehouseForm, setShowWarehouseForm] = useState(false);
     const [warehouseForm, setWarehouseForm] = useState({
-        name: '', category: 'bomba', brand: '', model: '', serial_number: '', power_hp: '', status: 'available', location: 'Bodega NÃºcleo', notes: '',
+        name: '', category: 'bomba', brand: '', model: '', serial_number: '', power_hp: '', status: 'available', location: 'Bodega Núcleo', notes: '',
     });
     const [filterCategory, setFilterCategory] = useState<string>('all');
 
@@ -150,7 +150,7 @@ export default function RepairsDashboard() {
             setShowForm(false);
             setForm(resetForm);
 
-            // â†’ M9: WA automation
+            // → M9: WA automation
             if (newRepair) {
                 const eqName = equipSource === 'warehouse'
                     ? warehouseEquipment.find(w => w.id === form.equipment_id)?.name || ''
@@ -160,7 +160,7 @@ export default function RepairsDashboard() {
                     event: 'created',
                     record: {
                         equipment_name: eqName,
-                        client_name: resolvedExternalClientName || (clients.find(c => c.id === resolvedClientId)?.company_name) || 'Bodega NÃºcleo',
+                        client_name: resolvedExternalClientName || (clients.find(c => c.id === resolvedClientId)?.company_name) || 'Bodega Núcleo',
                         failure_description: form.failure_description,
                         status_label: 'Reportado',
                     },
@@ -180,7 +180,7 @@ export default function RepairsDashboard() {
         const updates: Record<string, unknown> = { status: newStatus };
         if (newStatus === 'completed') updates.completion_date = new Date().toISOString().split('T')[0];
         await supabase.from('equipment_repairs').update(updates).eq('id', id);
-        await supabase.from('repair_timeline').insert({ repair_id: id, event_type: 'status_change', new_status: newStatus, description: `Estado â†’ ${REPAIR_STATUS_LABELS[newStatus]}` });
+        await supabase.from('repair_timeline').insert({ repair_id: id, event_type: 'status_change', new_status: newStatus, description: `Estado → ${REPAIR_STATUS_LABELS[newStatus]}` });
 
         // If completed, restore warehouse equipment status
         if (newStatus === 'completed') {
@@ -190,7 +190,7 @@ export default function RepairsDashboard() {
             }
         }
 
-        // â†’ M9: WA automation
+        // → M9: WA automation
         const r = repairs.find(x => x.id === id);
         triggerWaAutomation({
             module: 'repairs',
@@ -237,7 +237,7 @@ export default function RepairsDashboard() {
         e.preventDefault();
         await supabase.from('warehouse_equipment').insert([warehouseForm]);
         setShowWarehouseForm(false);
-        setWarehouseForm({ name: '', category: 'bomba', brand: '', model: '', serial_number: '', power_hp: '', status: 'available', location: 'Bodega NÃºcleo', notes: '' });
+        setWarehouseForm({ name: '', category: 'bomba', brand: '', model: '', serial_number: '', power_hp: '', status: 'available', location: 'Bodega Núcleo', notes: '' });
         fetchAll();
     };
 
@@ -270,7 +270,7 @@ export default function RepairsDashboard() {
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Reparaciones</h2>
-                    <p className="text-sm text-slate-500">GestiÃ³n completa de reparaciones externas e internas</p>
+                    <p className="text-sm text-slate-500">Gestión completa de reparaciones externas e internas</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
@@ -291,7 +291,7 @@ export default function RepairsDashboard() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {[
                     { label: 'Activas', value: active.length, icon: 'construction', color: 'text-amber-500', bgc: 'bg-amber-100 dark:bg-amber-900/30' },
-                    { label: 'En LogÃ­stica', value: inLogistics.length, icon: 'local_shipping', color: 'text-sky-500', bgc: 'bg-sky-100 dark:bg-sky-900/30' },
+                    { label: 'En Logística', value: inLogistics.length, icon: 'local_shipping', color: 'text-sky-500', bgc: 'bg-sky-100 dark:bg-sky-900/30' },
                     { label: 'Esperando Diag.', value: awaitingDiag.length, icon: 'troubleshoot', color: 'text-indigo-500', bgc: 'bg-indigo-100 dark:bg-indigo-900/30' },
                     { label: 'Pend. Autorizar', value: pendingAuth.length, icon: 'pending_actions', color: 'text-purple-500', bgc: 'bg-purple-100 dark:bg-purple-900/30' },
                     { label: 'Costo del Mes', value: formatCurrencyRepair(monthTotal), icon: 'payments', color: 'text-emerald-500', bgc: 'bg-emerald-100 dark:bg-emerald-900/30' },
@@ -308,9 +308,9 @@ export default function RepairsDashboard() {
                 ))}
             </div>
 
-            {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-                EQUIPOS DE BODEGA â€” Observaciones
-            â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+            {/* ═══════════════════════════════════════════════
+                EQUIPOS DE BODEGA — Observaciones
+            ═══════════════════════════════════════════════ */}
             <div className="rounded-xl border border-orange-200/60 bg-gradient-to-br from-orange-50/60 to-amber-50/30 p-5 shadow-sm dark:border-orange-800/40 dark:bg-orange-900/10">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
                     <div className="flex items-center gap-3">
@@ -319,12 +319,12 @@ export default function RepairsDashboard() {
                         </div>
                         <div>
                             <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                Equipos de Bodega â€” Observaciones
+                                Equipos de Bodega — Observaciones
                                 {totalPendingObs > 0 && (
                                     <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">{totalPendingObs}</span>
                                 )}
                             </h3>
-                            <p className="text-xs text-slate-500">{warehouseEquipment.length} equipos registrados en bodega NÃºcleo</p>
+                            <p className="text-xs text-slate-500">{warehouseEquipment.length} equipos registrados en bodega Núcleo</p>
                         </div>
                     </div>
                     <button onClick={() => setShowWarehouseForm(true)}
@@ -334,7 +334,7 @@ export default function RepairsDashboard() {
                     </button>
                 </div>
 
-                {/* Filtro por categorÃ­a */}
+                {/* Filtro por categoría */}
                 <div className="mb-4 flex flex-wrap gap-1.5">
                     <button onClick={() => setFilterCategory('all')}
                         className={`rounded-full px-3 py-1 text-[11px] font-bold transition-all ${filterCategory === 'all' ? 'bg-orange-500 text-white' : 'bg-white text-slate-500 border border-slate-200 hover:border-orange-300'}`}>
@@ -381,12 +381,12 @@ export default function RepairsDashboard() {
                                         eq.status === 'in_repair' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' :
                                         'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
                                     }`}>
-                                        {eq.status === 'available' ? 'âœ“ Disponible' : eq.status === 'in_repair' ? 'âš™ En ReparaciÃ³n' : 'âœ— Fuera de Servicio'}
+                                        {eq.status === 'available' ? '✓ Disponible' : eq.status === 'in_repair' ? '⚙ En Reparación' : '✗ Fuera de Servicio'}
                                     </span>
                                     {eq.power_hp && <span className="text-[10px] text-slate-400">{eq.power_hp}</span>}
                                 </div>
 
-                                {/* Ãšltimas observaciones */}
+                                {/* Últimas observaciones */}
                                 {sortedObs.slice(0, 2).map((obs: any) => (
                                     <div key={obs.id} className={`mb-1.5 rounded-lg p-2 text-xs ${
                                         obs.status === 'pendiente' ? 'bg-amber-50 border border-amber-200/80 dark:bg-amber-900/20 dark:border-amber-800/50' :
@@ -398,21 +398,21 @@ export default function RepairsDashboard() {
                                             {obs.status === 'pendiente' && (
                                                 <button onClick={() => handleResolveObs(obs.id)}
                                                     className="flex-shrink-0 rounded px-1.5 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 transition-all"
-                                                    title="Marcar como resuelto">âœ“</button>
+                                                    title="Marcar como resuelto">✓</button>
                                             )}
                                         </div>
-                                        <p className="text-slate-400 mt-0.5">{obs.observation_date}{obs.reported_by ? ` Â· ${obs.reported_by}` : ''}</p>
+                                        <p className="text-slate-400 mt-0.5">{obs.observation_date}{obs.reported_by ? ` · ${obs.reported_by}` : ''}</p>
                                     </div>
                                 ))}
                                 {sortedObs.length > 2 && (
-                                    <p className="text-[10px] text-slate-400 mb-1.5">+{sortedObs.length - 2} mÃ¡s...</p>
+                                    <p className="text-[10px] text-slate-400 mb-1.5">+{sortedObs.length - 2} más...</p>
                                 )}
 
                                 <button
                                     onClick={() => { setSelectedWarehouseEq(eq); setShowObsForm(true); }}
                                     className="mt-2 w-full flex items-center justify-center gap-1.5 rounded-lg border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 hover:bg-orange-100 dark:border-orange-800/60 dark:bg-orange-900/20 dark:text-orange-400 transition-all">
                                     <span className="material-symbols-outlined text-[14px]">add_comment</span>
-                                    Agregar ObservaciÃ³n
+                                    Agregar Observación
                                 </button>
                             </div>
                         );
@@ -470,9 +470,9 @@ export default function RepairsDashboard() {
                                     <th className="px-4 py-3 text-left font-semibold text-slate-500">Proveedor</th>
                                     <th className="px-3 py-3 text-center font-semibold text-slate-500">Estado</th>
                                     <th className="px-3 py-3 text-center font-semibold text-slate-500">Urgencia</th>
-                                    <th className="px-3 py-3 text-center font-semibold text-slate-500">GuÃ­a</th>
-                                    <th className="px-3 py-3 text-right font-semibold text-slate-500">CotizaciÃ³n</th>
-                                    <th className="px-3 py-3 text-right font-semibold text-slate-500">DÃ­as</th>
+                                    <th className="px-3 py-3 text-center font-semibold text-slate-500">Guía</th>
+                                    <th className="px-3 py-3 text-right font-semibold text-slate-500">Cotización</th>
+                                    <th className="px-3 py-3 text-right font-semibold text-slate-500">Días</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -494,9 +494,9 @@ export default function RepairsDashboard() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                                                {isWarehouse ? <span className="text-orange-600 font-medium">Bodega NÃºcleo</span> : (r.external_client_name || r.client?.company_name || 'â€”')}
+                                                {isWarehouse ? <span className="text-orange-600 font-medium">Bodega Núcleo</span> : (r.external_client_name || r.client?.company_name || '—')}
                                             </td>
-                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.external_provider || 'â€”'}</td>
+                                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{r.external_provider || '—'}</td>
                                             <td className="px-3 py-3 text-center">
                                                 <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${REPAIR_STATUS_COLORS[r.status].bg} ${REPAIR_STATUS_COLORS[r.status].text}`}>{REPAIR_STATUS_LABELS[r.status]}</span>
                                             </td>
@@ -505,8 +505,8 @@ export default function RepairsDashboard() {
                                                     <span className={`h-1.5 w-1.5 rounded-full ${URGENCY_COLORS[r.urgency].dot}`} />{URGENCY_LABELS[r.urgency]}
                                                 </span>
                                             </td>
-                                            <td className="px-3 py-3 text-center text-xs font-mono text-slate-500">{r.tracking_number_to || 'â€”'}</td>
-                                            <td className="px-3 py-3 text-right font-semibold text-slate-700 dark:text-slate-300">{r.quote_amount > 0 ? formatCurrencyRepair(r.quote_amount) : 'â€”'}</td>
+                                            <td className="px-3 py-3 text-center text-xs font-mono text-slate-500">{r.tracking_number_to || '—'}</td>
+                                            <td className="px-3 py-3 text-right font-semibold text-slate-700 dark:text-slate-300">{r.quote_amount > 0 ? formatCurrencyRepair(r.quote_amount) : '—'}</td>
                                             <td className="px-3 py-3 text-right">
                                                 <span className={`font-bold ${days > 15 ? 'text-red-500' : days > 7 ? 'text-amber-500' : 'text-slate-500'}`}>{days}d</span>
                                             </td>
@@ -520,13 +520,13 @@ export default function RepairsDashboard() {
                 </div>
             )}
 
-            {/* â•â•â• MODAL: Agregar ObservaciÃ³n â•â•â• */}
+            {/* ═══ MODAL: Agregar Observación ═══ */}
             {showObsForm && selectedWarehouseEq && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
                         <div className="mb-4 flex items-center justify-between">
                             <div>
-                                <p className="text-xs font-semibold uppercase tracking-wider text-orange-500 mb-0.5">ObservaciÃ³n de Equipo</p>
+                                <p className="text-xs font-semibold uppercase tracking-wider text-orange-500 mb-0.5">Observación de Equipo</p>
                                 <h3 className="font-bold text-slate-900 dark:text-white">{selectedWarehouseEq.name}</h3>
                             </div>
                             <button onClick={() => { setShowObsForm(false); setSelectedWarehouseEq(null); }} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700">
@@ -535,9 +535,9 @@ export default function RepairsDashboard() {
                         </div>
                         <form onSubmit={handleSaveObs} className="space-y-4">
                             <div>
-                                <label className={labelClass}>ObservaciÃ³n *</label>
+                                <label className={labelClass}>Observación *</label>
                                 <textarea value={obsText} onChange={e => setObsText(e.target.value)} required rows={3}
-                                    placeholder="Describe el problema o condiciÃ³n del equipo..."
+                                    placeholder="Describe el problema o condición del equipo..."
                                     className={inputClass + ' resize-none'} />
                             </div>
                             <div className="grid grid-cols-2 gap-3">
@@ -556,14 +556,14 @@ export default function RepairsDashboard() {
                             </div>
                             <div className="flex justify-end gap-3 pt-1">
                                 <button type="button" onClick={() => { setShowObsForm(false); setSelectedWarehouseEq(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">Cancelar</button>
-                                <button type="submit" className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-orange-600">Guardar ObservaciÃ³n</button>
+                                <button type="submit" className="rounded-lg bg-orange-500 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-orange-600">Guardar Observación</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* â•â•â• MODAL: Agregar Equipo de Bodega â•â•â• */}
+            {/* ═══ MODAL: Agregar Equipo de Bodega ═══ */}
             {showWarehouseForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
@@ -583,7 +583,7 @@ export default function RepairsDashboard() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className={labelClass}>CategorÃ­a</label>
+                                    <label className={labelClass}>Categoría</label>
                                     <select value={warehouseForm.category} onChange={e => setWarehouseForm({ ...warehouseForm, category: e.target.value })} className={inputClass}>
                                         {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                                     </select>
@@ -608,7 +608,7 @@ export default function RepairsDashboard() {
                                     <label className={labelClass}>Estado</label>
                                     <select value={warehouseForm.status} onChange={e => setWarehouseForm({ ...warehouseForm, status: e.target.value })} className={inputClass}>
                                         <option value="available">Disponible</option>
-                                        <option value="in_repair">En ReparaciÃ³n</option>
+                                        <option value="in_repair">En Reparación</option>
                                         <option value="out_of_service">Fuera de Servicio</option>
                                     </select>
                                 </div>
@@ -626,7 +626,7 @@ export default function RepairsDashboard() {
                 </div>
             )}
 
-            {/* â•â•â• MODAL: Reportar Falla â•â•â• */}
+            {/* ═══ MODAL: Reportar Falla ═══ */}
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
                     <div className="w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-slate-800">
@@ -648,7 +648,7 @@ export default function RepairsDashboard() {
                                                 onClick={() => { setEquipSource('warehouse'); setForm({ ...form, is_external: false, equipment_id: '' }); }}
                                                 className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all ${equipSource === 'warehouse' ? 'bg-orange-500 text-white shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}>
                                                 <span className="material-symbols-outlined text-[14px]">warehouse</span>
-                                                Bodega NÃºcleo
+                                                Bodega Núcleo
                                             </button>
                                             <button type="button"
                                                 onClick={() => { setEquipSource('client'); setForm({ ...form, is_external: true, equipment_id: '' }); }}
@@ -675,10 +675,10 @@ export default function RepairsDashboard() {
                                                 const catEquip = warehouseEquipment.filter(eq => eq.category === cat);
                                                 if (catEquip.length === 0) return null;
                                                 return (
-                                                    <optgroup key={cat} label={`â”€â”€ ${CATEGORY_LABELS[cat] || cat} â”€â”€`}>
+                                                    <optgroup key={cat} label={`── ${CATEGORY_LABELS[cat] || cat} ──`}>
                                                         {catEquip.map((eq: any) => (
                                                             <option key={eq.id} value={eq.id}>
-                                                                {eq.name}{eq.status !== 'available' ? ` (${eq.status === 'in_repair' ? 'En ReparaciÃ³n' : 'Fuera de Servicio'})` : ''}
+                                                                {eq.name}{eq.status !== 'available' ? ` (${eq.status === 'in_repair' ? 'En Reparación' : 'Fuera de Servicio'})` : ''}
                                                             </option>
                                                         ))}
                                                     </optgroup>
@@ -687,7 +687,7 @@ export default function RepairsDashboard() {
                                         </select>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <input value={form.external_equipment_name} onChange={e => setForm({ ...form, external_equipment_name: e.target.value })} required placeholder="Nombre o descripciÃ³n del equipo del cliente..." className={inputClass} />
+                                            <input value={form.external_equipment_name} onChange={e => setForm({ ...form, external_equipment_name: e.target.value })} required placeholder="Nombre o descripción del equipo del cliente..." className={inputClass} />
                                             <div>
                                                 <input list="clients-ext-list" value={form.client_name_input} onChange={e => {
                                                     const cName = e.target.value;
@@ -722,15 +722,15 @@ export default function RepairsDashboard() {
                                         ))}
                                     </div>
                                 </div>
-                                <div className="md:col-span-2"><label className={labelClass}>DescripciÃ³n de la Falla *</label>
+                                <div className="md:col-span-2"><label className={labelClass}>Descripción de la Falla *</label>
                                     <textarea value={form.failure_description} onChange={e => setForm({ ...form, failure_description: e.target.value })} required rows={3} placeholder="Describe detalladamente el problema..." className={inputClass + ' resize-none'} />
                                 </div>
 
-                                {/* RecolecciÃ³n */}
+                                {/* Recolección */}
                                 <div className="md:col-span-2 border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
-                                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">local_shipping</span>RecolecciÃ³n del Equipo</p>
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-1"><span className="material-symbols-outlined text-[14px]">local_shipping</span>Recolección del Equipo</p>
                                 </div>
-                                <div><label className={labelClass}>MÃ©todo de RecolecciÃ³n</label>
+                                <div><label className={labelClass}>Método de Recolección</label>
                                     <div className="grid grid-cols-2 gap-2">
                                         {(Object.keys(PICKUP_METHOD_LABELS) as PickupMethod[]).map(m => (
                                             <button key={m} type="button" onClick={() => setForm({ ...form, pickup_method: m })}
@@ -740,15 +740,15 @@ export default function RepairsDashboard() {
                                         ))}
                                     </div>
                                 </div>
-                                <div><label className={labelClass}>Lugar de RecolecciÃ³n</label><input value={form.pickup_location} onChange={e => setForm({ ...form, pickup_location: e.target.value })} placeholder="DirecciÃ³n o sitio del cliente" className={inputClass} /></div>
-                                <div><label className={labelClass}>Fecha RecolecciÃ³n</label><input type="date" value={form.pickup_date} onChange={e => setForm({ ...form, pickup_date: e.target.value })} className={inputClass} /></div>
+                                <div><label className={labelClass}>Lugar de Recolección</label><input value={form.pickup_location} onChange={e => setForm({ ...form, pickup_location: e.target.value })} placeholder="Dirección o sitio del cliente" className={inputClass} /></div>
+                                <div><label className={labelClass}>Fecha Recolección</label><input type="date" value={form.pickup_date} onChange={e => setForm({ ...form, pickup_date: e.target.value })} className={inputClass} /></div>
 
                                 {/* Proveedor */}
                                 <div><label className={labelClass}>Proveedor / Taller</label>
                                     <input list="workshops-list" value={form.external_provider} onChange={e => setForm({ ...form, external_provider: e.target.value })} placeholder="Nombre del taller..." className={inputClass} />
                                     <datalist id="workshops-list">{workshops.map(w => <option key={w.id} value={w.name} />)}</datalist>
                                 </div>
-                                <div><label className={labelClass}>PaqueterÃ­a EnvÃ­o</label>
+                                <div><label className={labelClass}>Paquetería Envío</label>
                                     <input list="carriers-list" value={form.shipping_carrier_to} onChange={e => setForm({ ...form, shipping_carrier_to: e.target.value })} placeholder="Fedex, DHL..." className={inputClass} />
                                     <datalist id="carriers-list">{carriers.map(c => <option key={c.id} value={c.name} />)}</datalist>
                                 </div>
@@ -782,7 +782,7 @@ export default function RepairsDashboard() {
                             </div>
                             <div className="mt-6 flex justify-end gap-3">
                                 <button type="button" onClick={() => setShowForm(false)} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-400">Cancelar</button>
-                                <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">Registrar ReparaciÃ³n</button>
+                                <button type="submit" className="rounded-lg bg-gradient-to-r from-primary to-primary-dark px-5 py-2.5 text-sm font-semibold text-white shadow-md hover:opacity-90">Registrar Reparación</button>
                             </div>
                         </form>
                     </div>
@@ -828,7 +828,7 @@ function KanbanCard({ repair: r, onStatusChange, onClick }: { repair: EquipmentR
             {/* Client + provider */}
             <div className="flex items-start justify-between text-[10px] text-slate-400 mb-1">
                 <div className="truncate flex flex-col gap-0.5">
-                    <span>{isWarehouse ? <span className="text-orange-500 font-medium">Bodega NÃºcleo</span> : (r.external_client_name || r.client?.company_name || 'â€”')}</span>
+                    <span>{isWarehouse ? <span className="text-orange-500 font-medium">Bodega Núcleo</span> : (r.external_client_name || r.client?.company_name || '—')}</span>
                     {r.client?.phone && <span className="text-[9px] text-slate-400 flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">phone</span>{r.client.phone}</span>}
                     {r.client?.email && <span className="text-[9px] text-slate-400 flex items-center gap-1"><span className="material-symbols-outlined text-[10px]">mail</span>{r.client.email}</span>}
                 </div>
@@ -929,7 +929,7 @@ Núcleo de Ingeniería`
             {/* Quote amount */}
             {r.quote_amount > 0 && (
                 <div className="flex items-center justify-between border-t border-slate-100 pt-2 dark:border-slate-700/60 text-[10px]">
-                    <span className="text-slate-400">CotizaciÃ³n:</span>
+                    <span className="text-slate-400">Cotización:</span>
                     <span className="font-bold text-emerald-600">{formatCurrencyRepair(r.quote_amount)}</span>
                 </div>
             )}
@@ -940,7 +940,7 @@ Núcleo de Ingeniería`
                     {nextOptions.map(ns => (
                         <button key={ns} onClick={() => onStatusChange(r.id, ns)}
                             className={`flex-1 rounded-lg px-2 py-1.5 text-[10px] font-semibold transition-all ${REPAIR_STATUS_COLORS[ns].bg} ${REPAIR_STATUS_COLORS[ns].text} hover:opacity-80`}>
-                            â†’ {REPAIR_STATUS_LABELS[ns]}
+                            → {REPAIR_STATUS_LABELS[ns]}
                         </button>
                     ))}
                 </div>
